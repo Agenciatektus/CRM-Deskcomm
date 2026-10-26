@@ -136,7 +136,7 @@ it("passo 3: tres abas, QR expirado e erro com Tentar agora, Voltar e Conectar d
   await clicar("Tentar agora");
   await passa(0);
   expect(h.get).toHaveBeenCalledTimes(1);
-  await clicar("Conectar depois");
+  await clicar("Continuar depois");
   expect(p.onClose).toHaveBeenCalled();
 });
 
@@ -238,14 +238,14 @@ it("sucesso: numero em mono, Proximo passo, atalho do agente e Agora nao", async
   const p = montar({ onConfigurarAgente });
   await ateOPasso3();
   expect(screen.getByText("Passo 4 de 4")).toBeTruthy();
-  expect(screen.getByText("WhatsApp conectado! 🎉")).toBeTruthy();
+  expect(screen.getByText("WhatsApp conectado!")).toBeTruthy();
   expect(screen.getByText("+5511912345678").className).toContain("font-mono");
   expect(screen.getByText("O CRM já recebe e envia mensagens por este número.")).toBeTruthy();
   h.get.mockClear();
   await passa(10_000);
   expect(h.get).not.toHaveBeenCalled();
   await clicar(/Configurar o agente de IA/);
-  expect(onConfigurarAgente).toHaveBeenCalledWith("c1");
+  expect(onConfigurarAgente).toHaveBeenCalledWith("c1", "hospedado");
   expect(p.onClose).toHaveBeenCalled();
 });
 

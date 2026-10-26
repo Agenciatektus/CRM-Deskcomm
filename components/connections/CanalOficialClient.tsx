@@ -62,22 +62,34 @@ function ParaColar({
   );
 }
 
-export function CanalOficialClient() {
+/** `onConectado`: o assistente de conexão habilita o "Concluir" quando o canal grava. */
+export function CanalOficialClient({ onConectado }: { onConectado?: (telefone: string | null) => void } = {}) {
   const t = useT();
   const { data, isPending } = useOfficialChannel();
   const conectar = useConnectOfficialChannel();
   const registrarWebhook = useRegistrarWebhookOficial();
   const [form, setForm] = useState({ phone_number_id: "", waba_id: "", token: "" });
+  const [erroId, setErroId] = useState<string | null>(null);
 
   const estado = data?.data;
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
+    // Os IDs da Meta são só dígitos: erro específico antes de gastar uma chamada.
+    const solo = (v: string) => /^\d+$/.test(v.trim());
+    const ruim = !solo(form.phone_number_id)
+      ? t("O ID do número de telefone tem só dígitos.")
+      : !solo(form.waba_id)
+        ? t("O ID da conta do WhatsApp Business tem só dígitos.")
+        : null;
+    setErroId(ruim);
+    if (ruim) return;
     const r = await conectar.mutateAsync(form);
     toast.success(`${t("Conectado:")} ${r.data.displayName} ${r.data.phoneNumber ?? ""}`.trim());
     // O token some do formulário assim que grava — deixá-lo na tela seria mantê-lo
     // em memória do navegador sem motivo, e ele não volta em nenhum GET.
     setForm((f) => ({ ...f, token: "" }));
+    onConectado?.(r.data.phoneNumber);
   }
 
   if (isPending) return <p className="text-sm text-muted-foreground">{t("Carregando…")}</p>;
@@ -284,6 +296,7 @@ export function CanalOficialClient() {
               {t("Guardado cifrado. Não é exibido de volta em nenhum momento.")}
             </span>
           </div>
+          {erroId && <p role="alert" className="text-sm text-error-fg">{erroId}</p>}
           <Button type="submit" disabled={conectar.isPending} data-testid="btn-conectar">
             {conectar.isPending ? t("Validando com a Meta…") : t("Validar e conectar")}
           </Button>
