@@ -45,6 +45,8 @@ interface Estado {
   /** Onde o código é gerado — a plataforma, não a rede. */
   plataforma?: string | null;
   connected: boolean;
+  /** Oferece "Conectar com o Instagram" (sem passar pelo código da plataforma)? */
+  direto?: boolean;
   display_name: string | null;
   status: string | null;
   has_token: boolean;
@@ -64,6 +66,12 @@ export function CanalInstagramClient() {
   const [codigo, setCodigo] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [recemConectado, setRecemConectado] = useState<Conectado | null>(null);
+  // Sem o botão direto, o código é o único caminho e já aparece aberto.
+  const [mostrarCodigo, setMostrarCodigo] = useState(false);
+  // O botão direto NAVEGA na mesma aba para a Meta e volta pela página de retorno: popup
+  // seria bloqueado por navegador e perderia o cookie do pedido em alguns casos.
+  const [direto, setDireto] = useState<"parado" | "iniciando" | "aguardando">("parado");
+  const [erroDireto, setErroDireto] = useState<string | null>(null);
 
   const carregar = async () => {
     try {
@@ -78,6 +86,23 @@ export function CanalInstagramClient() {
   useEffect(() => {
     void carregar();
   }, []);
+
+  const conectarDireto = async () => {
+    setDireto("iniciando");
+    setErroDireto(null);
+    try {
+      const r = await apiClient.post<{ data: { authorize_url: string } }>(
+        "/api/v1/channels/instagram/iniciar",
+        {},
+      );
+      setDireto("aguardando");
+      window.location.assign(r.data.authorize_url);
+    } catch (e) {
+      setDireto("parado");
+      // A mensagem do servidor já vem traduzida.
+      setErroDireto(e instanceof Error ? e.message : t("Não foi possível conectar."));
+    }
+  };
 
   const conectar = async () => {
     setSalvando(true);
@@ -106,6 +131,8 @@ export function CanalInstagramClient() {
   // CRM" — e mandava procurar no lugar errado.
   const plataforma = estado?.plataforma ?? t("sua plataforma");
   const conectado = estado?.connected ?? false;
+  const temDireto = estado?.direto === true;
+  const codigoAberto = !temDireto || mostrarCodigo;
 
   return (
     <div className="flex flex-col gap-4">
@@ -137,6 +164,39 @@ export function CanalInstagramClient() {
           <ChannelAiAccess channelId={estado.channel_session_id} phoneTesting={false} />
         )}
 
+        {temDireto && (
+          <div className="flex flex-col gap-1.5">
+            <div>
+              <Button
+                onClick={() => void conectarDireto()}
+                disabled={direto !== "parado"}
+              >
+                {direto === "iniciando"
+                  ? t("Abrindo a Meta…")
+                  : direto === "aguardando"
+                    ? t("Aguardando a Meta…")
+                    : conectado
+                      ? t("Reconectar com o Instagram")
+                      : t("Conectar com o Instagram")}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {t(
+                "Você entra na sua conta do Instagram na Meta, autoriza o acesso e volta para cá com tudo ligado. Não precisa abrir outra plataforma.",
+              )}
+            </p>
+            {erroDireto && <p className="text-xs text-destructive">{erroDireto}</p>}
+            {!mostrarCodigo && (
+              <div>
+                <Button variant="link" className="h-auto p-0 text-xs" onClick={() => setMostrarCodigo(true)}>
+                  {t("Já conectei na plataforma e tenho um código")}
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {codigoAberto && (
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="instagram-codigo">{t("Código de conexão")}</Label>
@@ -168,6 +228,7 @@ export function CanalInstagramClient() {
             </p>
           </div>
         </div>
+        )}
       </Card>
 
       {/* Conectou e a volta ficou de pé. Some na próxima carga — é confirmação

@@ -862,6 +862,11 @@ const HOSTS_DECLARADOS: Record<string, EntradaDeHost> = {
     motivo:
       "default de `VERDASH_API_BASE_URL`: a API da plataforma que roteia o canal hospedado. O `2` no nome é medido, não estilo — o host sem número responde 503, e fallback apontando para servidor morto falha parecendo configurado.",
   },
+  "api.verdash.com.br": {
+    categoria: "FORNECEDOR",
+    motivo:
+      "default de `VERDASH_CRM_API_BASE_URL`: o gateway da plataforma por onde o CRM inicia, conclui e desfaz a conexão direta do Instagram (`lib/channels/instagram/direto-verdash.ts`). É o destino do request.",
+  },
   "supabase.verdash.com.br": {
     categoria: "FORNECEDOR",
     motivo:

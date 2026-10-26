@@ -78,6 +78,11 @@ export const PUBLIC_PATHS: RegExp[] = [
   // Volta do consentimento da Meta (leitura de anúncios): mesma natureza, o `state`
   // assinado e o cookie de vínculo substituem a sessão.
   /^\/api\/v1\/plataformas-de-anuncio\/meta\/callback$/,
+  // Volta do "Conectar com o Instagram" (fluxo direto): vem da plataforma, de outro site, sem o
+  // cookie Strict. É só a ponte para a página autenticada, sem efeito e sem ler nada além de
+  // `pedido`/`status`/`motivo` validados; quem conclui é `/api/v1/channels/instagram/concluir`,
+  // com sessão e o cookie lacrado do pedido.
+  /^\/api\/v1\/channels\/instagram\/retorno$/,
   /^\/api\/v1\/integrations\/nuvemshop\/callback$/,
   /^\/api\/internal\//,
   /^\/api\/mcp(\/.*)?$/,
