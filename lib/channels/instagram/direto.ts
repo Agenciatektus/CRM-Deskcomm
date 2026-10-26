@@ -181,11 +181,14 @@ export async function concluirInstagramDireto(
   }
 
   const c = r.data;
-  const credCifrada = await encryptWebhookSecret(admin, c.token);
-  if (!credCifrada) return { ok: false, erro: "cifra_indisponivel", limparCookie: true };
-
   const sessoes = await listInstagramSessions(admin, pedido.orgId);
   const existente = escolherSessaoHospedada(sessoes, { instanceName: c.instanciaId, phoneNumber: null });
+
+  const credCifrada = await encryptWebhookSecret(admin, c.token);
+  if (!credCifrada) {
+    await desfazerConclusao(admin, pedido.orgId, c.vinculoId, existente?.id ?? null);
+    return { ok: false, erro: "cifra_indisponivel", limparCookie: true };
+  }
   const nome = c.username ? `@${c.username.replace(/^@/, "")}` : (c.displayName ?? "Instagram");
   const conectado = c.status === "WORKING" || c.status === "connected";
 
@@ -206,6 +209,7 @@ export async function concluirInstagramDireto(
       organization_id: pedido.orgId,
       vinculo_id: c.vinculoId,
     });
+    await desfazerConclusao(admin, pedido.orgId, c.vinculoId, existente?.id ?? null);
     return {
       ok: false,
       erro: error.includes("channel_sessions_verdash_instance_unique")
@@ -226,6 +230,38 @@ export async function concluirInstagramDireto(
     recebimento_ligado: true,
     recebimento_erro: null,
   };
+}
+
+/**
+ * O `concluir` já trocou o vínculo na plataforma; se o CRM não grava, o vínculo novo fica órfão
+ * e a sessão antiga da mesma conta (se houver) fica "viva" com o vínculo revogado. Revoga o novo
+ * e marca a antiga como parada. Tolerante a falha, e o log não leva segredo.
+ */
+async function desfazerConclusao(
+  admin: SupabaseClient,
+  orgId: string,
+  vinculoId: string,
+  sessaoAntigaId: string | null,
+): Promise<void> {
+  try {
+    const r = await desconectarVinculo({ vinculoId, orgExternaId: orgId });
+    if (!r.ok) {
+      logger.warn("[instagram-direto] vínculo novo não revogado após falha", {
+        organization_id: orgId,
+        vinculo_id: vinculoId,
+        motivo: r.erro,
+      });
+    }
+  } catch {
+    logger.warn("[instagram-direto] erro ao revogar o vínculo novo", { organization_id: orgId, vinculo_id: vinculoId });
+  }
+  if (!sessaoAntigaId) return;
+  const { error } = await admin
+    .from("channel_sessions")
+    .update({ status: "STOPPED", last_status_change_at: new Date().toISOString() })
+    .eq("organization_id", orgId)
+    .eq("id", sessaoAntigaId);
+  if (error) logger.warn("[instagram-direto] sessão antiga não marcada como parada", { organization_id: orgId });
 }
 
 /**

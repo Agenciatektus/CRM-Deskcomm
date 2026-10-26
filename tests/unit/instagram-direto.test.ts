@@ -11,7 +11,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { requireRole } from "@/lib/auth/require-role";
 import { mfaEmDivida } from "@/lib/auth/server";
-import { saveInstagramSession } from "@/lib/channels/connect";
+import { escolherSessaoHospedada, saveInstagramSession } from "@/lib/channels/connect";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { encryptWebhookSecret } from "@/lib/webhooks/secrets";
 import { destinoDaVoltaDoInstagram } from "@/lib/channels/instagram/direto-retorno";
 import { mensagemDoMotivo } from "@/lib/channels/instagram/direto-mensagens";
 
@@ -219,6 +221,67 @@ describe("concluir", () => {
     }
     // O cookie é apagado depois de usado.
     expect(res.headers.get("set-cookie")).toMatch(/crm_ig_pedido=;|Max-Age=0/i);
+  });
+
+  describe("falha DEPOIS do concluir", () => {
+    const antiga = { id: "sessao-antiga" };
+    const ramos: Array<[string, string, () => void]> = [
+      ["falha_ao_gravar", "falha_ao_gravar", () => vi.mocked(saveInstagramSession).mockResolvedValueOnce({ error: "boom" })],
+      [
+        "conta_em_outra_organizacao",
+        "conta_em_outra_organizacao",
+        () =>
+          vi.mocked(saveInstagramSession).mockResolvedValueOnce({
+            error: "duplicate key channel_sessions_verdash_instance_unique",
+          }),
+      ],
+      [
+        "cifra_indisponivel",
+        "cifra_indisponivel",
+        () => {
+          vi.mocked(encryptWebhookSecret).mockResolvedValueOnce("cifrado:segredo").mockResolvedValueOnce(null as never);
+        },
+      ],
+    ];
+
+    it.each(ramos)("%s: revoga o vínculo novo e para a sessão antiga", async (_n, codigo, preparar) => {
+      const { cookie, pedidoId } = await iniciar();
+      const update = vi.fn();
+      const q: Record<string, unknown> = {};
+      for (const m of ["select", "eq", "is"]) q[m] = () => q;
+      q.maybeSingle = async () => ({ data: null });
+      q.update = (patch: unknown) => {
+        update(patch);
+        return q;
+      };
+      vi.mocked(createAdminClient).mockReturnValue({ from: () => q } as never);
+      vi.mocked(escolherSessaoHospedada).mockReturnValueOnce(antiga as never);
+      preparar();
+      fetchMock
+        .mockResolvedValueOnce(new Response(JSON.stringify(dadosDoConcluir), { status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, data: {} }), { status: 200 }));
+      como("u1", ORG);
+
+      const res = await concluir(cookie, { pedido_id: pedidoId, conclusao: CONCLUSAO });
+      expect((await res.json()).error.code).toBe(codigo);
+
+      const ultima = fetchMock.mock.calls.at(-1)!;
+      expect(ultima[0]).toBe("https://api.verdash.com.br/crm/v1/instagram/desconectar");
+      expect(JSON.parse(String(ultima[1].body))).toMatchObject({
+        vinculo_id: dadosDoConcluir.data.vinculo_id,
+        org_externa_id: ORG,
+      });
+      expect(update).toHaveBeenCalledWith(expect.objectContaining({ status: "STOPPED" }));
+      expect(logs.join(" ")).not.toContain("token-de-maquina-unico");
+    });
+
+    it("controle negativo: sucesso não revoga nem para ninguém", async () => {
+      const { cookie, pedidoId } = await iniciar();
+      fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(dadosDoConcluir), { status: 200 }));
+      como("u1", ORG);
+      await concluir(cookie, { pedido_id: pedidoId, conclusao: CONCLUSAO });
+      expect(fetchMock.mock.calls.some((c) => String(c[0]).endsWith("/desconectar"))).toBe(false);
+    });
   });
 
   const casos: Array<[string, () => Promise<{ cookie: string | null; corpo: unknown; sessao: [string, string] }>]> = [
