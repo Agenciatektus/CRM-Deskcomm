@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { OFERTA } from "../../site/lib/conteudo";
+import { FAQ, OFERTA } from "../../site/lib/conteudo";
 import {
   IMPLANTACAO_CENTAVOS,
   IMPLANTACAO_PIX_CENTAVOS,
@@ -30,6 +30,7 @@ describe("preços da LP", () => {
     const taxaPix = 80;
     expect(IMPLANTACAO_PIX_CENTAVOS).toBe(IMPLANTACAO_CENTAVOS - (taxaCartao3x - taxaPix));
     expect(norm(OFERTA.implantacao.parcelas)).toContain(norm(reaisDeCentavos(IMPLANTACAO_PIX_CENTAVOS)));
+    for (const f of FAQ) if (/Pix/.test(f.r)) expect(norm(f.r)).toContain(norm(reaisDeCentavos(IMPLANTACAO_PIX_CENTAVOS)));
   });
 
   it("implantação em 3x de R$ 432,33 e total do 1º ao 3º mês no mensal", () => {
