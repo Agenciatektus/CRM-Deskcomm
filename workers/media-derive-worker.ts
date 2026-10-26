@@ -489,6 +489,12 @@ export async function deriveMessageMedia(row: EventRow): Promise<HandlerResult> 
               msg.media_mime ?? "application/octet-stream",
               montarDeps(degrau, false),
             );
+            if (!text.trim()) {
+              // Nem a fala nem os frames: vazio não vira `ready`.
+              const motivo = `a transcrição do áudio do vídeo falhou em todos os degraus (${detalheSaneado(err)}) e os frames não renderam descrição`;
+              await markFailed(motivo);
+              return { consumer_key, status: "ok", detail: "video_sem_fala_e_sem_frames" };
+            }
             motivoDaQueda = `${motivoDaQueda ? `${motivoDaQueda}; ` : ""}a transcrição do áudio do vídeo falhou em todos os degraus; seguiu só com a descrição visual`;
             await avisarMidiaNaoLida(
               msg.organization_id,
@@ -497,11 +503,15 @@ export async function deriveMessageMedia(row: EventRow): Promise<HandlerResult> 
             );
             break;
           }
-          if (!motivoDaQueda) throw err;
+          if (!motivoDaQueda) {
+            // Áudio/vídeo: a mensagem do provedor pode refletir a resposta do
+            // destino; só status/código fixo vão para o motivo e o log.
+            if (!precisaTranscricao) throw err;
+            throw new Error(`o degrau ${degrau.origem} falhou: ${detalheSaneado(err)}`);
+          }
           // Todos falharam: o motivo conta o caminho percorrido até o último.
           // Só status/código fixo: a mensagem do provedor pode refletir a resposta do destino.
-          const codigo = Number((err as { statusCode?: unknown } | null)?.statusCode);
-          const detalhe = codigo > 0 ? `HTTP ${codigo}` : destinoRecusado(err) ? "destino recusado" : "erro do provedor";
+          const detalhe = detalheSaneado(err);
           throw new Error(`${motivoDaQueda}; o degrau ${degrau.origem} também falhou: ${detalhe}`);
         }
         const daInstalacao = degrau.origem === "servico_da_instalacao";
@@ -1443,4 +1453,14 @@ export async function avisarChaveDeTranscricaoRecusada(
     "A chave de transcrição foi recusada e a leitura caiu para outro caminho",
   );
   if (abriu) avisoDaChaveRecusadaNoDia.set(organizationId, hoje);
+}
+
+/** Só status HTTP ou código fixo: nunca a mensagem crua do provedor. */
+function detalheSaneado(err: unknown): string {
+  const e = (err as { statusCode?: unknown; status?: unknown } | null) ?? {};
+  const codigo = Number(e.statusCode ?? e.status);
+  if (codigo > 0) return `HTTP ${codigo}`;
+  const m = /^transcription_(\d{3})$/.exec(err instanceof Error ? err.message : "");
+  if (m) return `HTTP ${m[1]}`;
+  return destinoRecusado(err) ? "destino recusado" : "erro do provedor";
 }

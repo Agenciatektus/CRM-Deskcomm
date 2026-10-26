@@ -528,4 +528,17 @@ describe("queda graciosa — a chave recusada (401/403) desce UM degrau (26/10)"
     expect(r.status).toBe("ok");
     expect(generateTextMock).toHaveBeenCalledTimes(1);
   });
+  it("P2-2: falha única no áudio grava só o código no motivo, nunca a mensagem do provedor", async () => {
+    messageRow.organization_id = "org-san-1";
+    resolveMock.mockImplementation(async () => configResolvida());
+    generateTextMock.mockRejectedValue(
+      Object.assign(new Error("resposta do destino: segredo-refletido"), { statusCode: 400 }),
+    );
+    const r = await deriveMessageMedia(eventRow(4));
+    messageRow.organization_id = "org1";
+    expect(r.status).toBe("error");
+    const gravado = JSON.stringify(updateEqMock.mock.calls);
+    expect(gravado).toContain("HTTP 400");
+    expect(gravado).not.toContain("segredo-refletido");
+  });
 });
