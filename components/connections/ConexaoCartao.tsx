@@ -40,7 +40,7 @@ export function SeloDeStatus({ item }: { item: ItemDeConexao }) {
 
 export function SeloDoMetodo({ item }: { item: ItemDeConexao }) {
   const t = useT();
-  return <Badge variant="tag">{t(ROTULO_DO_METODO[item.metodo])}</Badge>;
+  return <Badge variant="tag">{item.coexistence ? t("Coexistence") : t(ROTULO_DO_METODO[item.metodo])}</Badge>;
 }
 
 export function numeroOuAviso(item: ItemDeConexao, t: (x: string) => string): string {
