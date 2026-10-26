@@ -32,6 +32,7 @@ import { CHANNEL_PROVIDER_META } from "@/lib/channels/capabilities";
 import { appDaMeta, appDaMetaDoAmbiente } from "@/lib/channels/meta/app";
 import { metaGraphBase } from "@/lib/channels/meta/credentials";
 import { validateMetaCredentials } from "@/lib/channels/meta/validate-credentials";
+import { embeddedSignupConfigurado } from "@/lib/channels/meta/embedded-signup";
 import { gravarCanalOficial } from "@/lib/channels/meta/gravar-canal-oficial";
 import { COLUNAS_DO_DESFECHO_DO_WEBHOOK } from "@/lib/channels/meta/webhook-da-sessao";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -139,6 +140,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const base = basePublicaDoWebhookMeta(req);
   const desfecho = data?.id ? await lerDesfechoDoWebhook(admin, orgId, data.id) : null;
   return ok({
+    /**
+     * O "Conectar com a Meta" só existe com o app (id + segredo) e o config_id do popup.
+     * O App ID e o config_id são públicos (o navegador os usa no `FB.login`); o segredo não sai.
+     */
+    embeddedSignup: (await appDaMeta()).appSecret ? embeddedSignupConfigurado() : null,
     connected: Boolean(data),
     channel_session_id: data?.id ?? null,
     // `hasToken` em vez do token: uma vez gravado, a tela mostra que EXISTE, nunca

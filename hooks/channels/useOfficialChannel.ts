@@ -5,6 +5,8 @@ import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { apiClient } from "@/lib/api/client";
 
 export interface OfficialChannelState {
+  /** App ID e config_id do popup da Meta. Nulo = a instalação não oferece "Conectar com a Meta". */
+  embeddedSignup?: { appId: string; configId: string; configIdCoexistencia: string } | null;
   channel_session_id?: string | null;
   connected: boolean;
   /** Existe token gravado? O token em si NUNCA volta — ver a rota. */
@@ -76,6 +78,28 @@ export function useConnectOfficialChannel() {
         input,
       ),
     onError: showApiError,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["official-channel"] });
+    },
+  });
+}
+
+export interface EmbeddedSignupInput {
+  code: string;
+  waba_id: string;
+  phone_number_id: string;
+  coexistencia: boolean;
+}
+
+/** Conclui o popup da Meta: o servidor troca o `code`, valida, registra e grava o canal. */
+export function useConcluirEmbeddedSignup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: EmbeddedSignupInput) =>
+      apiClient.post<{ data: { connected: boolean; displayName: string; phoneNumber: string | null; coexistencia: boolean } }>(
+        "/api/v1/channels/official/embedded-signup",
+        input,
+      ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["official-channel"] });
     },
