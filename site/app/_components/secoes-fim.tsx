@@ -2,6 +2,7 @@ import { CTA, CTA_FINAL, FAQ, GOOGLE, SITE, linkWhatsapp } from "@/lib/conteudo"
 
 import { BotaoPrimario, BotaoSecundario } from "./Botao";
 import { Container, Secao } from "./Secao";
+import { ImagemDeSlot } from "./ui/ImagemDeSlot";
 import { Logotipo } from "./Marca";
 
 export function Faq() {
@@ -51,20 +52,7 @@ export function CtaFinal() {
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 fundo-brilho-menta" />
       <Container largura="texto" className="py-16 md:py-(--espaco-secao-m)">
         <div className="borda-luz janela-app revela relative overflow-hidden rounded-modal bg-surface p-8 sm:p-14">
-          <picture aria-hidden="true">
-            <source srcSet="/_lp/img/fluxo.avif" type="image/avif" />
-            <source srcSet="/_lp/img/fluxo.webp" type="image/webp" />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/_lp/img/fluxo.jpg"
-              alt=""
-              width={1600}
-              height={900}
-              loading="lazy"
-              decoding="async"
-              className="pointer-events-none absolute inset-0 size-full object-cover opacity-70 mix-blend-screen"
-            />
-          </picture>
+          <ImagemDeSlot id="cta-noite" opacidade={0.6} className="inset-0" />
           <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-r from-surface from-25% via-surface/55 to-transparent" />
           <div className="relative">
             <h2
