@@ -350,6 +350,8 @@ describe("concluir", () => {
       [422, "pedido_invalido", "pedido_invalido"],
       [410, "pedido_expirado", "pedido_expirado"],
       [409, "pedido_ja_concluido", "pedido_ja_concluido"],
+      [409, "instancia_indisponivel", "instancia_indisponivel"],
+      [422, "webhook_url_recusada", "webhook_url_recusada"],
     ] as const) {
       const { cookie, pedidoId } = await iniciar();
       fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ error }), { status }));

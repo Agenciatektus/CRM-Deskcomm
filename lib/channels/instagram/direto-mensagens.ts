@@ -42,6 +42,10 @@ export function mensagemDoErro(erro: string, t: T): string {
       return t("A autorização na Meta ainda não terminou. Comece de novo.");
     case "pedido_expirado":
       return t("O pedido de conexão expirou. Comece de novo para gerar outro.");
+    case "instancia_indisponivel":
+      return t("A instância desta conta não está disponível no serviço de conexão agora. Tente em instantes ou fale com o suporte.");
+    case "webhook_url_recusada":
+      return t("O serviço de conexão recusou o endereço de recebimento desta instalação. Fale com o suporte.");
     case "indisponivel":
       return t("Não foi possível falar com o serviço de conexão agora. Tente em instantes.");
     case "limite_de_orgs":
@@ -67,6 +71,7 @@ export function statusDoErro(erro: string): number {
       return 422;
     case "pedido_ja_concluido":
     case "pedido_nao_autorizado":
+    case "instancia_indisponivel":
     case "conta_em_outra_organizacao":
       return 409;
     case "pedido_expirado":
@@ -74,6 +79,7 @@ export function statusDoErro(erro: string): number {
     case "limite_de_orgs":
       return 429;
     case "sem_endereco_publico":
+    case "webhook_url_recusada":
     case "cifra_indisponivel":
       return 422;
     case "falha_ao_gravar":

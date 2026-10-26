@@ -16490,6 +16490,8 @@ export const DICIONARIO: Traducoes = {
   "Não foi possível concluir a conexão nesta sessão. Comece de novo pelo botão Conectar com o Instagram.": { es: "No fue posible concluir la conexión en esta sesión. Empieza de nuevo con el botón Conectar con Instagram." },
   "Este pedido já foi concluído. Confira a conta na lista de conexões.": { es: "Esta solicitud ya fue concluida. Revisa la cuenta en la lista de conexiones." },
   "A autorização na Meta ainda não terminou. Comece de novo.": { es: "La autorización en Meta aún no terminó. Empieza de nuevo." },
+  "A instância desta conta não está disponível no serviço de conexão agora. Tente em instantes ou fale com o suporte.": { es: "La instancia de esta cuenta no está disponible en el servicio de conexión ahora. Inténtalo en unos instantes o habla con soporte." },
+  "O serviço de conexão recusou o endereço de recebimento desta instalação. Fale com o suporte.": { es: "El servicio de conexión rechazó la dirección de recepción de esta instalación. Habla con soporte." },
   "Não foi possível falar com o serviço de conexão agora. Tente em instantes.": { es: "No fue posible hablar con el servicio de conexión ahora. Inténtalo en unos instantes." },
   "Esta instalação atingiu o limite de contas do serviço de conexão. Fale com o suporte.": { es: "Esta instalación alcanzó el límite de cuentas del servicio de conexión. Habla con soporte." },
   "O serviço de conexão recusou o pedido. Fale com o suporte.": { es: "El servicio de conexión rechazó la solicitud. Habla con soporte." },

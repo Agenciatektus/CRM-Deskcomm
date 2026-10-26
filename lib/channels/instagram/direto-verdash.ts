@@ -21,6 +21,8 @@ export type ErroDoPedido =
   | "pedido_invalido"
   | "pedido_ja_concluido"
   | "pedido_nao_autorizado"
+  | "instancia_indisponivel"
+  | "webhook_url_recusada"
   | "pedido_expirado"
   | "indisponivel";
 
@@ -80,11 +82,13 @@ async function chamar(
   if (res.status === 401 || res.status === 403) return { ok: false, erro: "recusado" };
   if (res.status === 410) return { ok: false, erro: "pedido_expirado" };
   if (res.status === 409) {
+    if (codigo === "instancia_indisponivel") return { ok: false, erro: "instancia_indisponivel" };
     return {
       ok: false,
       erro: codigo === "pedido_nao_autorizado" ? "pedido_nao_autorizado" : "pedido_ja_concluido",
     };
   }
+  if (res.status === 422 && codigo === "webhook_url_recusada") return { ok: false, erro: "webhook_url_recusada" };
   // 422 e 400 (pedido, nonce ou conclusão errados dão a MESMA resposta lá, de propósito).
   if (res.status === 422 || res.status === 400 || res.status === 404) {
     return { ok: false, erro: rota === "iniciar" ? "recusado" : "pedido_invalido" };
