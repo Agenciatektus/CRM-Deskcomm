@@ -147,7 +147,7 @@ describe("ConexoesPagina", () => {
 
   it("Conectar abre a escolha de fluxo com WhatsApp, Instagram e Ligação", () => {
     montar();
-    fireEvent.click(screen.getAllByRole("button", { name: "Conectar" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Conectar" })[0]!);
     expect(screen.getByRole("button", { name: /WhatsApp/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Ligação/ })).toBeTruthy();
   });

@@ -1,7 +1,7 @@
 "use client";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -116,7 +116,12 @@ export function ConexoesPagina({
   });
   const kpis = useMemo(() => calcularKpis(itens), [itens]);
   const visiveis = useMemo(() => filtrarConexoes(itens, filtros), [itens, filtros]);
-  const agora = Date.now();
+  // "Conectando há N min" anda sozinho: o relógio avança a cada 30 s.
+  const [agora, setAgora] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setAgora(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
   const acoes: PropsDeAcoes = {
     transporteNoAr: wahaConfigured && !wahaDesligado,
     transporteConfigurado: wahaConfigured,

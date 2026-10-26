@@ -92,7 +92,7 @@ describe("KPIs e filtros", () => {
 
 describe("acoes pelo status", () => {
   const item = (o: Partial<ItemDeConexao>): ItemDeConexao => ({
-    ...montar([sessao({ id: "x" })])[0],
+    ...montar([sessao({ id: "x" })])[0]!,
     ...o,
   });
 
@@ -129,7 +129,7 @@ describe("acoes pelo status", () => {
 describe("detalhe", () => {
   const agora = Date.parse("2026-10-26T10:10:00Z");
   const conectando = (desde: string) =>
-    ({ ...montar([sessao({ id: "x" })])[0], status: "STARTING", mudouEm: desde }) as ItemDeConexao;
+    ({ ...montar([sessao({ id: "x" })])[0]!, status: "STARTING", mudouEm: desde }) as ItemDeConexao;
 
   it("conectando ha 1 min nao avisa; depois de 2 min diz que esta demorando", () => {
     expect(detalheDaConexao(conectando("2026-10-26T10:09:00Z"), agora)).toBe("Conectando há 1 min.");
