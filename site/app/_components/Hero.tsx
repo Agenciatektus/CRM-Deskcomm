@@ -169,7 +169,14 @@ export function Hero() {
         </div>
 
         {/* Legenda: bloco próprio, com espaço para os chips que saem da janela. Vira o player quando houver vídeo. */}
-        <div className="mt-20 flex max-w-(--container-leitura) items-start gap-4">
+        <div className="relative isolate mt-20 flex max-w-(--container-leitura) items-start gap-4">
+          {/* IMG-02: pano de fundo discreto da legenda. Ainda não há vídeo; quando houver, a imagem vira o pôster do player. */}
+          <ImagemDeSlot
+            id="hero-poster-video"
+            opacidade={0.3}
+            className="-inset-x-6 -inset-y-5 -z-10 rounded-grande"
+            mascara="[mask-image:linear-gradient(to_right,#000,transparent_85%)]"
+          />
           <svg aria-hidden="true" viewBox="0 0 256 256" className="mt-0.5 size-7 shrink-0 text-link" fill="currentColor" focusable="false">
             <circle cx="128" cy="128" r="96" opacity="0.2" />
             <path d="M128 24a104 104 0 1 0 104 104A104.11 104.11 0 0 0 128 24Zm0 192a88 88 0 1 1 88-88 88.1 88.1 0 0 1-88 88Zm40-95.54-56-32A8 8 0 0 0 100 95.45v65.1a8 8 0 0 0 12 6.93l56-32.55a8 8 0 0 0 0-13.47Z" />

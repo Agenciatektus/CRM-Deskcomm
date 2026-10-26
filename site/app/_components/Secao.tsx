@@ -58,6 +58,7 @@ export function Secao({
   fundo = "nenhum",
   largura = "grade",
   ritmo = "m",
+  fundoExtra,
   children,
 }: {
   id?: string;
@@ -66,6 +67,8 @@ export function Secao({
   fundo?: Fundo;
   largura?: Largura;
   ritmo?: Ritmo;
+  /** Camadas extras de fundo (ex.: `ImagemDeSlot`), sob a mesma máscara vertical dos fundos. */
+  fundoExtra?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -74,6 +77,7 @@ export function Secao({
         {FUNDOS[fundo].map((c) => (
           <div key={c} className={`absolute inset-0 ${c}`} />
         ))}
+        {fundoExtra}
       </div>
       <Container largura={largura} className={RITMO[ritmo]}>
         {children}
