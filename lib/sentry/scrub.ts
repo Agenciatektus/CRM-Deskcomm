@@ -229,7 +229,7 @@ const CREDENTIAL_PATH =
   /(\/api\/v1\/webhooks\/[^/?#\s]+\/|\/team\/accept-invite\/)[^/?#\s]+/g;
 
 /** Parâmetro de query (ou de fragmento) que carrega credencial: `token_hash`, `code`… */
-const CREDENTIAL_PARAM = /token|code|secret|password|otp|^sig$/i;
+const CREDENTIAL_PARAM = /token|code|secret|password|otp|conclusao|^sig$/i;
 
 /**
  * A URL carrega credencial: no path (as rotas acima) ou num parâmetro com nome de
@@ -264,6 +264,14 @@ export function scrubUrl(input: string): string {
     /(^|[?&])([^=&#\s]+)=[^&#\s]*/g,
     "$1$2=[REDACTED]",
   );
+  // Fragmento no formato de query (`#conclusao=abc&x=y`): o valor sai igual.
+  const hash = withoutQueryValues.indexOf("#");
+  if (hash >= 0) {
+    return scrubMessage(
+      withoutQueryValues.slice(0, hash + 1) +
+        withoutQueryValues.slice(hash + 1).replace(/([^=&\s]+)=[^&\s]*/g, "$1=[REDACTED]"),
+    );
+  }
   return scrubMessage(withoutQueryValues);
 }
 

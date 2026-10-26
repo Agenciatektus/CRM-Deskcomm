@@ -52,6 +52,18 @@ describe("scrubUrl", () => {
     );
   });
 
+  it("redige o valor de parâmetro dentro do fragmento (#conclusao=...)", () => {
+    const out = scrubUrl("https://crm.exemplo.com/settings/conexoes?ok=1#conclusao=abc&x=y");
+    expect(out).not.toContain("abc");
+    expect(out).toContain("#conclusao=[REDACTED]");
+  });
+
+  it("URL sem fragmento fica igual", () => {
+    expect(scrubUrl("https://crm.exemplo.com/settings/conexoes")).toBe(
+      "https://crm.exemplo.com/settings/conexoes",
+    );
+  });
+
   it("pega o token mesmo com query junto", () => {
     const out = scrubUrl(`https://crm.exemplo.com/api/v1/webhooks/in/${TOKEN}?sig=deadbeef`);
     expect(out).not.toContain(TOKEN);
