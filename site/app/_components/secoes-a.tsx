@@ -284,7 +284,13 @@ export function Plantao() {
   return (
     <Secao id="plantao" titulo="titulo-plantao" fundo="faixa">
       <Cabeca id="titulo-plantao" titulo={MECANISMO.titulo} texto={MECANISMO.texto} />
-      <div className="mb-20 grid gap-6 lg:gap-8 md:grid-cols-3 [&>*]:min-w-0">
+      <div className="relative isolate mb-20 grid gap-6 lg:gap-8 md:grid-cols-3 [&>*]:min-w-0">
+        <ImagemDeSlot
+          id="plantao-tres-pecas"
+          opacidade={0.5}
+          className="inset-x-0 -top-10 -z-10 h-[22rem]"
+          mascara="[mask-image:radial-gradient(ellipse_90%_85%_at_50%_45%,#000_40%,transparent_100%)]"
+        />
         {MECANISMO.pecas.map((p, i) => (
           <Card key={p.titulo} atraso={i * 0.1}>
             <h3 className="m-0 text-[1.15rem] font-bold">{p.titulo}</h3>
