@@ -1,60 +1,75 @@
 /**
- * Com `WAHA_HABILITADO=false` a tela de Conexões não oferece a aba dos números
- * por QR e abre na Verdash (o caminho FZAP). Ligado, nada muda. As abas filhas
- * viram marcadores: o que está sob teste é qual aba existe, não o conteúdo delas.
+ * A tela de Conexões é uma página só. Números por QR e Redes sociais saíram da navegação:
+ * `?aba=numeros|sociais` voltam para a página, e as telas de apoio abrem com o caminho de volta.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 
 const nav = vi.hoisted(() => ({ aba: null as string | null, replace: vi.fn() }));
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace: nav.replace }),
+  useRouter: () => ({ replace: nav.replace, push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(nav.aba ? `aba=${nav.aba}` : ""),
 }));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (v: string) => v }));
-vi.mock("@/components/connections/ConnectionsClient", () => ({
-  ConnectionsClient: (p: { wahaDesligado?: boolean }) => (
-    <div data-testid="lista-por-qr" data-desligado={String(Boolean(p.wahaDesligado))} />
-  ),
-}));
-vi.mock("@/components/connections/RedesSociaisClient", () => ({ RedesSociaisClient: () => <div /> }));
-vi.mock("@/components/connections/CanalGraphParceiroClient", () => ({ CanalGraphParceiroClient: () => <div /> }));
-vi.mock("@/components/connections/CanalOficialClient", () => ({ CanalOficialClient: () => <div /> }));
-vi.mock("@/components/connections/CanalInstagramClient", () => ({ CanalInstagramClient: () => <div /> }));
-vi.mock("@/components/connections/CanalParceiroClient", () => ({ CanalParceiroClient: () => <div /> }));
-vi.mock("@/components/connections/CanalVozClient", () => ({ CanalVozClient: () => <div /> }));
-vi.mock("@/components/connections/TemplatesClient", () => ({ TemplatesClient: () => <div /> }));
-vi.mock("@/components/connections/TemplatesParceiroClient", () => ({ TemplatesParceiroClient: () => <div /> }));
-vi.mock("@/components/connections/TelefoniaClient", () => ({ TelefoniaClient: () => <div /> }));
-vi.mock("@/components/connections/CanalHospedadoClient", () => ({
-  CanalHospedadoClient: () => <div data-testid="aba-verdash" />,
-}));
+const { marcador } = await vi.hoisted(async () => {
+  const React = await import("react");
+  return { marcador: (id: string) => () => React.createElement("div", { "data-testid": id }) };
+});
+vi.mock("@/components/connections/ConexoesPagina", () => ({ ConexoesPagina: marcador("pagina") }));
+vi.mock("@/components/connections/CanalGraphParceiroClient", () => ({ CanalGraphParceiroClient: marcador("graph") }));
+vi.mock("@/components/connections/CanalOficialClient", () => ({ CanalOficialClient: marcador("oficial") }));
+vi.mock("@/components/connections/CanalInstagramClient", () => ({ CanalInstagramClient: marcador("instagram") }));
+vi.mock("@/components/connections/CanalParceiroClient", () => ({ CanalParceiroClient: marcador("parceiro") }));
+vi.mock("@/components/connections/CanalVozClient", () => ({ CanalVozClient: marcador("voz") }));
+vi.mock("@/components/connections/TemplatesClient", () => ({ TemplatesClient: marcador("templates-meta") }));
+vi.mock("@/components/connections/TemplatesParceiroClient", () => ({ TemplatesParceiroClient: marcador("templates-parceiro") }));
+vi.mock("@/components/connections/TelefoniaClient", () => ({ TelefoniaClient: marcador("telefonia") }));
+vi.mock("@/components/connections/CanalHospedadoClient", () => ({ CanalHospedadoClient: marcador("hospedado") }));
 
 import { ConexoesShell } from "@/components/connections/ConexoesShell";
+
+const montar = (aba: string | null, graph: { label: string } | null = null) => {
+  nav.aba = aba;
+  render(<ConexoesShell wahaConfigured={false} wahaDesligado wacallsConfigured={false} graphParceiro={graph} />);
+};
 
 afterEach(() => {
   cleanup();
   nav.aba = null;
+  nav.replace.mockClear();
 });
 
-describe("ConexoesShell e o interruptor do WAHA", () => {
-  it("desligado: abre na Verdash e a lista de números existentes continua na aba", () => {
-    render(<ConexoesShell wahaConfigured={false} wahaDesligado wacallsConfigured={false} />);
-    expect(screen.getByRole("tab", { name: "Verdash" }).getAttribute("data-state")).toBe("active");
-    expect(screen.getByTestId("aba-verdash")).toBeTruthy();
-    expect(screen.getByRole("tab", { name: "Números por QR" })).toBeTruthy();
+describe("ConexoesShell: página única", () => {
+  it("sem aba: a página, sem barra de abas", () => {
+    montar(null);
+    expect(screen.getByTestId("pagina")).toBeTruthy();
+    expect(screen.queryByRole("tab", { name: "Números por QR" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "Redes sociais" })).toBeNull();
   });
 
-  it("desligado: ?aba=numeros abre a lista (sem criar), nunca um painel em branco", () => {
-    nav.aba = "numeros";
-    render(<ConexoesShell wahaConfigured={false} wahaDesligado wacallsConfigured={false} />);
-    const lista = screen.getByTestId("lista-por-qr");
-    expect(lista.getAttribute("data-desligado")).toBe("true");
+  it.each(["numeros", "sociais"])("?aba=%s abre a página e limpa a URL", (aba) => {
+    montar(aba);
+    expect(screen.getByTestId("pagina")).toBeTruthy();
+    expect(nav.replace).toHaveBeenCalledWith("/app/connections", { scroll: false });
   });
 
-  it("controle negativo, ligado: a aba por QR existe e é a padrão", () => {
-    render(<ConexoesShell wahaConfigured wacallsConfigured={false} />);
-    expect(screen.getByRole("tab", { name: "Números por QR" }).getAttribute("data-state")).toBe("active");
-    expect(screen.getByTestId("lista-por-qr")).toBeTruthy();
+  it("controle negativo: aba de apoio não redireciona e mostra o caminho de volta", () => {
+    montar("oficial");
+    expect(screen.getByTestId("oficial")).toBeTruthy();
+    expect(screen.queryByTestId("pagina")).toBeNull();
+    expect(screen.getByRole("link", { name: /Conexões/ }).getAttribute("href")).toBe("/app/connections");
+    expect(nav.replace).not.toHaveBeenCalled();
+  });
+
+  it("?aba=modelos abre os modelos da Meta e do parceiro", () => {
+    montar("modelos");
+    expect(screen.getByRole("tab", { name: "Templates da Meta" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Modelos do parceiro" })).toBeTruthy();
+    expect(screen.getByTestId("templates-meta")).toBeTruthy();
+  });
+
+  it("?aba=graph sem o parceiro ligado cai na página", () => {
+    montar("graph", null);
+    expect(screen.getByTestId("pagina")).toBeTruthy();
   });
 });
