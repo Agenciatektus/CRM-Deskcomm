@@ -13,24 +13,22 @@
  * `null` legítimo no fim que o chamador grava como `failed` + motivo — nunca
  * silêncio, nunca nulo.
  *
- *  1. **Serviço de transcrição da instalação** (`TRANSCRIPTION_API_KEY`) — a
- *     escolha EXPLÍCITA de transcrição do `.env`. Ignorá-la em silêncio para
- *     falar com o modelo de conversa seria trocar o fornecedor de quem já
- *     transcreve por outro, sem avisar (a mesma cautela do degrau 5 da escada
- *     de embedding, que protege quem já pagava por um provedor).
- *  2. **Padrão OpenAI-compatível** — a chave OpenAI resolvida como sempre
- *     (credencial da organização, senão a da instalação), com `whisper-1` ou
- *     `TRANSCRIPTION_MODEL`. Vem ANTES do modelo da organização pelo motivo
- *     escrito em `lib/ai/embeddings/chave.ts` (degraus 5 e 7): quem já
- *     transcrevia pela OpenAI não troca de fornecedor — nem de conta que paga —
- *     numa atualização. Vale para nota de voz e para a trilha de áudio do
- *     vídeo, que usa o mesmo transcriber.
- *  3. **Modelo de conversa da organização, quando declarar `audio`** — paga
- *     com a mesma credencial BYOK da conversa, que a organização já validou.
- *     É o degrau da #2171: a organização SEM chave OpenAI passa a ouvir o
- *     áudio. `transcreveAudio` é o registro de capacidades (`capabilities.ts`).
- *  4. **Nada** — resposta legítima, com o motivo. É o que o item 2 da issue
- *     pede: hoje "ninguém tentou" e "tentou e não deu" são o mesmo nulo.
+ * Ordem desde 26/10/2026 (decisão do dono): tudo o que é da PRÓPRIA organização
+ * primeiro; a chave da Tektus (OpenRouter) é a ÚLTIMA opção, para todos. Em
+ * produção a chave do serviço da instalação estava morta (401) e, por vir
+ * antes, derrubava 195 áudios de clientes que tinham Gemini válido.
+ *
+ *  A. **Modelo de conversa da organização que declara `audio`, com credencial
+ *     PRÓPRIA** (`origemDaChave = credencial_da_organizacao`): custo zero para
+ *     a Tektus. `transcreveAudio` é o registro de capacidades.
+ *  B. **Chave OpenAI PRÓPRIA da organização** (BYOK), nunca a da instalação.
+ *  C. **Serviço de transcrição da instalação** (`TRANSCRIPTION_API_KEY`): o
+ *     último degrau, usado só se A e B não existem ou falham.
+ *  D. **Nada** — resposta legítima, com o motivo.
+ *
+ * ── Queda graciosa ──────────────────────────────────────────────────────────
+ * Cada decisão carrega `proxima()`: o degrau válido seguinte, que o worker usa
+ * quando o escolhido recusa a chave (401/403). Uma vez por degrau, sem laço.
  *
  * ── Quem ANUNCIA esta escada (#2190) ────────────────────────────────────────
  *
@@ -97,7 +95,7 @@ export interface AnuncioDaTranscricao {
 export const MOTIVOS_DA_TRANSCRICAO = {
   servicoDaInstalacao:
     "o serviço de transcrição configurado nesta instalação (TRANSCRIPTION_API_KEY) é o que ouve os áudios",
-  chaveOpenai: "a chave OpenAI desta organização ou instalação usa o padrão de transcrição de sempre",
+  chaveOpenai: "a chave OpenAI desta organização usa o padrão de transcrição de sempre",
   modeloDaOrganizacao:
     "o modelo de conversa da organização declara a capacidade audio e transcreve com a própria chave",
   semModeloDeConversa:
@@ -113,6 +111,11 @@ export interface ConversaDaOrganizacao {
   apiKey: string | null;
   modelId: string | null;
   baseUrl?: string | null;
+  /**
+   * A credencial é da PRÓPRIA organização (assinatura/BYOK), e não a chave da
+   * instalação? Só `true` habilita o degrau A. Ausente = não é própria.
+   */
+  credencialPropria?: boolean;
 }
 
 export interface DecisaoDeTranscricao {
@@ -126,6 +129,47 @@ export interface DecisaoDeTranscricao {
   motivo: string;
   /** O anúncio fiel do degrau escolhido — a tela repassa ao resolvedor. */
   anuncio: AnuncioDaTranscricao;
+  /**
+   * O próximo degrau VÁLIDO abaixo deste, para a queda graciosa quando este
+   * recusa a chave. `null` = não há. Ausente em `nada`.
+   */
+  proxima?: () => Promise<DecisaoDeTranscricao | null>;
+  /**
+   * Endereço (base URL) cadastrado pela organização para o degrau A. O worker
+   * passa por `motivoDaRecusaDeDestino` antes de o áudio sair para ele.
+   */
+  baseUrlDoDestino?: string | null;
+}
+
+/** Erro de chave (401/403): justifica descer um degrau E avisar a organização. */
+export function chaveRecusadaPeloProvedor(err: unknown): boolean {
+  const status = (err as { statusCode?: unknown; status?: unknown } | null) ?? {};
+  const codigo = Number(status.statusCode ?? status.status);
+  if (codigo === 401 || codigo === 403) return true;
+  const msg = err instanceof Error ? err.message : "";
+  return /^transcription_(401|403)$/.test(msg);
+}
+
+/** O endereço do degrau A foi recusado como destino interno (nada saiu). */
+export function destinoRecusado(err: unknown): boolean {
+  return err instanceof Error && err.message === "transcricao_destino_recusado";
+}
+
+/** Erros que justificam descer um degrau: chave recusada, limite (429), 5xx e tempo esgotado. */
+export function podeDescerDeDegrau(err: unknown): boolean {
+  if (chaveRecusadaPeloProvedor(err)) return true;
+  const e = (err as { statusCode?: unknown; status?: unknown; name?: unknown } | null) ?? {};
+  const codigo = Number(e.statusCode ?? e.status);
+  if (codigo === 429 || (codigo >= 500 && codigo <= 599)) return true;
+  const msg = err instanceof Error ? err.message : "";
+  return (
+    // Degrau que não existe de fato (provedor sem fábrica, custom sem base URL).
+    /custom_provider_sem_base_url|transcription_provider_unavailable|transcricao_destino_recusado/.test(msg) ||
+    /^transcription_(429|5\d\d)$/.test(msg) ||
+    e.name === "AbortError" ||
+    e.name === "TimeoutError" ||
+    /timeout|timed out/i.test(msg)
+  );
 }
 
 
@@ -175,6 +219,9 @@ export function transcricaoPeloModelo(modelo: {
     const res = await generateText({
       model: factory(modelo.apiKey, modelo.modelId, modelo.baseUrl ?? undefined),
       maxOutputTokens: MAX_TOKENS_DA_TRANSCRICAO_PELO_MODELO,
+      // Sem retentativa interna e com teto de tempo: a cascata é quem desce.
+      maxRetries: 0,
+      abortSignal: AbortSignal.timeout(60_000),
       messages: [
         {
           role: "user",
@@ -202,85 +249,105 @@ export function transcricaoPeloModelo(modelo: {
 }
 
 /**
- * A escada. `chaveOpenai` é um DEGRAU com thunk: só é consultado quando o
- * serviço de transcrição da instalação não vale.
+ * A escada. `chaveOpenai` é um DEGRAU com thunk: só é consultado quando um
+ * degrau anterior não vale. `de` é o índice por onde recomeçar (queda).
  */
-export async function decidirTranscricao(entrada: {
-  conversa?: ConversaDaOrganizacao | null;
-  idiomas?: readonly string[];
-  chaveOpenai?: () => Promise<string | null>;
-}): Promise<DecisaoDeTranscricao> {
+export async function decidirTranscricao(
+  entrada: {
+    conversa?: ConversaDaOrganizacao | null;
+    idiomas?: readonly string[];
+    chaveOpenai?: () => Promise<string | null>;
+  },
+  de = 0,
+): Promise<DecisaoDeTranscricao> {
   const idiomas = entrada.idiomas ?? idiomasDaTranscricao(env.TRANSCRIPTION_LANGUAGES);
-
-  // 1 · Serviço de transcrição da instalação — escolha explícita.
-  const servico = env.TRANSCRIPTION_API_KEY;
-  if (servico) {
-    // Com a chave do serviço na mão, `modeloDeTranscricaoEmVigor` devolve
-    // exatamente o modelo que o transcriber abaixo vai mandar: o de
-    // `TRANSCRIPTION_MODEL`, ou `whisper-1` quando vazio.
-    const modelo = modeloDeTranscricaoEmVigor({
-      model: env.TRANSCRIPTION_MODEL,
-      apiKey: servico,
-      baseUrl: env.TRANSCRIPTION_BASE_URL,
-    });
-    return {
-      origem: "servico_da_instalacao",
-      transcriber: apiTranscriptionProvider({
-        apiKey: servico,
-        baseUrl: env.TRANSCRIPTION_BASE_URL || undefined,
-        model: env.TRANSCRIPTION_MODEL || undefined,
-        languages: idiomas,
-      }),
-      motivo: MOTIVOS_DA_TRANSCRICAO.servicoDaInstalacao,
-      anuncio: { provider: "openai", modelId: modelo },
-    };
-  }
-
-  // 2 · Padrão OpenAI-compatível — o degrau de sempre, antes do modelo da
-  //     organização para ninguém trocar de fornecedor numa atualização.
-  const chaveOpenai = entrada.chaveOpenai ? await entrada.chaveOpenai() : null;
-  if (chaveOpenai) {
-    const modelo = modeloDeTranscricaoEmVigor({
-      model: env.TRANSCRIPTION_MODEL,
-      apiKey: env.TRANSCRIPTION_API_KEY,
-      baseUrl: env.TRANSCRIPTION_BASE_URL,
-    });
-    return {
-      origem: "padrao_openai_compativel",
-      transcriber: apiTranscriptionProvider({
-        apiKey: chaveOpenai,
-        model: modelo,
-        languages: idiomas,
-      }),
-      motivo: MOTIVOS_DA_TRANSCRICAO.chaveOpenai,
-      anuncio: { provider: "openai", modelId: modelo },
-    };
-  }
-
-  // 3 · Modelo de conversa da organização que declara a capacidade `audio`.
   const conversa = entrada.conversa;
-  if (
+  const conversaOuve = !!(
     conversa?.apiKey &&
     conversa.modelId &&
     transcreveAudio(conversa.provider, conversa.modelId)
-  ) {
-    return {
-      origem: "modelo_da_organizacao",
-      transcriber: transcricaoPeloModelo({
-        provider: conversa.provider,
-        modelId: conversa.modelId,
-        apiKey: conversa.apiKey,
-        baseUrl: conversa.baseUrl ?? null,
-        languages: idiomas,
-      }),
-      motivo: MOTIVOS_DA_TRANSCRICAO.modeloDaOrganizacao,
-      // É ESTE anúncio — e não `whisper-1` — que a tela precisa mostrar quando
-      // a organização não tem chave OpenAI (#2190).
-      anuncio: { provider: conversa.provider, modelId: conversa.modelId },
-    };
+  );
+  const pelaConversa = (
+    origem: "modelo_da_organizacao",
+    motivo: string,
+  ): DecisaoDeTranscricao => ({
+    origem,
+    transcriber: transcricaoPeloModelo({
+      provider: conversa!.provider,
+      modelId: conversa!.modelId!,
+      apiKey: conversa!.apiKey!,
+      baseUrl: conversa!.baseUrl ?? null,
+      languages: idiomas,
+    }),
+    motivo,
+    baseUrlDoDestino: conversa!.baseUrl ?? null,
+    // É ESTE anúncio — e não `whisper-1` — que a tela precisa mostrar quando
+    // a organização não tem chave OpenAI (#2190).
+    anuncio: { provider: conversa!.provider, modelId: conversa!.modelId! },
+  });
+
+  const degraus: Array<() => Promise<DecisaoDeTranscricao | null>> = [
+    // A · assinatura/chave PRÓPRIA da organização, no modelo de conversa.
+    async () =>
+      conversaOuve && conversa!.credencialPropria
+        ? pelaConversa("modelo_da_organizacao", MOTIVOS_DA_TRANSCRICAO.modeloDaOrganizacao)
+        : null,
+    // B · chave OpenAI PRÓPRIA da organização (o worker só entrega a credencial dela).
+    async () => {
+      const chaveOpenai = entrada.chaveOpenai ? await entrada.chaveOpenai() : null;
+      if (!chaveOpenai) return null;
+      // A chave PRÓPRIA da org vai para api.openai.com: `openai/whisper-1` é o
+      // id do OpenRouter (envs do serviço da instalação) e lá não existe. Com
+      // BASE_URL configurada o modelo do .env é de OUTRO serviço: vale whisper-1.
+      const modelo = env.TRANSCRIPTION_BASE_URL
+        ? "whisper-1"
+        : modeloDeTranscricaoEmVigor({ model: env.TRANSCRIPTION_MODEL, apiKey: undefined, baseUrl: undefined });
+      return {
+        origem: "padrao_openai_compativel",
+        transcriber: apiTranscriptionProvider({ apiKey: chaveOpenai, model: modelo, languages: idiomas }),
+        motivo: MOTIVOS_DA_TRANSCRICAO.chaveOpenai,
+        anuncio: { provider: "openai", modelId: modelo },
+      };
+    },
+    // C · serviço de transcrição da instalação — a chave da Tektus, a última.
+    async () => {
+      const servico = env.TRANSCRIPTION_API_KEY;
+      if (!servico) return null;
+      // Com a chave do serviço na mão, `modeloDeTranscricaoEmVigor` devolve
+      // exatamente o modelo que o transcriber abaixo vai mandar.
+      const modelo = modeloDeTranscricaoEmVigor({
+        model: env.TRANSCRIPTION_MODEL,
+        apiKey: servico,
+        baseUrl: env.TRANSCRIPTION_BASE_URL,
+      });
+      return {
+        origem: "servico_da_instalacao",
+        transcriber: apiTranscriptionProvider({
+          apiKey: servico,
+          baseUrl: env.TRANSCRIPTION_BASE_URL || undefined,
+          model: env.TRANSCRIPTION_MODEL || undefined,
+          languages: idiomas,
+        }),
+        motivo: MOTIVOS_DA_TRANSCRICAO.servicoDaInstalacao,
+        anuncio: { provider: "openai", modelId: modelo },
+      };
+    },
+  ];
+
+  for (let i = de; i < degraus.length; i++) {
+    const d = await degraus[i]!();
+    if (d) {
+      return {
+        ...d,
+        proxima: async () => {
+          const seguinte = await decidirTranscricao(entrada, i + 1);
+          return seguinte.transcriber ? seguinte : null;
+        },
+      };
+    }
   }
 
-  // 4 · Nada — e o motivo é do caso, não um "deu erro" genérico.
+  // D · Nada — e o motivo é do caso, não um "deu erro" genérico.
   const motivo = !conversa
     ? MOTIVOS_DA_TRANSCRICAO.semModeloDeConversa
     : conversa.modelId && !transcreveAudio(conversa.provider, conversa.modelId)
@@ -291,11 +358,7 @@ export async function decidirTranscricao(entrada: {
     transcriber: null,
     motivo,
     // Sem quem transcreva não há modelo a anunciar: `modelId: null` é o que a
-    // tela desenha como "—", ao lado do motivo. O `provider` repete o da
-    // conversa (vazio quando ela não veio) só como etiqueta: o cartão de um
-    // ponto fixo não o mostra nem o deixa editar, e ninguém chama esse
-    // provedor para transcrever — anunciar um MODELO aqui é que recriaria, na
-    // tela, a mentira que a #2190 veio matar.
+    // tela desenha como "—". O `provider` repete o da conversa só como etiqueta.
     anuncio: { provider: conversa?.provider ?? "", modelId: null },
   };
 }

@@ -127,7 +127,10 @@ const credencial = vi.hoisted(() => ({
   origemDaChave: "credencial_da_organizacao" as "credencial_da_organizacao" | "chave_da_instalacao",
 }));
 vi.mock("@/lib/agent-engine/edge/llm/credentials", () => ({
-  resolveOrgLlmConfig: vi.fn(async () => ({
+  resolveOrgLlmConfig: vi.fn(async (_db: unknown, _cfg: unknown, _org: unknown, override?: { provider?: string }) => {
+    // Com o serviço da instalação configurado, o caso é "sem credencial OpenAI própria".
+    if (override?.provider === "openai" && transcricaoDoEnv.apiKey) throw new Error("sem credencial openai");
+    return {
     provider: "openrouter",
     apiKey: "chave-do-binding",
     origemDaChave: credencial.origemDaChave,
@@ -136,7 +139,8 @@ vi.mock("@/lib/agent-engine/edge/llm/credentials", () => ({
     enabledModels: [],
     orcamento: { modo: "off", tetoCents: 0, efetivoEm: null, limiarPct: 80 },
     orcamentoIndisponivelPorque: null,
-  })),
+    };
+  }),
 }));
 
 // Registro de provedores com um factory espionável em todos os nomes.

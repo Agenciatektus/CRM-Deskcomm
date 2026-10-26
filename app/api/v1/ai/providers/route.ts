@@ -190,9 +190,15 @@ export async function GET(): Promise<Response> {
             // A base do provedor custom não é selecionada aqui; ela só muda
             // PARA ONDE a chamada vai, e este lado pergunta QUAL degrau roda.
             baseUrl: null,
+            // Credencial ativa e validada da organização = assinatura/BYOK
+            // própria; a chave da instalação não conta (degrau A da escada).
+            credencialPropria: credenciais.some(
+              (c) => c.provider === padraoDaOrganizacao.provider && !!c.validated_at,
+            ),
           }
         : null,
-    chaveOpenai: async () => chaveExiste("openai"),
+    chaveOpenai: async () =>
+      credenciais.some((c) => c.provider === "openai" && c.validated_at) ? "chave-existente" : null,
   });
 
   const pontos = PONTOS_DE_IA.map((ponto) => {
