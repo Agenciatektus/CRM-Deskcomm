@@ -40,7 +40,7 @@ export function Coluna({ etapa, cartoes, lista = false, compacto = false }: { et
         {soma > 0 ? (
           <div className="border-b border-border px-3 py-1.5 text-[11px] text-text-muted tabular-nums">
             {reais(soma)}
-            {ponderado !== undefined ? <span className="ml-2">· ponderado {reais(ponderado)}</span> : null}
+            {ponderado !== undefined ? <span className="ml-2">ponderado {reais(ponderado)}</span> : null}
           </div>
         ) : null}
       </div>

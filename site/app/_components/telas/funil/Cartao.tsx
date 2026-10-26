@@ -137,7 +137,7 @@ export function Cartao({ k, etapaMarcada = false, compacto = false }: { k: Dados
         ) : null}
         <input
           type="checkbox"
-          checked={selecionado}
+          checked={marcado || etapaMarcada}
           onChange={(e) => setMarcado(e.target.checked)}
           aria-label={`Selecionar: ${k.nome}`}
           className={`mt-1.5 size-4 shrink-0 cursor-pointer self-start accent-accent transition-opacity focus:opacity-100 focus-visible:outline-2 focus-visible:outline-accent ${
@@ -201,7 +201,7 @@ export function Cartao({ k, etapaMarcada = false, compacto = false }: { k: Dados
           {abertas > 0 ? (
             <span
               role="img"
-              aria-label={`${abertas} tarefa aberta${k.atrasado ? " · 1 atrasada" : ""}`}
+              aria-label={`${abertas} tarefa aberta${k.atrasado ? ", 1 atrasada" : ""}`}
               className={`flex shrink-0 items-center gap-0.5 text-[11px] tabular-nums ${
                 k.atrasado ? "font-semibold text-error-fg" : "text-text-muted"
               }`}
