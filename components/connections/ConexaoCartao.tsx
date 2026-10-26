@@ -16,7 +16,7 @@ import { InstagramLogo, Phone, WhatsappLogo } from "@/lib/ui/icons";
 import { AcoesDaConexao, type AcoesDaConexaoProps } from "./AcoesDaConexao";
 import { ChannelAiAccess } from "./ChannelAiAccess";
 
-export type PropsDeAcoes = Omit<AcoesDaConexaoProps, "item">;
+export type PropsDeAcoes = Omit<AcoesDaConexaoProps, "item" | "ocupado"> & { ocupadoId: string | null };
 
 export function IconeDoTipo({ tipo, className }: { tipo: TipoDeConexao; className?: string }) {
   const Icone = tipo === "instagram" ? InstagramLogo : tipo === "ligacao" ? Phone : WhatsappLogo;
@@ -52,6 +52,7 @@ export function CartaoDaConexao({
   item,
   compacto = false,
   agora,
+  ocupadoId,
   ...acoes
 }: PropsDeAcoes & { item: ItemDeConexao; compacto?: boolean; agora: number }) {
   const t = useT();
@@ -87,7 +88,7 @@ export function CartaoDaConexao({
         </div>
       )}
       <div className="mt-auto">
-        <AcoesDaConexao item={item} {...acoes} />
+        <AcoesDaConexao item={item} ocupado={ocupadoId === item.id} {...acoes} />
       </div>
     </Card>
   );
@@ -97,6 +98,7 @@ export function CartaoDaConexao({
 export function LinhaDaConexao({
   item,
   agora,
+  ocupadoId,
   ...acoes
 }: PropsDeAcoes & { item: ItemDeConexao; agora: number }) {
   const t = useT();
@@ -118,7 +120,7 @@ export function LinhaDaConexao({
       <td className="px-3 py-3 text-xs text-muted-foreground">{detalheDaConexao(item, agora, t)}</td>
       <td className="px-3 py-3">
         <div className="flex justify-end">
-          <AcoesDaConexao item={item} {...acoes} />
+          <AcoesDaConexao item={item} ocupado={ocupadoId === item.id} {...acoes} />
         </div>
       </td>
     </tr>
