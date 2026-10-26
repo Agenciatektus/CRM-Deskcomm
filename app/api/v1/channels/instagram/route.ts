@@ -50,6 +50,7 @@ import {
   saveInstagramSession,
   trocarCodigoHospedado,
 } from "@/lib/channels/connect";
+import { instagramDiretoConfigurado } from "@/lib/channels/instagram/direto";
 import { env } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { encryptWebhookSecret } from "@/lib/webhooks/secrets";
@@ -111,6 +112,8 @@ export async function GET(): Promise<NextResponse> {
        */
       plataforma: HOSTED_CHANNEL_LABEL,
       connected: conectado,
+      /** A instalação oferece "Conectar com o Instagram"? Sem o segredo do parceiro, a tela não mostra. */
+      direto: instagramDiretoConfigurado(),
       channel_session_id: conectado ? sessao.id : null,
       // O @ da conta, que é como o operador confere se ligou a certa.
       display_name: conectado ? sessao.displayName : null,

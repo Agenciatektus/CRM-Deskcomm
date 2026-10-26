@@ -27,6 +27,7 @@ import { ok, fail } from "@/lib/api/wrappers";
 import { loadAuthUser, mfaEmDivida } from "@/lib/auth/server";
 import { orgAtivaDaApi, requireRole } from "@/lib/auth/require-role";
 import {
+  CHANNEL_PROVIDER_INSTAGRAM,
   CHANNEL_PROVIDER_SOCIAL,
   CHANNEL_PROVIDER_VERDASH,
   CHANNEL_PROVIDER_WAHA,
@@ -34,6 +35,7 @@ import {
 import { executarLimpeza, lerPlanoDeLimpeza } from "@/lib/channels/verdash/limpar-nativo";
 import { resumoDoErro } from "@/lib/channels/verdash/nativo";
 import { HOSTED_CHANNEL_PROVIDER, saudeAoVivoDoCanalHospedado } from "@/lib/channels/connect";
+import { desconectarInstagramDireto } from "@/lib/channels/instagram/direto";
 import { resolverSaudeDaConexaoRemovida } from "@/lib/channels/health";
 import { sincronizarAvisoDePausa } from "@/lib/channels/central-de-pausa";
 import { desfazerWebhookDoNumero } from "@/lib/channels/meta/webhook-override";
@@ -399,6 +401,13 @@ export async function DELETE(
           channelSessionId: id,
         }).catch(() => ({ nativa: false }) as const)
       : null;
+
+  // INSTAGRAM CONECTADO DIRETO PELO CRM: o vínculo é nosso e é revogado na plataforma. Melhor
+  // esforço, sem travar a exclusão (a função não lança). Canal criado por código não tem a
+  // marca e não é tocado.
+  if (session.provider === CHANNEL_PROVIDER_INSTAGRAM) {
+    await desconectarInstagramDireto(createAdminClient(), { orgId: activeOrg.orgId, channelSessionId: id });
+  }
 
   if (session.provider === CHANNEL_PROVIDER_WAHA) {
     const waha = getWahaClient();
