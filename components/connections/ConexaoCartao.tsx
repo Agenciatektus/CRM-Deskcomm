@@ -47,6 +47,16 @@ export function numeroOuAviso(item: ItemDeConexao, t: (x: string) => string): st
   return item.numero ?? t("Sem número ainda");
 }
 
+/** "Configurar IA": só canal conectado e não pausado (o mesmo controle de sempre). */
+function AcessoDaIa({ item }: { item: ItemDeConexao }) {
+  if (item.fonte !== "canal" || item.status !== "WORKING" || item.pausado) return null;
+  return (
+    <div id={`canal-ia-${item.id}`} className="mt-1">
+      <ChannelAiAccess channelId={item.id} />
+    </div>
+  );
+}
+
 /** O cartão da Galeria (e da Lista no celular, em `compacto`). */
 export function CartaoDaConexao({
   item,
@@ -82,11 +92,7 @@ export function CartaoDaConexao({
         </div>
       </div>
       <p className="text-xs text-muted-foreground">{detalheDaConexao(item, agora, t)}</p>
-      {!compacto && item.fonte === "canal" && item.status === "WORKING" && !item.pausado && (
-        <div id={`canal-ia-${item.id}`}>
-          <ChannelAiAccess channelId={item.id} />
-        </div>
-      )}
+      <AcessoDaIa item={item} />
       <div className="mt-auto">
         <AcoesDaConexao item={item} ocupado={ocupadoId === item.id} {...acoes} />
       </div>
@@ -117,7 +123,10 @@ export function LinhaDaConexao({
       <td className="px-3 py-3">
         <SeloDeStatus item={item} />
       </td>
-      <td className="px-3 py-3 text-xs text-muted-foreground">{detalheDaConexao(item, agora, t)}</td>
+      <td className="px-3 py-3 text-xs text-muted-foreground">
+        <p>{detalheDaConexao(item, agora, t)}</p>
+        <AcessoDaIa item={item} />
+      </td>
       <td className="px-3 py-3">
         <div className="flex justify-end">
           <AcoesDaConexao item={item} ocupado={ocupadoId === item.id} {...acoes} />

@@ -2350,6 +2350,11 @@ export const DICIONARIO: Traducoes = {
   "Número ou conta": { es: "Número o cuenta" },
   "Detalhe": { es: "Detalle" },
   "Não foi possível reconectar.": { es: "No fue posible reconectar." },
+  "canais?": { es: "canales?" },
+  "Nenhuma conversa nova entra, a IA não responde e não há follow-up nestes canais até você retomar. Nada é apagado.": { es: "No entra ninguna conversación nueva, la IA no responde y no hay seguimiento en estos canales hasta que usted los reanude. No se borra nada." },
+  "Os canais voltam a receber conversas e a IA volta a responder.": { es: "Los canales vuelven a recibir conversaciones y la IA vuelve a responder." },
+  "O serviço do WhatsApp por QR não está configurado.": { es: "El servicio de WhatsApp por QR no está configurado." },
+  "Enquanto isso, não dá para reconectar nem excluir os números pareados por QR: excluir também desconecta o aparelho, e sem o serviço isso não acontece.": { es: "Mientras tanto, no se pueden reconectar ni eliminar los números vinculados por QR: eliminar también desconecta el aparato, y sin el servicio eso no ocurre." },
   "Conectar WhatsApp": { es: "Conectar WhatsApp" },
   "para poder publicar.": { es: "para poder publicar." },
   "Escolha o número para poder publicar. Sem ele, o rascunho salva mas não atende.": {

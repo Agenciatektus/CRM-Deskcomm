@@ -51,6 +51,7 @@ export function useConexoes() {
     sessoes: canais.data ?? [],
     carregando: canais.isLoading,
     erro: canais.isError,
+    bancoAtrasado: canais.schemaOutdated,
     nativoHabilitado: hospedado.data?.nativo_habilitado === true,
   };
 }

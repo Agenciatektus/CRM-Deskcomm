@@ -20,6 +20,7 @@ import {
 } from "@/lib/channels/conexoes-lista";
 import { Plus, Stack, Warning } from "@/lib/ui/icons";
 
+import { AcoesEmLote } from "./AcoesEmLote";
 import { AgendaDePausa } from "./AgendaDePausa";
 import { CartaoDaConexao, IconeDoTipo, LinhaDaConexao, type PropsDeAcoes } from "./ConexaoCartao";
 import { ConexoesFiltros } from "./ConexoesFiltros";
@@ -32,6 +33,31 @@ function Kpi({ rotulo, valor, alerta = false }: { rotulo: string; valor: number;
       <span className="text-xs text-muted-foreground">{rotulo}</span>
       <b className="block text-2xl">{valor}</b>
     </Card>
+  );
+}
+
+function Avisos({ servicoForaDoAr, bancoAtrasado }: { servicoForaDoAr: boolean; bancoAtrasado: boolean }) {
+  const t = useT();
+  const faixa = "rounded-md border border-warning bg-warning-bg p-4 text-sm text-warning-fg";
+  return (
+    <>
+      {servicoForaDoAr && (
+        <div role="alert" className={faixa}>
+          <p className="font-medium">{t("O serviço do WhatsApp por QR não está configurado.")}</p>
+          <p className="mt-1">
+            {t("Enquanto isso, não dá para reconectar nem excluir os números pareados por QR: excluir também desconecta o aparelho, e sem o serviço isso não acontece.")}
+          </p>
+        </div>
+      )}
+      {bancoAtrasado && (
+        <div role="alert" className={faixa}>
+          <p className="font-medium">{t("Esta instalação está com o banco atrasado.")}</p>
+          <p className="mt-1">
+            {t("Falta aplicar a migration que registra canal excluído. Até lá, um número que você excluir continua aparecendo nesta lista.")}
+          </p>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -102,7 +128,7 @@ export function ConexoesPagina({
 }) {
   const t = useT();
   const qc = useQueryClient();
-  const { itens, sessoes, carregando, erro, nativoHabilitado } = useConexoes();
+  const { itens, sessoes, carregando, erro, bancoAtrasado, nativoHabilitado } = useConexoes();
   const [filtros, setFiltros] = useState<FiltrosDaLista>(SEM_FILTROS);
   const [vista, setVista] = useVistaDeConexoes();
   const [escolhendo, setEscolhendo] = useState(false);
@@ -140,6 +166,7 @@ export function ConexoesPagina({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <AcoesEmLote itens={itens} />
           <AgendaDePausa canais={sessoes} />
           <Button asChild variant="outline">
             <Link href="/app/connections?aba=modelos">{t("Modelos de mensagem")}</Link>
@@ -151,11 +178,20 @@ export function ConexoesPagina({
         </div>
       </header>
 
+      <Avisos
+        servicoForaDoAr={!wahaConfigured && !wahaDesligado && itens.some((i) => i.viveNoTransporte)}
+        bancoAtrasado={bancoAtrasado}
+      />
+
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Kpi rotulo={t("Conectados")} valor={kpis.conectados} />
         <Kpi rotulo={t("Precisam de atenção")} valor={kpis.atencao} alerta />
         <Kpi rotulo={t("Total")} valor={kpis.total} />
       </div>
+
+      <Link href="/app/settings/atendimento" className="text-sm text-accent-text underline">
+        {t("Configurar responsáveis por número")}
+      </Link>
 
       <ConexoesFiltros filtros={filtros} onMudar={setFiltros} vista={vista} onVista={setVista} />
 
