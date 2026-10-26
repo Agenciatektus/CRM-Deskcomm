@@ -97,7 +97,7 @@ function Responsavel({ k }: { k: DadosDoCartao }) {
  * caixa de seleção que aparece no hover, valor, última mensagem, etiquetas, faixa do agente
  * (Propõe: Aprovar, Ignorar), próximo passo e rodapé (tempo na etapa, tarefas e responsável).
  */
-export function Cartao({ k, etapaMarcada = false }: { k: DadosDoCartao; etapaMarcada?: boolean }) {
+export function Cartao({ k, etapaMarcada = false, compacto = false }: { k: DadosDoCartao; etapaMarcada?: boolean; compacto?: boolean }) {
   const [proposta, setProposta] = useState<"aberta" | "aprovada" | "ignorada">(k.proposta ? "aberta" : "ignorada");
   const [marcado, setMarcado] = useState(false);
   const selecionado = marcado || etapaMarcada || !!k.destaque;
@@ -106,7 +106,7 @@ export function Cartao({ k, etapaMarcada = false }: { k: DadosDoCartao; etapaMar
     <div
       role="group"
       aria-label={`Lead: ${k.nome}`}
-      className={`group relative flex flex-col gap-2.5 overflow-hidden rounded-xl border px-3 pt-3 pb-2.5 text-left shadow-xs transition-[border-color,box-shadow] ${
+      className={`group relative flex flex-col overflow-hidden rounded-xl border text-left ${compacto ? "gap-1.75 px-2.5 py-2" : "gap-2.5 px-3 pt-3 pb-2.5"} shadow-xs transition-[border-color,box-shadow] ${
         selecionado
           ? "a-pulso-borda border-accent bg-accent-soft ring-1 ring-accent"
           : "border-border bg-surface hover:border-border-strong hover:shadow-md"
@@ -114,7 +114,7 @@ export function Cartao({ k, etapaMarcada = false }: { k: DadosDoCartao; etapaMar
     >
       <div className="flex items-center gap-2.5">
         <span className="relative">
-          <Avatar nome={k.nome} tom={k.tom} tamanho="size-9" />
+          <Avatar nome={k.nome} tom={k.tom} tamanho={compacto ? "size-7" : "size-9"} />
           <span
             className={`absolute -right-1 -bottom-1 grid size-[17px] place-items-center rounded-full text-white ring-2 ${
               selecionado ? "ring-[#1d3943]" : "ring-surface"
@@ -148,11 +148,14 @@ export function Cartao({ k, etapaMarcada = false }: { k: DadosDoCartao; etapaMar
 
       {k.valor ? <span className="text-[15px] leading-tight font-bold text-text tabular-nums">{reais(k.valor)}</span> : null}
 
+      {!compacto ? (
       <p className="m-0 mt-1 flex items-center gap-1.5 px-1 py-0.5 text-[11px] text-text-muted">
         <Icone nome="conversa" peso="regular" className="size-3 shrink-0" />
         <span className="truncate">{k.ultima}</span>
       </p>
+      ) : null}
 
+      {!compacto ? (
       <span className="flex flex-wrap gap-1">
         {k.etiquetas.map((e) => (
           <span key={e} className="inline-flex h-5.5 max-w-full items-center truncate rounded-full border border-border bg-surface px-2 text-xs text-text-muted">
@@ -160,6 +163,7 @@ export function Cartao({ k, etapaMarcada = false }: { k: DadosDoCartao; etapaMar
           </span>
         ))}
       </span>
+      ) : null}
 
       {k.proposta && proposta !== "ignorada" ? (
         <div className="flex items-center gap-2 text-xs">
@@ -191,7 +195,7 @@ export function Cartao({ k, etapaMarcada = false }: { k: DadosDoCartao; etapaMar
 
       <ProximoPasso k={k} />
 
-      <div className="flex items-center justify-between gap-2 border-t border-border pt-2 text-xs text-text-subtle">
+      <div className={`flex items-center justify-between gap-2 border-t border-border ${compacto ? "pt-1.5" : "pt-2"} text-xs text-text-subtle`}>
         <Tempo k={k} />
         <div className="flex min-w-0 items-center gap-2">
           {abertas > 0 ? (

@@ -10,7 +10,7 @@ import { reais, somaEtapa, type Cartao as DadosDoCartao, type Etapa } from "./da
  * ponto da etapa, nome e contador), faixa própria com a soma e o valor ponderado, e os cartões.
  * Na vista de celular (`lista`) ocupa a largura toda e empilha.
  */
-export function Coluna({ etapa, cartoes, lista = false }: { etapa: Etapa; cartoes: DadosDoCartao[]; lista?: boolean }) {
+export function Coluna({ etapa, cartoes, lista = false, compacto = false }: { etapa: Etapa; cartoes: DadosDoCartao[]; lista?: boolean; compacto?: boolean }) {
   const { soma, ponderado } = somaEtapa(etapa, cartoes);
   const [todos, setTodos] = useState(false);
   const marcado = todos && cartoes.length > 0;
@@ -46,7 +46,7 @@ export function Coluna({ etapa, cartoes, lista = false }: { etapa: Etapa; cartoe
       </div>
       <div className="flex flex-col gap-2 p-2">
         {cartoes.length ? (
-          cartoes.map((k) => <Cartao key={k.id} k={k} etapaMarcada={marcado} />)
+          cartoes.map((k) => <Cartao key={k.id} k={k} etapaMarcada={marcado} compacto={compacto} />)
         ) : (
           <div className="flex h-20 items-center justify-center text-[11px] text-text-muted">vazio</div>
         )}
