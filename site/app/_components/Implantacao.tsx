@@ -32,7 +32,7 @@ export function Implantacao() {
           opacidade={0.7}
           className="top-0 right-0 hidden h-[20rem] w-[clamp(26rem,36vw,40rem)] xl:block"
           imgClassName="size-full object-cover object-center"
-          mascara="[mask-image:radial-gradient(ellipse_72%_72%_at_55%_50%,#000_45%,transparent_100%)]"
+          mascara="[mask-image:radial-gradient(ellipse_closest-side,#000_38%,transparent_100%)]"
         />
       </div>
 
