@@ -468,4 +468,31 @@ describe("queda graciosa — a chave recusada (401/403) desce UM degrau (26/10)"
     expect(r2.status).toBe("error");
     expect(fetchMock).not.toHaveBeenCalled();
   });
+  it("P1-2: imagem com a visão em 401 NÃO entra na cascata (sem 2ª chamada, sem aviso, sem motivo de queda)", async () => {
+    messageRow.organization_id = "org-queda-5";
+    messageRow.type = "image";
+    messageRow.media_mime = "image/jpeg";
+    messageRow.media_storage_path = "org1/conv1/msg1.jpg";
+    const r = await deriveMessageMedia(eventRow());
+    messageRow.organization_id = "org1";
+
+    void r;
+    expect(generateTextMock.mock.calls.length).toBeLessThanOrEqual(1);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(JSON.stringify(inboxInsertMock.mock.calls)).not.toContain("chave de transcrição");
+    expect(updateEqMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ metadata: expect.objectContaining({ media_derived_motivo: expect.anything() }) }),
+    );
+  });
+
+  it("P1-3: degrau A sem base URL (custom_provider_sem_base_url) é degrau inexistente: desce sem avisar", async () => {
+    messageRow.organization_id = "org-queda-6";
+    generateTextMock.mockRejectedValue(new Error("custom_provider_sem_base_url: cadastre o endereço"));
+    const r = await deriveMessageMedia(eventRow());
+    messageRow.organization_id = "org1";
+
+    expect(r.status).toBe("ok");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(inboxInsertMock).not.toHaveBeenCalled();
+  });
 });

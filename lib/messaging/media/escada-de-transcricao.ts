@@ -153,6 +153,8 @@ export function podeDescerDeDegrau(err: unknown): boolean {
   if (codigo === 429 || (codigo >= 500 && codigo <= 599)) return true;
   const msg = err instanceof Error ? err.message : "";
   return (
+    // Degrau que não existe de fato (provedor sem fábrica, custom sem base URL).
+    /custom_provider_sem_base_url|transcription_provider_unavailable/.test(msg) ||
     /^transcription_(429|5\d\d)$/.test(msg) ||
     e.name === "AbortError" ||
     e.name === "TimeoutError" ||
@@ -207,6 +209,9 @@ export function transcricaoPeloModelo(modelo: {
     const res = await generateText({
       model: factory(modelo.apiKey, modelo.modelId, modelo.baseUrl ?? undefined),
       maxOutputTokens: MAX_TOKENS_DA_TRANSCRICAO_PELO_MODELO,
+      // Sem retentativa interna e com teto de tempo: a cascata é quem desce.
+      maxRetries: 0,
+      abortSignal: AbortSignal.timeout(60_000),
       messages: [
         {
           role: "user",
@@ -280,11 +285,12 @@ export async function decidirTranscricao(
     async () => {
       const chaveOpenai = entrada.chaveOpenai ? await entrada.chaveOpenai() : null;
       if (!chaveOpenai) return null;
-      const modelo = modeloDeTranscricaoEmVigor({
-        model: env.TRANSCRIPTION_MODEL,
-        apiKey: env.TRANSCRIPTION_API_KEY,
-        baseUrl: env.TRANSCRIPTION_BASE_URL,
-      });
+      // A chave PRÓPRIA da org vai para api.openai.com: `openai/whisper-1` é o
+      // id do OpenRouter (envs do serviço da instalação) e lá não existe. Com
+      // BASE_URL configurada o modelo do .env é de OUTRO serviço: vale whisper-1.
+      const modelo = env.TRANSCRIPTION_BASE_URL
+        ? "whisper-1"
+        : modeloDeTranscricaoEmVigor({ model: env.TRANSCRIPTION_MODEL, apiKey: undefined, baseUrl: undefined });
       return {
         origem: "padrao_openai_compativel",
         transcriber: apiTranscriptionProvider({ apiKey: chaveOpenai, model: modelo, languages: idiomas }),

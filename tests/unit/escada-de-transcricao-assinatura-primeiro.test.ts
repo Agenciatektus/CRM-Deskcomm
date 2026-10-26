@@ -1,6 +1,11 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import { describe, expect, it, vi } from "vitest";
 
 import type * as ModuloDeEnv from "@/lib/env";
+import { env } from "@/lib/env";
+import { deriveVideoText } from "@/lib/messaging/media/video-derive";
 import {
   chaveRecusadaPeloProvedor,
   podeDescerDeDegrau,
@@ -81,5 +86,49 @@ describe("chaveRecusadaPeloProvedor", () => {
     expect(podeDescerDeDegrau(new Error("transcription_502"))).toBe(true);
     expect(podeDescerDeDegrau(Object.assign(new Error("t"), { name: "TimeoutError" }))).toBe(true);
     expect(podeDescerDeDegrau(Object.assign(new Error("x"), { statusCode: 400 }))).toBe(false);
+  });
+});
+
+describe("P1-1: a chave OpenAI própria vai para api.openai.com com whisper-1", () => {
+  it("com as envs de produção (OpenRouter) preenchidas, o degrau B anuncia whisper-1, e não openai/whisper-1", async () => {
+    const e = env as unknown as Record<string, string>;
+    const antes = { ...e };
+    e.TRANSCRIPTION_BASE_URL = "https://openrouter.ai/api/v1";
+    e.TRANSCRIPTION_MODEL = "openai/whisper-1";
+    try {
+      const b = await decidirTranscricao({ conversa: null, chaveOpenai: openai });
+      expect(b.origem).toBe("padrao_openai_compativel");
+      expect(b.anuncio.modelId).toBe("whisper-1");
+      const c = await b.proxima!();
+      expect(c?.origem).toBe("servico_da_instalacao");
+      expect(c?.anuncio.modelId).toBe("openai/whisper-1");
+    } finally {
+      Object.assign(e, antes);
+    }
+  });
+});
+
+describe("P2-1: vídeo propaga o erro da transcrição quando o worker pede", () => {
+  const runFfmpeg = async (args: string[], cwd: string) => {
+    if (args.includes("audio.ogg")) {
+      await mkdir(cwd, { recursive: true });
+      await writeFile(join(cwd, "audio.ogg"), Buffer.from("x"));
+    }
+  };
+  const transcriber = {
+    transcribe: async () => {
+      throw Object.assign(new Error("boom"), { statusCode: 503 });
+    },
+  };
+  const describeImage = async () => "";
+
+  it("com subirErroDaTranscricao, o erro chega ao worker", async () => {
+    await expect(
+      deriveVideoText(Buffer.from("v"), { transcriber, describeImage, runFfmpeg, subirErroDaTranscricao: podeDescerDeDegrau }),
+    ).rejects.toThrow("boom");
+  });
+
+  it("sem ele, continua engolindo (comportamento de sempre)", async () => {
+    await expect(deriveVideoText(Buffer.from("v"), { transcriber, describeImage, runFfmpeg })).resolves.not.toThrow();
   });
 });

@@ -19,8 +19,18 @@ const FRAME_COUNT = 4;
 /** Teto de segurança p/ o vídeo processado (evita ffmpeg travar em arquivo gigante). */
 const FRAME_SCALE = "512:-1";
 
+/** Marca o erro da transcrição que atravessa o `catch` das etapas de ffmpeg. */
+class TranscricaoSubiu {
+  constructor(readonly causa: unknown) {}
+}
+
 export interface VideoDeriveDeps {
   transcriber: TranscriptionProvider;
+  /**
+   * Erro da transcrição que NÃO deve ser engolido (o worker desce um degrau da
+   * escada com ele). Ausente = engole, como sempre.
+   */
+  subirErroDaTranscricao?: (err: unknown) => boolean;
   describeImage(buffer: Buffer, mime: string): Promise<string>;
   /** Executa ffmpeg com os args dados no cwd; rejeita em exit != 0. Injetável p/ teste. */
   runFfmpeg?: (args: string[], cwd: string) => Promise<void>;
@@ -57,8 +67,16 @@ export async function deriveVideoText(buffer: Buffer, deps: VideoDeriveDeps): Pr
     try {
       await run(["-i", "in.mp4", "-vn", "-ac", "1", "-ar", "16000", "-c:a", "libopus", "audio.ogg"], dir);
       const audio = await readFile(join(dir, "audio.ogg"));
-      if (audio.byteLength > 0) transcript = await deps.transcriber.transcribe(audio, "audio/ogg");
-    } catch {
+      if (audio.byteLength > 0) {
+        try {
+          transcript = await deps.transcriber.transcribe(audio, "audio/ogg");
+        } catch (err) {
+          if (deps.subirErroDaTranscricao?.(err)) throw new TranscricaoSubiu(err);
+          throw err;
+        }
+      }
+    } catch (err) {
+      if (err instanceof TranscricaoSubiu) throw err.causa;
       transcript = "";
     }
 

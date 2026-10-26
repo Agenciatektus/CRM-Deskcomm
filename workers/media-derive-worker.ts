@@ -343,7 +343,9 @@ export async function deriveMessageMedia(row: EventRow): Promise<HandlerResult> 
     // consome). Preenchido quando o thunk resolve.
     let origemDaChaveOpenai: OrigemDaChaveLlm | null = null;
     const chaveOpenai = async (): Promise<string | null> => {
-      if (llm.provider === "openai") {
+      // `baseUrlDaVisao`: o `llm` é um binding com endereço próprio; a chave dele
+      // não é "a OpenAI da org" para api.openai.com.
+      if (llm.provider === "openai" && !baseUrlDaVisao) {
         origemDaChaveOpenai = llm.origemDaChave;
         // Só a credencial PRÓPRIA da organização vale aqui (a chave da
         // instalação é o último degrau, pelo serviço de transcrição).
@@ -376,9 +378,11 @@ export async function deriveMessageMedia(row: EventRow): Promise<HandlerResult> 
               // Degrau A da escada: só a credencial da PRÓPRIA organização conta;
               // a chave da instalação no chat fica para o degrau D.
               credencialPropria: conversa.origemDaChave === "credencial_da_organizacao",
+              baseUrl: conversa.baseUrl ?? null,
             }
           : null,
-      chaveOpenai,
+      // Imagem e documento não passam pela escada: não resolvem a OpenAI à toa.
+      chaveOpenai: precisaTranscricao ? chaveOpenai : undefined,
     });
     logger.info("[media-derive] transcrição resolvida", {
       organization_id: row.organization_id,
@@ -470,16 +474,20 @@ export async function deriveMessageMedia(row: EventRow): Promise<HandlerResult> 
         );
         break;
       } catch (err) {
-        const seguinte = podeDescerDeDegrau(err) && degrau.proxima ? await degrau.proxima() : null;
+        // Imagem e documento ficam FORA da cascata: um 401 da visão não pode
+        // virar aviso de "chave de transcrição" nem nova chamada.
+        const seguinte =
+          precisaTranscricao && podeDescerDeDegrau(err) && degrau.proxima ? await degrau.proxima() : null;
         if (!seguinte) {
           if (!motivoDaQueda) throw err;
           // Todos falharam: o motivo conta o caminho percorrido até o último.
           const detalhe = err instanceof Error ? err.message : String(err);
           throw new Error(`${motivoDaQueda}; o degrau ${degrau.origem} também falhou: ${detalhe}`);
         }
-        const quemRecusou = degrau.origem === "servico_da_instalacao"
+        const daInstalacao = degrau.origem === "servico_da_instalacao";
+        const quemRecusou = daInstalacao
           ? "a chave de transcrição da instalação (TRANSCRIPTION_API_KEY)"
-          : `a chave do degrau ${degrau.origem}`;
+          : `a chave do seu provedor ${degrau.anuncio.provider}`;
         const recusada = chaveRecusadaPeloProvedor(err);
         motivoDaQueda = recusada
           ? `${quemRecusou} foi recusada pelo provedor (401/403); transcrito pelo degrau ${seguinte.origem}`
@@ -489,7 +497,7 @@ export async function deriveMessageMedia(row: EventRow): Promise<HandlerResult> 
           de: degrau.origem,
           para: seguinte.origem,
         });
-        if (recusada) await avisarChaveDeTranscricaoRecusada(msg.organization_id, rotuloDoTipo, quemRecusou);
+        if (recusada) await avisarChaveDeTranscricaoRecusada(msg.organization_id, rotuloDoTipo, quemRecusou, daInstalacao);
         degrau = seguinte;
       }
     }
@@ -1033,7 +1041,11 @@ function buildDeriveDeps(
     // A trilha de áudio do vídeo passa pela mesma trava de duração do áudio:
     // acima dela o vídeo sai só com os frames, sem a transcrição paga.
     deriveVideo: (buffer) =>
-      deriveVideoText(buffer, { transcriber: comTravaDeDuracao(transcriber), describeImage }),
+      deriveVideoText(buffer, {
+        transcriber: comTravaDeDuracao(transcriber),
+        describeImage,
+        subirErroDaTranscricao: podeDescerDeDegrau,
+      }),
   };
 }
 
@@ -1301,7 +1313,7 @@ async function avisarMidiaNaoLida(
   detalheTecnico?: string,
   paraResolver?: string,
   titulo?: string,
-): Promise<void> {
+): Promise<boolean> {
   try {
     const admin = createAdminClient();
     const { data: jaAberto } = await admin
@@ -1312,7 +1324,7 @@ async function avisarMidiaNaoLida(
       .eq("status", "open")
       .limit(1)
       .maybeSingle();
-    if (jaAberto) return;
+    if (jaAberto) return false;
 
     // `warn`, não `warning`: o CHECK de `agent_inbox_items.severity` aceita
     // info|warn|critical. Com o valor errado o INSERT era recusado com 23514 —
@@ -1342,11 +1354,13 @@ async function avisarMidiaNaoLida(
         error: error.message,
       });
     }
+    return !error;
   } catch (err) {
     logger.warn("[media-derive] não consegui abrir o aviso de mídia não lida", {
       organization_id: organizationId,
       error: err instanceof Error ? err.message : String(err),
     });
+    return false;
   }
 }
 
@@ -1362,17 +1376,21 @@ export async function avisarChaveDeTranscricaoRecusada(
   organizationId: string,
   tipo: string,
   quemRecusou: string,
+  daInstalacao = false,
 ): Promise<void> {
   const hoje = new Date().toISOString().slice(0, 10);
   if (avisoDaChaveRecusadaNoDia.get(organizationId) === hoje) return;
-  avisoDaChaveRecusadaNoDia.set(organizationId, hoje);
-  await avisarMidiaNaoLida(
+  // O dia só é consumido se o aviso de fato abriu.
+  const abriu = await avisarMidiaNaoLida(
     organizationId,
     tipo,
     `${quemRecusou} foi recusada pelo provedor`,
     "A leitura seguiu por outro caminho e o atendimento não parou, mas a chave recusada precisa ser trocada.",
     undefined,
-    "Quem administra a instalação atualiza a chave da transcrição no .env (TRANSCRIPTION_API_KEY); a organização pode cadastrar a própria chave em Agente de IA → Provedores.",
+    daInstalacao
+      ? "Quem administra a instalação atualiza a chave da transcrição no .env (TRANSCRIPTION_API_KEY)."
+      : "Atualize a chave em Agente de IA → Provedores de IA.",
     "A chave de transcrição foi recusada e a leitura caiu para outro caminho",
   );
+  if (abriu) avisoDaChaveRecusadaNoDia.set(organizationId, hoje);
 }
