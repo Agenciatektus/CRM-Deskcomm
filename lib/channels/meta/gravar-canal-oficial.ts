@@ -139,10 +139,11 @@ export async function gravarCanalOficial(input: {
     // precisa dos DOIS, e o INSERT não os devolve sozinho.
     const inserida = await admin
       .from("channel_sessions")
+      // `linha.metadata` (só quando o Embedded Signup diz se é Coexistence) vence a configuração inicial.
       .insert({
+        metadata: metadataInicialDoCanal(),
         ...linha,
         webhook_secret_encrypted: cifrado,
-        metadata: { ...metadataInicialDoCanal(), ...(input.coexistencia === undefined ? {} : { coexistence: input.coexistencia }) },
       })
       .select("id, webhook_path_token")
       .maybeSingle();
