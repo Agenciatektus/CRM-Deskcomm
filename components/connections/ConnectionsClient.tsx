@@ -796,7 +796,7 @@ export function frasesDoImpacto(
  * que agora chega no preflight. O desfecho vem da MESMA função que o DELETE usa
  * para decidir, antes do clique.
  */
-function ExcluirCanalDialog({
+export function ExcluirCanalDialog({
   canal,
   onCancel,
   onDeleted,
