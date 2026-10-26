@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -150,6 +150,13 @@ export function FormularioDeMetaAds({
     });
   }
 
+  // Acabou de conectar (?escolher=1): leva o usuário direto ao seletor de contas, que fica no cartão de baixo.
+  useEffect(() => {
+    if (!conectada || typeof window === "undefined") return;
+    if (new URLSearchParams(window.location.search).get("escolher") !== "1") return;
+    document.getElementById("escolher-contas")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [conectada]);
+
   const manualComValidade = conectada && via !== "oauth" && Boolean(expiraEm);
   const venceEmBreve = diasParaVencer !== null && diasParaVencer < DIAS_DE_AVISO_DE_VENCIMENTO;
 
@@ -216,7 +223,7 @@ export function FormularioDeMetaAds({
         )}
       </Card>
 
-      <Card className="p-6">
+      <Card className="p-6" id="escolher-contas">
         <form onSubmit={salvar} className="flex flex-col gap-5">
           {conectada && (
             <SeletorDeContas
