@@ -4,6 +4,7 @@ import { BotaoSecundario } from "./Botao";
 import { Planos } from "./Planos";
 import { Card, Cabeca, Secao } from "./Secao";
 import { Icone } from "./ui/Icones";
+import { ImagemDeSlot } from "./ui/ImagemDeSlot";
 
 /** Oferta: seletor de período, os dois planos em comparativo, a implantação opcional e a dúvida. */
 export function Oferta() {
@@ -26,6 +27,13 @@ export function Garantia() {
   return (
     <Secao titulo="titulo-garantia" fundo="menta" largura="texto" ritmo="m">
       <div className="luz luz-menta luz-fraca rounded-modal [--luz-blur:80px]">
+        <ImagemDeSlot
+          id="garantia-anel"
+          opacidade={0.75}
+          fallback="fundo-brilho-menta"
+          className="top-1/2 left-1/2 -z-10 size-[58rem] max-w-none -translate-x-1/2 -translate-y-1/2"
+          mascara="[mask-image:radial-gradient(circle_closest-side,#000_88%,transparent_100%)]"
+        />
         <div className="card borda-luz revela rounded-modal p-8 sm:p-10 lg:p-14">
           <div className="grid items-center gap-6 md:grid-cols-[auto_1fr] md:gap-8">
             <Selo100 />
@@ -102,12 +110,16 @@ export function Objecoes() {
   return (
     <Secao titulo="titulo-objecoes" fundo="azul">
       <Cabeca id="titulo-objecoes" titulo="O que costuma passar pela cabeça antes de comprar" />
-      <div className="grid gap-6 lg:gap-8 md:grid-cols-2 lg:grid-cols-3 [&>*]:min-w-0">
-        {OBJECOES.map((o, i) => (
-          <Card key={o.p} atraso={(i % 3) * 0.08}>
-            <h3 className="m-0 text-[1.05rem] leading-snug font-bold">{o.p}</h3>
-            <p className="mt-2 mb-0 leading-relaxed text-text-muted">{o.r}</p>
-          </Card>
+      {/* Acordeão nativo (details/summary): sem cartão, sem JavaScript, duas colunas no desktop. */}
+      <div className="grid items-start gap-x-12 md:grid-cols-2 [&>*]:min-w-0">
+        {OBJECOES.map((o) => (
+          <details key={o.p} className="group revela border-b border-border py-1">
+            <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 rounded-controle py-3 text-[1.05rem] leading-snug font-bold marker:content-none focus-visible:outline-2 focus-visible:outline-offset-2 [&::-webkit-details-marker]:hidden">
+              {o.p}
+              <Icone nome="chevron" peso="bold" className="size-4 shrink-0 text-text-muted transition-transform duration-200 group-open:rotate-90" />
+            </summary>
+            <p className="mt-0 mb-4 leading-relaxed text-text-muted">{o.r}</p>
+          </details>
         ))}
       </div>
     </Secao>

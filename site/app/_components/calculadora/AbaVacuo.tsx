@@ -5,7 +5,7 @@ import { useId, useState } from "react";
 import { CALCULADORA, CONTA } from "@/lib/conteudo";
 import { LIMITES, lerCampo, perdaDoVacuo } from "@/lib/conta";
 
-import { BRL, Campo, textoDoErro, useAtrasado } from "./Campo";
+import { BRL, Campo, PainelDeResultado, textoDoErro, useAtrasado } from "./Campo";
 
 /** A conta do vácuo: conversas x fatia sem resposta x ticket. Sem valor pré-preenchido. */
 export function AbaVacuo() {
@@ -29,7 +29,7 @@ export function AbaVacuo() {
         <Campo id={`${base}-t`} rotulo={CONTA.campo3} valor={ticket} aoMudar={setTicket} erro={textoDoErro(t)} />
       </div>
       <div className="flex flex-col gap-4 lg:col-span-7">
-        <div className="rounded-grande border border-border-strong bg-bg p-6 sm:p-8">
+        <PainelDeResultado>
           {total !== null ? (
             <>
               <p className="m-0 text-text-muted">{CONTA.resultado}</p>
@@ -40,7 +40,7 @@ export function AbaVacuo() {
           ) : (
             <p className="m-0 text-text-muted">{algumErro ? CALCULADORA.time.erro : CONTA.vazio}</p>
           )}
-        </div>
+        </PainelDeResultado>
         <p className="m-0 text-[0.95rem] leading-relaxed text-text-muted">{CONTA.nota}</p>
         <p className="sr-only" aria-live="polite">
           {anuncio}

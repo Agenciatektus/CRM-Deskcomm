@@ -5,7 +5,7 @@ import { useId, useState } from "react";
 import { CALCULADORA, CONTA } from "@/lib/conteudo";
 import { IMPLANTACAO, LIMITES, calculaTime, lerCampo, type Plano } from "@/lib/conta";
 
-import { BRL, Campo, textoDoErro, useAtrasado } from "./Campo";
+import { BRL, Campo, PainelDeResultado, textoDoErro, useAtrasado } from "./Campo";
 
 const T = CALCULADORA.time;
 
@@ -141,7 +141,7 @@ export function AbaTime() {
       </div>
 
       <div className="flex flex-col gap-4 lg:col-span-7">
-        <div className="rounded-grande border border-border-strong bg-bg p-6 sm:p-8">
+        <PainelDeResultado>
           {r === null ? (
             temErro ? (
               <p className="m-0 text-text-muted">{T.erro}</p>
@@ -188,7 +188,7 @@ export function AbaTime() {
               ) : null}
             </>
           )}
-        </div>
+        </PainelDeResultado>
         <p className="m-0 text-[0.95rem] leading-relaxed text-text-muted">{CALCULADORA.honesta}</p>
         <p className="m-0 text-meta text-text-subtle">{CONTA.privacidade}</p>
         <p className="sr-only" aria-live="polite">

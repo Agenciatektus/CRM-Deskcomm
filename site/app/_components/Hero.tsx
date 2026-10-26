@@ -4,6 +4,7 @@ import { BotaoPrimario, BotaoSecundario } from "./Botao";
 import { Container } from "./Secao";
 import { TelaInbox } from "./telas/TelaInbox";
 import { Icone } from "./ui/Icones";
+import { ImagemDeSlot } from "./ui/ImagemDeSlot";
 import { Avatar, Selo } from "./ui/Pecas";
 import { Janela } from "./ui/Janela";
 
@@ -11,7 +12,7 @@ import { Janela } from "./ui/Janela";
  * O hero: promessa grande em cima e, embaixo, o próprio sistema. A janela da Inbox sobe com
  * perspectiva e esmaece na base (o app continua "para baixo da dobra"). Em volta, três cards de
  * componentes reais (etapa do funil, agente com teto de gasto, Radar) flutuam sobre a janela.
- * Fundo em camadas: grade, brilhos de marca e ruído, mais a arte do fluxo bem ao fundo.
+ * Fundo em camadas: grade, brilhos de marca e ruído, mais a imagem hero-fluxo (IMG-01) ao fundo, sob máscara.
  */
 export function Hero() {
   return (
@@ -23,19 +24,16 @@ export function Hero() {
         <div className="fundo-brilho-azul absolute inset-0" />
         <div className="fundo-brilho-menta absolute inset-0" />
         <div className="fundo-grade absolute inset-0" />
-        <picture>
-          <source srcSet="/_lp/img/fluxo.avif" type="image/avif" />
-          <img
-            src="/_lp/img/fluxo.jpg"
-            alt=""
-            width={1920}
-            height={1080}
-            loading="lazy"
-            decoding="async"
-            fetchPriority="low"
-            className="absolute -top-10 left-1/2 w-[135%] max-w-none -translate-x-1/2 opacity-[0.22] mix-blend-screen [mask-image:radial-gradient(ellipse_55%_50%_at_50%_30%,#000_25%,transparent_72%)] md:w-[110%]"
-          />
-        </picture>
+        <ImagemDeSlot
+          id="hero-fluxo"
+          prioridade
+          opacidade={0.6}
+          className="inset-0"
+          imgClassName="size-full object-cover object-top"
+          mascara="[mask-image:radial-gradient(ellipse_85%_80%_at_50%_35%,#000_35%,transparent_100%)]"
+        />
+        {/* Scrim: escurece só a coluna de texto (eyebrow até a nota) para o texto pequeno manter AA sobre a imagem. */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_46%_30%_at_50%_24%,rgb(13_14_17/0.92)_0%,rgb(13_14_17/0.85)_55%,transparent_100%)]" />
         <div className="fundo-ruido absolute inset-0 opacity-60" />
       </div>
 
@@ -173,7 +171,14 @@ export function Hero() {
         </div>
 
         {/* Legenda: bloco próprio, com espaço para os chips que saem da janela. Vira o player quando houver vídeo. */}
-        <div className="mt-20 flex max-w-(--container-leitura) items-start gap-4">
+        <div className="relative isolate mt-20 flex max-w-(--container-leitura) items-start gap-4">
+          {/* IMG-02: pano de fundo discreto da legenda. Ainda não há vídeo; quando houver, a imagem vira o pôster do player. */}
+          <ImagemDeSlot
+            id="hero-poster-video"
+            opacidade={0.3}
+            className="-inset-x-6 -inset-y-5 -z-10 rounded-grande"
+            mascara="[mask-image:linear-gradient(to_right,#000,transparent_85%)]"
+          />
           <svg aria-hidden="true" viewBox="0 0 256 256" className="mt-0.5 size-7 shrink-0 text-link" fill="currentColor" focusable="false">
             <circle cx="128" cy="128" r="96" opacity="0.2" />
             <path d="M128 24a104 104 0 1 0 104 104A104.11 104.11 0 0 0 128 24Zm0 192a88 88 0 1 1 88-88 88.1 88.1 0 0 1-88 88Zm40-95.54-56-32A8 8 0 0 0 100 95.45v65.1a8 8 0 0 0 12 6.93l56-32.55a8 8 0 0 0 0-13.47Z" />
