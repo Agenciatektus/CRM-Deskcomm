@@ -82,7 +82,8 @@ function ParaColar({ rotulo, valor }: { rotulo: string; valor: string }) {
   );
 }
 
-export function CanalParceiroClient() {
+/** `onConectado`: o assistente de conexão habilita o "Concluir" quando o canal grava. */
+export function CanalParceiroClient({ onConectado }: { onConectado?: (telefone: string | null) => void } = {}) {
   const t = useT();
   const [estado, setEstado] = useState<Estado | null>(null);
   const [accountId, setAccountId] = useState("");
@@ -117,6 +118,7 @@ export function CanalParceiroClient() {
       // GET, e deixá-la no input só cria uma cópia a mais de um segredo.
       setApiKey("");
       toast.success(t("Canal conectado."));
+      onConectado?.(r.data.phone_number);
       await carregar();
     } catch (e) {
       toast.error(e instanceof Error ? t(e.message) : t("Não foi possível conectar."));

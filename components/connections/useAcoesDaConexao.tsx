@@ -1,5 +1,6 @@
 "use client";
 import { useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { useCallback, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
@@ -31,9 +32,17 @@ type Aberto =
 export function useAcoesDaConexao({
   transporteConfigurado,
   recarregar,
+  nativoHabilitado = true,
+  graphParceiro = null,
+  devolverFoco,
 }: {
   transporteConfigurado: boolean;
   recarregar: () => Promise<void>;
+  /** A organização cria conexão por QR neste CRM (cartão QR do assistente). */
+  nativoHabilitado?: boolean;
+  graphParceiro?: string | null;
+  /** Quem abriu a gaveta (botão Conectar) recebe o foco de volta ao fechar. */
+  devolverFoco?: () => void;
 }): {
   onAcao: (a: AcaoDaConexao, i: ItemDeConexao) => void;
   abrirAssistente: () => void;
@@ -41,6 +50,7 @@ export function useAcoesDaConexao({
   dialogos: ReactNode;
 } {
   const t = useT();
+  const router = useRouter();
   const qc = useQueryClient();
   const [aberto, setAberto] = useState<Aberto | null>(null);
   const [ocupadoId, setOcupadoId] = useState<string | null>(null);
@@ -129,9 +139,14 @@ export function useAcoesDaConexao({
           nomeInicial={aberto.nome}
           onClose={fechar}
           onAtualizar={() => void recarregar()}
-          onConfigurarAgente={(id) =>
-            setTimeout(() => document.getElementById(`canal-ia-${id}`)?.scrollIntoView({ block: "center" }), 150)
-          }
+          nativoHabilitado={nativoHabilitado}
+          graphParceiro={graphParceiro}
+          devolverFoco={devolverFoco}
+          onConfigurarAgente={(id, aba) => {
+            // O agente do canal vive na tela do método; o QR cai na lista de números da Verdash.
+            router.push(`/app/connections?aba=${aba}`);
+            if (id) setTimeout(() => document.getElementById(`canal-ia-${id}`)?.scrollIntoView({ block: "center" }), 600);
+          }}
         />
       )}
     </>

@@ -5,68 +5,24 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useT } from "@/hooks/i18n/useT";
 import { apiClient } from "@/lib/api/client";
 import { randomId } from "@/lib/random-id";
+import { ArrowRight, CircleNotch } from "@/lib/ui/icons";
 
-import { Etapas, PassoComo, PassoNome, PassoSucesso, type Passo, type Uso } from "./AssistentePassos";
-import { ConexaoNativaNumero } from "./ConexaoNativaNumero";
-import { ConexaoNativaPasskey } from "./ConexaoNativaPasskey";
-import { ConexaoNativaQr } from "./ConexaoNativaQr";
-import { useConexaoNativa } from "./useConexaoNativa";
+import { PassoConexao, type Parceiro } from "./AssistentePasso3";
+import { PassoMetodo, recomendar, type Metodo, type Uso } from "./AssistenteMetodo";
+import { Etapas, PassoNome, PassoSucesso, type Passo } from "./AssistentePassos";
 
-/** Passo 3: o mesmo poll alimenta as tres abas; o hook para sozinho ao conectar. */
-function PassoConectar({
-  canalId,
-  onConectado,
-  onVoltar,
-  onDepois,
-}: {
-  canalId: string;
-  onConectado: (telefone: string | null) => void;
-  onVoltar: () => void;
-  onDepois: () => void;
-}) {
-  const t = useT();
-  const { corpo, falha, tentarAgora } = useConexaoNativa(canalId, (c) => onConectado(c.telefone ?? null));
-  return (
-    <div className="mt-6 flex flex-col gap-4">
-      <div aria-live="polite">
-        <Tabs defaultValue="qr">
-          <TabsList>
-            <TabsTrigger value="qr">{t("QR code")}</TabsTrigger>
-            <TabsTrigger value="numero">{t("Por número")}</TabsTrigger>
-            <TabsTrigger value="passkey">{t("Passkey")}</TabsTrigger>
-          </TabsList>
-          <TabsContent value="qr" className="pt-4">
-            <ConexaoNativaQr corpo={corpo} falha={falha} onTentarAgora={tentarAgora} />
-          </TabsContent>
-          <TabsContent value="numero" className="pt-4">
-            <ConexaoNativaNumero canalId={canalId} />
-          </TabsContent>
-          <TabsContent value="passkey" className="pt-4">
-            <ConexaoNativaPasskey canalId={canalId} corpo={corpo} />
-          </TabsContent>
-        </Tabs>
-      </div>
-      <div className="flex items-center justify-between">
-        <Button variant="ghost" onClick={onVoltar}>
-          {t("Voltar")}
-        </Button>
-        <Button variant="link" onClick={onDepois}>
-          {t("Conectar depois")}
-        </Button>
-      </div>
-    </div>
-  );
-}
+/** Aba de Conexoes que mostra o canal (e o agente de IA dele) de cada metodo. */
+const ABA: Record<Metodo, string> = { qr: "hospedado", codigo: "hospedado", oficial: "oficial", parceiro: "parceiro" };
 
 /**
- * Assistente de conexao de WhatsApp em 4 passos (nome, como conectar, conectar,
- * sucesso). A conexao e CRIADA ao sair do passo 2 (POST hosted, modo qr). A chave
- * de idempotencia vive ate a criacao dar certo e muda se o nome mudar: repetir o
- * clique ou a rede cair devolve o MESMO canal em vez de criar outro.
+ * Assistente unico de conexao de WhatsApp (nome, metodo, conexao, pronto), numa gaveta
+ * lateral. So o metodo QR cria o canal ao sair do passo 2 (POST hosted, modo qr); nos
+ * demais ele nasce ao concluir a conexao, no passo 3. A chave de idempotencia vive ate a
+ * criacao dar certo e muda se o nome mudar: repetir o clique ou a rede cair devolve o
+ * MESMO canal em vez de criar outro.
  */
 export function AssistenteConexao({
   onClose,
@@ -74,22 +30,36 @@ export function AssistenteConexao({
   onConfigurarAgente,
   canalIdInicial,
   nomeInicial,
+  nativoHabilitado = true,
+  graphParceiro = null,
+  devolverFoco,
 }: {
   onClose: () => void;
   onAtualizar: () => void;
-  onConfigurarAgente?: (canalId: string) => void;
+  /** Leva ao agente de IA do canal: `canalId` so existe no QR; os outros vao pela `aba`. */
+  onConfigurarAgente?: (canalId: string | null, aba: string) => void;
   /** Canal nativo que ficou pela metade: abre direto no passo 3, sem criar outro. */
   canalIdInicial?: string;
   /** Nome atual do canal retomado, para o passo 1 (travado) não aparecer vazio. */
   nomeInicial?: string;
+  /** A organização cria conexão por QR neste CRM; sem isso o cartão QR não aparece. */
+  nativoHabilitado?: boolean;
+  /** Rótulo do parceiro compatível com a Cloud API, quando a instalação o liga. */
+  graphParceiro?: string | null;
+  /** Devolve o foco ao botão que abriu a gaveta (Radix não sabe quem foi, não há Trigger). */
+  devolverFoco?: () => void;
 }) {
   const t = useT();
   const [passo, setPasso] = useState<Passo>(canalIdInicial ? 3 : 1);
   const [nome, setNome] = useState(nomeInicial ?? "");
   const [uso, setUso] = useState<Uso | null>(null);
+  const [metodo, setMetodo] = useState<Metodo | null>(canalIdInicial || nativoHabilitado ? "qr" : null);
+  const [parceiro, setParceiro] = useState<Parceiro | null>(null);
   const [criando, setCriando] = useState(false);
   const [canalId, setCanalId] = useState<string | null>(canalIdInicial ?? null);
   const [telefone, setTelefone] = useState<string | null>(null);
+  // Metodos que nao avancam sozinhos: a tela de credenciais gravou, falta a pessoa concluir.
+  const [gravou, setGravou] = useState(false);
   const chave = useRef<{ nome: string; id: string } | null>(null);
 
   const criar = async () => {
@@ -119,46 +89,104 @@ export function AssistenteConexao({
     onAtualizar();
     onClose();
   };
+  const escolherUso = (u: Uso) => {
+    setUso(u);
+    // A resposta já aponta o método; a pessoa pode trocar no cartão.
+    const r = recomendar(u, nativoHabilitado);
+    if (r && !canalId) setMetodo(r);
+  };
+  const aba = metodo === "parceiro" && parceiro === "graph" ? "graph" : metodo ? ABA[metodo] : "hospedado";
   const descricao: Record<Passo, string> = {
     1: t("Comece dando um nome para esta conexão."),
     2: t("Conte como você usa este WhatsApp para escolhermos a conexão certa."),
     3: t("Conclua a conexão. A tela atualiza sozinha."),
     4: t("Pronto! WhatsApp conectado ao CRM."),
   };
+  const continuar = () => {
+    if (passo === 1) setPasso(2);
+    else if (passo === 2) void (metodo === "qr" ? criar() : setPasso(3));
+    else setPasso(4);
+  };
+  const podeContinuar = passo === 1 ? !!nome.trim() : passo === 2 ? !!metodo && !criando : gravou;
+  const mostraContinuar = passo < 3 || (passo === 3 && metodo !== "qr");
 
   return (
     <Sheet open onOpenChange={(o) => !o && fechar()}>
-      <SheetContent className="flex w-full flex-col overflow-y-auto sm:max-w-xl">
+      <SheetContent
+        className="flex w-full flex-col gap-0 overflow-hidden sm:max-w-[520px]"
+        onCloseAutoFocus={(e) => {
+          if (!devolverFoco) return;
+          e.preventDefault();
+          devolverFoco();
+        }}
+      >
         <SheetHeader>
           <SheetTitle>{t("Conectar WhatsApp")}</SheetTitle>
           <SheetDescription>{descricao[passo]}</SheetDescription>
         </SheetHeader>
         <Etapas passo={passo} />
-        {passo === 1 && <PassoNome nome={nome} travado={!!canalId} onNome={setNome} onContinuar={() => setPasso(2)} />}
-        {passo === 2 && (
-          <PassoComo uso={uso} criando={criando} onUso={setUso} onVoltar={() => setPasso(1)} onContinuar={() => void criar()} />
-        )}
-        {passo === 3 && canalId && (
-          <PassoConectar
-            canalId={canalId}
-            onConectado={(tel) => {
-              setTelefone(tel);
-              setPasso(4);
-              onAtualizar();
-            }}
-            onVoltar={() => setPasso(2)}
-            onDepois={fechar}
-          />
-        )}
-        {passo === 4 && (
-          <PassoSucesso
-            telefone={telefone}
-            onAgente={() => {
-              fechar();
-              if (canalId) onConfigurarAgente?.(canalId);
-            }}
-            onConcluir={fechar}
-          />
+        <div className="mt-6 flex-1 overflow-y-auto pb-4">
+          {passo === 1 && <PassoNome nome={nome} travado={!!canalId} onNome={setNome} onContinuar={continuar} />}
+          {passo === 2 &&
+            (criando ? (
+              <div role="status" className="flex flex-col items-center gap-3 py-10">
+                <CircleNotch size={28} className="animate-spin text-accent-text" aria-hidden />
+                <p className="text-sm text-text-muted">{t("Preparando sua conexão…")}</p>
+              </div>
+            ) : (
+              <PassoMetodo uso={uso} metodo={metodo} nativo={nativoHabilitado} onUso={escolherUso} onMetodo={(m) => {
+                setMetodo(m);
+                setGravou(false);
+              }} />
+            ))}
+          {passo === 3 && metodo && (
+            <PassoConexao
+              metodo={metodo}
+              canalId={canalId}
+              graphParceiro={graphParceiro}
+              parceiro={parceiro}
+              onParceiro={setParceiro}
+              onConectado={(tel) => {
+                setTelefone(tel);
+                onAtualizar();
+                if (metodo === "qr") setPasso(4);
+                else setGravou(true);
+              }}
+            />
+          )}
+          {passo === 4 && (
+            <PassoSucesso
+              telefone={telefone}
+              onAgente={() => {
+                fechar();
+                onConfigurarAgente?.(metodo === "qr" ? canalId : null, aba);
+              }}
+              onConcluir={fechar}
+            />
+          )}
+        </div>
+        {passo < 4 && (
+          <div className="flex items-center justify-between gap-2 border-t border-border pt-4">
+            {passo > 1 ? (
+              <Button variant="ghost" onClick={() => setPasso((p) => (p - 1) as Passo)}>
+                {t("Voltar")}
+              </Button>
+            ) : (
+              <span />
+            )}
+            {passo > 1 && (
+              <Button variant="link" onClick={fechar}>
+                {t("Continuar depois")}
+              </Button>
+            )}
+            {mostraContinuar ? (
+              <Button onClick={continuar} disabled={!podeContinuar}>
+                {passo === 3 ? t("Concluir") : t("Continuar")} <ArrowRight size={16} aria-hidden />
+              </Button>
+            ) : (
+              <span />
+            )}
+          </div>
         )}
       </SheetContent>
     </Sheet>

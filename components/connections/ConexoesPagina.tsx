@@ -1,7 +1,7 @@
 "use client";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -132,6 +132,7 @@ export function ConexoesPagina({
   const [filtros, setFiltros] = useState<FiltrosDaLista>(SEM_FILTROS);
   const [vista, setVista] = useVistaDeConexoes();
   const [escolhendo, setEscolhendo] = useState(false);
+  const botaoConectar = useRef<HTMLButtonElement>(null);
   const recarregar = async () => {
     await qc.invalidateQueries({ queryKey: ["channel-sessions"] });
     await qc.invalidateQueries({ queryKey: ["channels-hosted"] });
@@ -139,6 +140,9 @@ export function ConexoesPagina({
   const { onAcao, abrirAssistente, ocupadoId, dialogos } = useAcoesDaConexao({
     transporteConfigurado: wahaConfigured,
     recarregar,
+    nativoHabilitado,
+    graphParceiro: graphParceiro?.label ?? null,
+    devolverFoco: () => botaoConectar.current?.focus(),
   });
   const kpis = useMemo(() => calcularKpis(itens), [itens]);
   const visiveis = useMemo(() => filtrarConexoes(itens, filtros), [itens, filtros]);
@@ -171,7 +175,7 @@ export function ConexoesPagina({
           <Button asChild variant="outline">
             <Link href="/app/connections?aba=modelos">{t("Modelos de mensagem")}</Link>
           </Button>
-          <Button onClick={() => setEscolhendo(true)}>
+          <Button ref={botaoConectar} onClick={() => setEscolhendo(true)}>
             <Plus size={14} aria-hidden />
             {t("Conectar")}
           </Button>
@@ -223,9 +227,7 @@ export function ConexoesPagina({
 
       {escolhendo && (
         <EscolhaDeFluxo
-          nativoHabilitado={nativoHabilitado}
-          parceiroGraph={graphParceiro?.label ?? null}
-          onAssistenteQr={abrirAssistente}
+          onWhatsapp={abrirAssistente}
           onFechar={() => setEscolhendo(false)}
         />
       )}
