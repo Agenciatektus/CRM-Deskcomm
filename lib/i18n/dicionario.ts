@@ -4914,6 +4914,12 @@ export const DICIONARIO: Traducoes = {
   "O Jev usa esta chave. Sem ela, ele passa a usar a outra chave dele que já passou no teste.": {
     es: "Jev usa esta clave. Sin ella, pasa a usar su otra clave que ya pasó la prueba.",
   },
+  "O Jev usa esta chave. Sem ela, ele passa a usar o Jev da plataforma e continua ligado.": {
+    es: "Jev usa esta clave. Sin ella, pasa a usar el Jev de la plataforma y sigue activado.",
+  },
+  "Usando o Jev da plataforma. Cadastre a sua chave para usar a sua conta.": {
+    es: "Usando el Jev de la plataforma. Registra tu clave para usar tu cuenta.",
+  },
   "O Jev parou de funcionar": { es: "Jev dejó de funcionar" },
   // Título antigo do mesmo aviso: segue aqui para a busca achar o aviso aberto
   // em espanhol numa instalação que atualizou (`lib/ai/decisao/aviso.ts`).

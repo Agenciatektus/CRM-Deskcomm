@@ -27,7 +27,13 @@ interface Props {
    * O Jev LIGADO: as tarefas dele e se há IA principal para medir sem ele
    * (`page.tsx`). Qual chave ele usa sai da lista viva, aqui — ver `doJev`.
    */
-  jev?: { tarefas: readonly string[]; temIaPrincipal: boolean; origem?: OrigemDoJev } | null;
+  jev?: {
+    tarefas: readonly string[];
+    temIaPrincipal: boolean;
+    origem?: OrigemDoJev;
+    /** A plataforma serve o Jev a esta empresa (booleano; a chave nunca chega aqui). */
+    plataformaTemJev?: boolean;
+  } | null;
   /**
    * A instalação trouxe chave de IA no `.env` (a do provedor ou a do gateway)?
    * É o caso mais comum do kit, e essa chave não é linha desta lista.
@@ -78,6 +84,7 @@ export function CredentialsList({
           temOutraChave: credencialEmUsoPeloJev(credentials.filter((c) => c.id !== doJev.id), jev.origem) !== null,
           tarefas: jev.tarefas,
           temIaPrincipal: jev.temIaPrincipal,
+          plataformaServe: jev.plataformaTemJev === true && (jev.origem ?? "typesafe") === "typesafe",
         });
 
   // Só a chave do Jev não faz o atendimento funcionar: ele decide, não conversa.
@@ -93,9 +100,19 @@ export function CredentialsList({
       (c) => c.is_active && ehProvedorSuportado(c.provider) && credentialStatus(c) !== "invalid",
     );
 
+  // A plataforma serve o Jev e a empresa ainda não cadastrou a dela.
+  const usandoOJevDaPlataforma =
+    jev?.plataformaTemJev === true && (jev.origem ?? "typesafe") === "typesafe" && doJev === null;
+  const avisoDaPlataforma = usandoOJevDaPlataforma ? (
+    <p className="text-sm text-muted-foreground" data-testid="jev-da-plataforma">
+      {t("Usando o Jev da plataforma. Cadastre a sua chave para usar a sua conta.")}
+    </p>
+  ) : null;
+
   if (credentials.length === 0) {
     return (
       <>
+        {avisoDaPlataforma}
         <Card className="flex flex-col items-center gap-3 p-10 text-center">
           <h2 className="font-medium">{t("Nenhuma chave cadastrada ainda")}</h2>
           <p className="max-w-md text-sm text-muted-foreground">
@@ -116,6 +133,7 @@ export function CredentialsList({
 
   return (
     <div className="flex flex-col gap-6">
+      {avisoDaPlataforma}
       {soDecisao && (
         <Card className="border-amber-500/40 bg-amber-500/5 p-4" data-testid="aviso-so-decisao">
           <p className="text-sm">

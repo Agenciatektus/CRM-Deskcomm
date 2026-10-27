@@ -55,8 +55,14 @@ export interface DadosDoJev {
     credencial_id: string | null;
     rotulo: string | null;
     erro_de_validacao: string | null;
+    /** De quem é a chave que o Jev usa. Ausente na imagem anterior. */
+    fonte_da_chave?: "propria" | "plataforma" | "nenhuma";
   };
+  /** A plataforma serve o Jev a esta empresa (só o booleano; a chave nunca chega à tela). */
+  plataforma_tem_jev?: boolean;
   config: {
+    /** Ligado pelo padrão da plataforma, sem aceite gravado: o aceite nunca vem na resposta. */
+    no_padrao?: boolean;
     ligado: boolean;
     modo: "observacao" | "decide";
     modo_roteador?: "comparacao" | "sob_demanda";
@@ -486,7 +492,12 @@ export function CartaoDoJev({
           o resultado do teste, dito em palavras (o ✓ é enfeite). O nome do
           provedor acompanha a origem: via OpenRouter, quem conferiu foi a
           OpenRouter, e a chave é a mesma da conversa. */}
-      {dados.chave.validada && (
+      {dados.chave.fonte_da_chave === "plataforma" && (
+        <p className="mt-3 text-xs text-muted-foreground" data-testid="jev-da-plataforma">
+          {t("Usando o Jev da plataforma. Cadastre a sua chave para usar a sua conta.")}
+        </p>
+      )}
+      {dados.chave.validada && dados.chave.fonte_da_chave !== "plataforma" && (
         <p className="mt-3 flex items-center gap-1.5 text-xs text-success-fg" data-testid="jev-chave-conferida">
           <span aria-hidden>✓</span>
           {origemDoCartao(dados) === "openrouter"
