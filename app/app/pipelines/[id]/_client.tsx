@@ -189,13 +189,25 @@ export function PipelinePageClient({
         onAbrir={setDossieDaLista}
       />
     );
+  // `/app/leads/:id` redireciona para cá com `?lead=`: no celular quem abre é a página.
+  const leadDaUrl = searchParams.get("lead");
+  // No celular o dossiê é desta página nas duas vistas (lá não há KanbanBoard).
+  // O lead da URL vale mesmo fora do recorte: o filtro lembrado não esconde o link.
   const leadDaLista =
-    vista === "lista" && dossieDaLista ? (ordenados.find((l) => l.id === dossieDaLista) ?? null) : null;
-  // Trocou de vista ou o lead saiu do recorte: o dossiê fecha de vez, em vez de
-  // reabrir sozinho quando a pessoa volta para a Lista.
+    (vista === "lista" || celular) && dossieDaLista
+      ? (ordenados.find((l) => l.id === dossieDaLista) ??
+        (dossieDaLista === leadDaUrl ? data?.leads.find((l) => l.id === dossieDaLista) : undefined) ??
+        null)
+      : null;
   useEffect(() => {
-    if (dossieDaLista && !leadDaLista) setDossieDaLista(null);
-  }, [dossieDaLista, leadDaLista]);
+    if (celular && leadDaUrl) setDossieDaLista(leadDaUrl);
+  }, [celular, leadDaUrl]);
+  // Trocou de vista ou o lead saiu do recorte: o dossiê fecha de vez, em vez de
+  // reabrir sozinho quando a pessoa volta para a Lista. Com o quadro ainda
+  // carregando, o `?lead=` não fecha antes de existir.
+  useEffect(() => {
+    if (data && dossieDaLista && !leadDaLista) setDossieDaLista(null);
+  }, [data, dossieDaLista, leadDaLista]);
   const dossie = data && leadDaLista && (
     <LeadDossier
       open
@@ -218,11 +230,13 @@ export function PipelinePageClient({
           pipelineId={pipelineId}
           aoTrocarFunil={(id) => router.push(`/app/pipelines/${id}`)}
           leadsDoRecorte={data ? ordenados : undefined}
-          barra={<div className="flex flex-col gap-2 px-4 pt-2">{cabecalho}{barra}</div>}
+          barra={<div className="flex flex-col gap-2 px-4 py-2">{cabecalho}{barra}</div>}
           conteudo={vista === "lista" ? lista(ListaDoFunilCelular) : undefined}
+          aoAbrir={setDossieDaLista}
         />
         {vista === "lista" && lote}
         {novo}
+        {dossie}
       </>
     );
   }

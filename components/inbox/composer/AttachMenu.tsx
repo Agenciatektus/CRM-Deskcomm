@@ -4,7 +4,7 @@ import { useT } from "@/hooks/i18n/useT";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { FileText, ImageSquare, Plus, UserCircle } from "@/lib/ui/icons";
+import { Camera, FileText, ImageSquare, Plus, UserCircle } from "@/lib/ui/icons";
 
 interface Props {
   disabled?: boolean;
@@ -16,6 +16,7 @@ interface Props {
 export function AttachMenu({ disabled, onPick, onPickContact }: Props) {
   const t = useT();
   const mediaRef = useRef<HTMLInputElement | null>(null);
+  const cameraRef = useRef<HTMLInputElement | null>(null);
   const docRef = useRef<HTMLInputElement | null>(null);
 
   const handle = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -51,6 +52,14 @@ export function AttachMenu({ disabled, onPick, onPickContact }: Props) {
           <button
             type="button"
             className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm hover:bg-muted"
+            onClick={() => cameraRef.current?.click()}
+          >
+            <Camera size={18} weight="duotone" className="text-primary" aria-hidden />
+            {t("Câmera")}
+          </button>
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm hover:bg-muted"
             onClick={() => docRef.current?.click()}
           >
             <FileText size={18} weight="duotone" className="text-primary" aria-hidden />
@@ -73,6 +82,7 @@ export function AttachMenu({ disabled, onPick, onPickContact }: Props) {
           file picker ("nada acontece"). Aqui os refs seguem válidos após o
           fechamento — o .click() síncrono no onClick preserva o user-gesture. */}
       <input ref={mediaRef} type="file" accept="image/*,video/*" className="hidden" onChange={handle} />
+      <input ref={cameraRef} type="file" accept="image/*,video/*" capture="environment" className="hidden" onChange={handle} />
       <input
         ref={docRef}
         type="file"
