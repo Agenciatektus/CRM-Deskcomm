@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { dinheiroEmCentavos, mapearPedido, semRegredir } from "@/lib/nuvemshop/pedido-mapper";
 import { processPedido, pedidosNuvemshopHandler } from "@/lib/nuvemshop/pedidos.handler";
-import { SUBSCRIBED_EVENTS } from "@/lib/nuvemshop/config";
+import { eventLogTypeFor, SUBSCRIBED_EVENTS } from "@/lib/nuvemshop/config";
 import { credenciaisDaLoja } from "@/lib/nuvemshop/credenciais";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ensureHandlersRegistered } from "@/lib/event-log/register-handlers";
@@ -135,14 +135,66 @@ const evento = (org = "org-1") => ({
   attempts: 0,
 });
 
-describe("handler", () => {
-  beforeEach(() => {
-    linhas = new Map();
-    getOrder.mockReset();
-    vi.mocked(credenciaisDaLoja).mockResolvedValue({ accessToken: "t", storeId: "1" });
-    vi.mocked(createAdminClient).mockReturnValue(fakeAdmin() as never);
+beforeEach(() => {
+  linhas = new Map();
+  getOrder.mockReset();
+  vi.mocked(credenciaisDaLoja).mockResolvedValue({ accessToken: "t", storeId: "1" });
+  vi.mocked(createAdminClient).mockReturnValue(fakeAdmin() as never);
+});
+
+const COMPRADOR = {
+  customer: { id: 77, name: "Maria", email: "m@x.com", identification: "123.456.789-00" },
+  contact_name: "Maria",
+  contact_email: "m@x.com",
+  contact_phone: "+5511999999999",
+  contact_identification: "12345678900",
+  billing_name: "Maria",
+  billing_address: "Rua A",
+  billing_phone: "1",
+  shipping_address: { address: "Rua B", zipcode: "01000-000" },
+  shipping_name: "Maria",
+  client_details: { browser_ip: "1.2.3.4", user_agent: "x" },
+  browser_ip: "1.2.3.4",
+  note: "deixar com o porteiro Joao",
+};
+
+describe("LGPD: payload sem dado pessoal", () => {
+  it("só a lista fixa; nenhuma chave pessoal em profundidade", () => {
+    const m = mapearPedido(
+      pedido({
+        ...COMPRADOR,
+        products: [{ id: 1, product_id: 2, name: "Tênis", quantity: 1, price: "10.00", customer_note: "x" }],
+        fulfillments: [{ id: 5, status: "x", tracking_info: { code: "BR1", address: "Rua C" }, address: "Rua C" }],
+      }),
+    );
+    const json = JSON.stringify(m.payload);
+    for (const proibido of ["Maria", "m@x.com", "Rua", "1.2.3.4", "123.456", "porteiro", "99999", "01000"]) {
+      expect(json).not.toContain(proibido);
+    }
+    expect(m.payload).toMatchObject({ id: 9001, total: "650.00" });
+    expect(m.payload["fulfillments"]).toEqual([{ id: 5, status: "x", tracking_info: { code: "BR1" } }]);
+    expect(m.customer_external_id).toBe("77");
   });
 
+  it("linha anonimizada não é reescrita", async () => {
+    linhas = new Map([["org-1|9001", { is_anonymized: true, status: "paid", payload: {} }]]);
+    getOrder.mockResolvedValue(pedido({ payment_status: "paid", ...COMPRADOR }));
+    expect(await processPedido(evento())).toMatchObject({ status: "skipped", detail: "anonimizado" });
+    expect(linhas.get("org-1|9001")).toEqual({ is_anonymized: true, status: "paid", payload: {} });
+  });
+});
+
+describe("dado ruim vira skipped", () => {
+  it("created_at ausente e total inválido", async () => {
+    getOrder.mockResolvedValueOnce(pedido({ created_at: undefined }));
+    expect(await processPedido(evento())).toMatchObject({ status: "skipped", detail: "created_at_ausente" });
+    getOrder.mockResolvedValueOnce(pedido({ total: "abc" }));
+    expect(await processPedido(evento())).toMatchObject({ status: "skipped", detail: "total_invalido" });
+    expect(linhas.size).toBe(0);
+  });
+});
+
+describe("handler", () => {
   it("grava, e o mesmo evento 2x não duplica", async () => {
     getOrder.mockResolvedValue(pedido({ payment_status: "paid" }));
     expect((await processPedido(evento())).status).toBe("ok");
@@ -193,10 +245,9 @@ describe("handler", () => {
 
 describe("ligação webhook -> handler", () => {
   it("o handler está registrado e assina exatamente o que o webhook emite", () => {
-    // Emissão do webhook: `nuvemshop.${event.replace("/", "_")}` para o que não é produto.
-    const emitidos = SUBSCRIBED_EVENTS.filter((e) => e.startsWith("order/")).map(
-      (e) => `nuvemshop.${e.replace("/", "_")}`,
-    );
+    // Mesma função que a rota usa para nomear o que emite.
+    const emitidos = SUBSCRIBED_EVENTS.filter((e) => e.startsWith("order/")).map(eventLogTypeFor);
+    expect(emitidos).toContain("nuvemshop.order_updated");
     expect([...pedidosNuvemshopHandler.events].sort()).toEqual([...emitidos].sort());
 
     ensureHandlersRegistered();

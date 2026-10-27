@@ -13,7 +13,43 @@
  *                       packed    <- unshipped, partially_packed
  *                       shipped   <- shipped, partially_fulfilled
  *                       delivered <- delivered
+ *
+ * Cancelado e refunded têm o mesmo peso e o primeiro gravado fica (de propósito:
+ * ambos são finais e a API não ordena os dois). Dentro de UMA leitura, cancelled
+ * vence refunded.
+ *
+ * `payload` é uma LISTA FIXA de campos não pessoais (LGPD): nada de customer,
+ * contact_*, billing_*, shipping_address, client_details, IP ou CPF.
  */
+
+export class PedidoInvalidoError extends Error {}
+
+const PEDIDO_OK = [
+  "id", "number", "status", "payment_status", "shipping_status", "total", "subtotal",
+  "discount", "shipping_cost_customer", "shipping_cost_owner", "currency", "gateway",
+  "created_at", "updated_at", "paid_at", "closed_at", "cancelled_at", "shipped_at",
+] as const;
+const ITEM_OK = ["id", "product_id", "variant_id", "name", "sku", "quantity", "price"] as const;
+const ENVIO_OK = ["id", "status", "shipped_at", "delivered_at"] as const;
+
+const so = (o: unknown, chaves: readonly string[]): Cru => {
+  const base = (o && typeof o === "object" ? o : {}) as Cru;
+  return Object.fromEntries(chaves.filter((k) => base[k] !== undefined).map((k) => [k, base[k]]));
+};
+const lista = (v: unknown): Cru[] => (Array.isArray(v) ? (v as Cru[]) : []);
+
+function payloadSeguro(p: Cru): Cru {
+  const pd = p["payment_details"] as Cru | undefined;
+  return {
+    ...so(p, PEDIDO_OK),
+    ...(pd ? { payment_details: so(pd, ["method", "installments"]) } : {}),
+    products: lista(p["products"]).map((i) => so(i, ITEM_OK)),
+    fulfillments: lista(p["fulfillments"]).map((f) => ({
+      ...so(f, ENVIO_OK),
+      tracking_info: so(f["tracking_info"], ["code", "url"]),
+    })),
+  };
+}
 
 export type StatusPedido =
   | "pending"
@@ -43,7 +79,7 @@ type Cru = Record<string, unknown>;
 /** "650.00" -> 65000, sem float. Mais de 2 casas truncam. */
 export function dinheiroEmCentavos(v: unknown): number {
   const m = /^(\d+)(?:\.(\d+))?$/.exec(String(v ?? "").trim());
-  if (!m) throw new Error("total_invalido");
+  if (!m) throw new PedidoInvalidoError("total_invalido");
   return Number(m[1]) * 100 + Number(((m[2] ?? "") + "00").slice(0, 2));
 }
 
@@ -57,6 +93,9 @@ const ENVIO: Record<string, StatusEnvio> = {
 };
 
 export function mapearPedido(p: Cru): PedidoRow {
+  if (typeof p["created_at"] !== "string" || Number.isNaN(Date.parse(p["created_at"]))) {
+    throw new PedidoInvalidoError("created_at_ausente");
+  }
   const pay = String(p["payment_status"] ?? "");
   const ship = String(p["shipping_status"] ?? "");
 
@@ -88,7 +127,7 @@ export function mapearPedido(p: Cru): PedidoRow {
     ordered_at: String(p["created_at"]),
     updated_at_remote: typeof p["updated_at"] === "string" ? p["updated_at"] : null,
     customer_external_id: cliente?.["id"] != null ? String(cliente["id"]) : null,
-    payload: p,
+    payload: payloadSeguro(p),
   };
 }
 

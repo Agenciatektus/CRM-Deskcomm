@@ -3,23 +3,22 @@
  *
  * O webhook chega duplicado e fora de ordem, então o pedido é RELIDO na API e o
  * estado nunca regride (`semRegredir`). Service role: todo filtro leva
- * `organization_id`. Não loga token nem dado do cliente do pedido.
+ * `organization_id`. shortcut: leitura + upsert não é atômico (dois eventos simultâneos
+ * podem regredir até o próximo evento); upgrade = upsert condicional em SQL. Não loga token nem dado do cliente do pedido.
  */
 import type { EventHandler, EventRow, HandlerResult } from "@/lib/event-log/dispatcher";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { eventLogTypeFor, SUBSCRIBED_EVENTS } from "./config";
 import { NuvemshopApiClient } from "./api-client";
 import { credenciaisDaLoja } from "./credenciais";
-import { mapearPedido, semRegredir, type PedidoRow } from "./pedido-mapper";
+import { mapearPedido, PedidoInvalidoError, semRegredir, type PedidoRow } from "./pedido-mapper";
 
 export const PEDIDOS_HANDLER_KEY = "nuvemshop-pedidos.v1";
 
-// Nomes que o webhook emite: `nuvemshop.${event.replace("/", "_")}`.
-export const EVENTOS_DE_PEDIDO = [
-  "nuvemshop.order_created",
-  "nuvemshop.order_updated",
-  "nuvemshop.order_paid",
-  "nuvemshop.order_cancelled",
-];
+// Mesma função que a rota do webhook usa para nomear o que emite.
+export const EVENTOS_DE_PEDIDO = SUBSCRIBED_EVENTS.filter((e) => e.startsWith("order/")).map(
+  eventLogTypeFor,
+);
 
 const r = (status: HandlerResult["status"], detail?: string): HandlerResult => ({
   consumer_key: PEDIDOS_HANDLER_KEY,
@@ -30,7 +29,7 @@ const r = (status: HandlerResult["status"], detail?: string): HandlerResult => (
 type Atual = Pick<
   PedidoRow,
   "status" | "fulfillment_status" | "tracking_code" | "updated_at_remote"
->;
+> & { is_anonymized: boolean };
 
 export async function processPedido(row: EventRow): Promise<HandlerResult> {
   const id = row.payload["id"] != null ? String(row.payload["id"]) : "";
@@ -53,12 +52,14 @@ export async function processPedido(row: EventRow): Promise<HandlerResult> {
     };
     const { data, error: errLeitura } = await admin
       .from("orders")
-      .select("status, fulfillment_status, tracking_code, updated_at_remote")
+      .select("status, fulfillment_status, tracking_code, updated_at_remote, is_anonymized")
       .match(chave)
       .maybeSingle();
     if (errLeitura) return r("error", `leitura:${errLeitura.code ?? "erro"}`);
 
     const atual = data as Atual | null;
+    // LGPD: titular anonimizado não é reescrito pelo próximo `order/updated`.
+    if (atual?.is_anonymized) return r("skipped", "anonimizado");
     const novo = mapearPedido(cru);
     if (
       atual?.updated_at_remote &&
@@ -77,6 +78,8 @@ export async function processPedido(row: EventRow): Promise<HandlerResult> {
     if (error) return r("error", `gravacao:${error.code ?? "erro"}`);
     return r("ok");
   } catch (err) {
+    // Dado ruim não muda na próxima tentativa: pula em vez de ficar em retry.
+    if (err instanceof PedidoInvalidoError) return r("skipped", err.message);
     // Só a mensagem curta: o corpo do erro da API pode trazer dado do cliente.
     return r("error", err instanceof Error ? err.message.slice(0, 80) : "erro");
   }
