@@ -50,16 +50,18 @@ vi.mock("@/hooks/auth/AuthProvider", () => ({
 }));
 vi.mock("@/hooks/inbox/useAssignableMembers", () => ({ useAssignableMembers: () => ({ data: [] }) }));
 vi.mock("@/components/mobile/FunisDoMenu", () => ({ useFunisDoMenu: () => [] }));
+const QUADRO = {
+  pipeline: { id: "p-1", name: "Pré-venda", vocabulary: null, settings: null },
+  stages: [{ id: "s1", name: "Novo contato", position: 1, is_archived: false, expected_duration_hours: null }],
+  leads: [
+    { id: "l1", title: "A", status: "open", stage_id: "s1", position_in_stage: 1, contact_name: "Ana", created_at: new Date().toISOString(), stage_changed_at: null, tags: [], source: "manual", value_cents: null, owner_user_id: null, owner_agent_id: null, owner_kind: null },
+  ],
+};
+const quadro = vi.hoisted(() => ({ data: undefined as unknown }));
 vi.mock("@/hooks/kanban/useBoard", () => ({
   useBoard: () => ({
-    data: {
-      pipeline: { id: "p-1", name: "Pré-venda", vocabulary: null, settings: null },
-      stages: [{ id: "s1", name: "Novo contato", position: 1, is_archived: false, expected_duration_hours: null }],
-      leads: [
-        { id: "l1", title: "A", status: "open", stage_id: "s1", position_in_stage: 1, contact_name: "Ana", created_at: new Date().toISOString(), stage_changed_at: null, tags: [], source: "manual", value_cents: null, owner_user_id: null, owner_agent_id: null, owner_kind: null },
-      ],
-    },
-    isLoading: false,
+    data: quadro.data,
+    isLoading: !quadro.data,
     error: null,
     pulses: [],
     realtimeStatus: "SUBSCRIBED",
@@ -73,12 +75,19 @@ vi.mock("@/components/kanban/NewLeadDialog", () => ({ NewLeadDialog: () => null 
 vi.mock("@/components/kanban/BulkActionBar", () => ({ BulkActionBar: () => null }));
 vi.mock("@/components/mobile/telas/FolhaMoverEtapaDoLead", () => ({ FolhaMoverEtapaDoLead: () => null }));
 vi.mock("@/components/kanban/LeadDossier", () => ({
-  LeadDossier: ({ lead }: { lead: { id: string } }) => <div data-testid="dossie">{lead.id}</div>,
+  LeadDossier: ({ lead, onOpenChange }: { lead: { id: string }; onOpenChange: (v: boolean) => void }) => (
+    <div data-testid="dossie">
+      <span data-testid="dossie-id">{lead.id}</span>
+      <button type="button" onClick={() => onOpenChange(false)}>fechar</button>
+    </div>
+  ),
 }));
 
 async function montarPagina() {
   const { PipelinePageClient } = await import("@/app/app/pipelines/[id]/_client");
-  render(<PipelinePageClient pipelineId="p-1" initialName="Pré-venda" role="agent" funis={[]} />);
+  const pagina = () => <PipelinePageClient pipelineId="p-1" initialName="Pré-venda" role="agent" funis={[]} />;
+  const r = render(pagina());
+  return { rerender: () => r.rerender(pagina()) };
 }
 
 function tocar(texto: string) {
@@ -91,6 +100,7 @@ beforeEach(() => {
   window.localStorage.clear();
   estado.busca = new URLSearchParams();
   estado.navegou = [];
+  quadro.data = QUADRO;
 });
 
 describe("Funil no celular: tocar no card abre o lead", () => {
@@ -100,20 +110,54 @@ describe("Funil no celular: tocar no card abre o lead", () => {
     expect(screen.queryByTestId("dossie")).toBeNull();
     tocar("Ana");
     expect(estado.navegou).toEqual([]);
-    expect(screen.getByTestId("dossie").textContent).toBe("l1");
+    expect(screen.getByTestId("dossie-id").textContent).toBe("l1");
   });
 
   it("abas de etapa: abre o dossiê na página e não sai para /app/leads", async () => {
     await montarPagina();
     tocar("Ana");
     expect(estado.navegou).toEqual([]);
-    expect(screen.getByTestId("dossie").textContent).toBe("l1");
+    expect(screen.getByTestId("dossie-id").textContent).toBe("l1");
   });
 
   it("o destino do redirecionamento (`?lead=`) abre o dossiê no celular", async () => {
     estado.busca = new URLSearchParams("lead=l1");
     await montarPagina();
-    expect(screen.getByTestId("dossie").textContent).toBe("l1");
+    expect(screen.getByTestId("dossie-id").textContent).toBe("l1");
+  });
+
+  it("`?lead=` com o quadro ainda carregando: o dossiê espera os dados e abre", async () => {
+    quadro.data = undefined;
+    estado.busca = new URLSearchParams("lead=l1");
+    const { rerender } = await montarPagina();
+    expect(screen.queryByTestId("dossie")).toBeNull();
+    quadro.data = QUADRO;
+    act(() => rerender());
+    expect(screen.getByTestId("dossie-id").textContent).toBe("l1");
+  });
+
+  it("`?lead=` de lead que não existe: nada abre e a tela fica estável", async () => {
+    const erro = vi.spyOn(console, "error").mockImplementation(() => {});
+    estado.busca = new URLSearchParams("lead=lx");
+    const { rerender } = await montarPagina();
+    act(() => rerender());
+    expect(screen.queryByTestId("dossie")).toBeNull();
+    expect(erro.mock.calls.flat().join(" ")).not.toMatch(/Maximum update depth/);
+    erro.mockRestore();
+  });
+
+  it("fechar o dossiê aberto pelo `?lead=` não o reabre sozinho", async () => {
+    estado.busca = new URLSearchParams("lead=l1");
+    const { rerender } = await montarPagina();
+    tocar("fechar");
+    act(() => rerender());
+    expect(screen.queryByTestId("dossie")).toBeNull();
+  });
+
+  it("`?lead=` abre mesmo com o filtro (lembrado) tirando o lead do recorte", async () => {
+    estado.busca = new URLSearchParams("q=ninguem-com-este-nome&lead=l1");
+    await montarPagina();
+    expect(screen.getByTestId("dossie-id").textContent).toBe("l1");
   });
 
   it("controle: sem `?lead=` e sem toque, nada abre", async () => {
