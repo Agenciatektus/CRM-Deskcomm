@@ -119,6 +119,16 @@ describe("aplicaGatilhoDeLead — o que não dispara", () => {
     expect(reg.contatoConsultado).toBe(0);
   });
 
+  it("card de pedido da loja não inscreve em follow-up", async () => {
+    const reg = registro();
+    const s = await aplicaGatilhoDeLead(
+      { db: fakeDb({ pointers: [pointerArmado], pedeAgente: false, registro: reg }), gateDb: fakeGate([]), clock: CLOCK },
+      evento({ metadata: { via: "pedido_loja" } }),
+    );
+    expect(s.enrolled).toBe(0);
+    expect(s.criados_em_lote).toBe(1);
+  });
+
   it("negócio que entrou por planilha não inscreve — importação não vira disparo em massa", async () => {
     const reg = registro();
     const s = await aplicaGatilhoDeLead(

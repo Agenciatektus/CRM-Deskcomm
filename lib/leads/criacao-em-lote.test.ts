@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import { ORIGEM_CAMPANHA } from "@/lib/campanhas/origem-do-lead";
 
-import { ORIGENS_DE_CRIACAO_EM_LOTE, criacaoEmLote } from "./criacao-em-lote";
+import { ORIGENS_DE_CRIACAO_EM_LOTE, ORIGEM_PEDIDO_DA_LOJA, criacaoEmLote } from "./criacao-em-lote";
 import { ORIGEM_DA_PLANILHA } from "./planilha";
 
 describe("criacaoEmLote", () => {
@@ -31,7 +31,7 @@ describe("criacaoEmLote", () => {
 
   it("a lista contém exatamente as origens declaradas", () => {
     expect([...ORIGENS_DE_CRIACAO_EM_LOTE].sort()).toEqual(
-      [ORIGEM_DA_PLANILHA, ORIGEM_CAMPANHA].sort(),
+      [ORIGEM_DA_PLANILHA, ORIGEM_CAMPANHA, ORIGEM_PEDIDO_DA_LOJA].sort(),
     );
   });
 });

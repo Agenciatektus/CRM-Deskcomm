@@ -10,3 +10,4 @@ conforme o pedido é pago, enviado e entregue; pedido cancelado ou reembolsado v
 "Cancelado ou com problema" e fica lá. O card só aparece quando o comprador já é um
 contato do CRM (casado pelo telefone ou e-mail), e o título leva apenas o número do pedido.
 Quem não tem o funil não percebe mudança.
+As automações que você criou não rodam sobre esses cards, e o follow-up de "lead criado" não inscreve o comprador por causa de um pedido.

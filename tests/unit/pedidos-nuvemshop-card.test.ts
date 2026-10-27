@@ -12,6 +12,8 @@ vi.mock("@/app/api/v1/leads/_handler", () => ({
   createLeadHandler: vi.fn(),
   moveLeadHandler: vi.fn(),
 }));
+import { CANONICAL_LOST_REASONS } from "@/lib/schemas/leads";
+const CANONICOS: string[] = [...CANONICAL_LOST_REASONS];
 const getOrder = vi.fn();
 vi.mock("@/lib/nuvemshop/api-client", () => ({
   NuvemshopApiClient: class {
@@ -79,6 +81,8 @@ const montaFunil = (org: string) => {
       slug,
       position: i + 1,
       is_archived: false,
+      is_won: slug === "entregue",
+      is_lost: slug === "cancelado-ou-com-problema",
     }),
   );
 };
@@ -123,10 +127,18 @@ beforeEach(() => {
   vi.mocked(credenciaisDaLoja).mockResolvedValue({ accessToken: "t", storeId: "1" });
   vi.mocked(createAdminClient).mockReturnValue(fakeAdmin() as never);
   vi.mocked(createLeadHandler).mockReset().mockImplementation((async (_a: unknown, ctx: Linha, input: Linha) => {
+    // Guarda do banco: nascer em etapa de perda sem motivo é recusado (#2743).
+    if (etapas.find((e) => e.id === input.stage_id)?.is_lost) throw Object.assign(new Error("lost_reason_required"), { code: "422" });
+    // Índice único uniq_crm_leads_org_source_external.
+    if (leads.some((l) => l.organization_id === ctx.organization_id && l.source === input.source && l.external_id === input.external_id))
+      throw Object.assign(new Error("duplicate"), { code: "23505" });
     leads.push({ id: `l${leads.length + 1}`, organization_id: ctx.organization_id, source: input.source, external_id: input.external_id, stage_id: input.stage_id, title: input.title });
-    return {};
+    return { id: `l${leads.length}` };
   }) as never);
   vi.mocked(moveLeadHandler).mockReset().mockImplementation((async (_a: unknown, _c: unknown, id: string, i: Linha) => {
+    // Guarda do banco: etapa de perda exige motivo do vocabulário canônico.
+    if (etapas.find((e) => e.id === i.to_stage_id)?.is_lost && !CANONICOS.includes(String(i.lost_reason)))
+      throw Object.assign(new Error("lost_reason_required"), { code: "422" });
     leads.find((l) => l.id === id)!.stage_id = i.to_stage_id;
     return {};
   }) as never);
@@ -163,7 +175,7 @@ describe("card do pedido", () => {
     await roda("paid", "delivered");
     await roda("paid", "unpacked");
     expect(etapaDoCard()).toEqual(["org-1-entregue"]);
-    expect(moveLeadHandler).not.toHaveBeenCalled();
+    expect(moveLeadHandler).toHaveBeenCalledTimes(1); // só o move de nascimento (entregue)
   });
 
   it("cancelado vence e fica", async () => {
@@ -221,6 +233,42 @@ describe("card do pedido", () => {
     expect(orders.get("org-1|9001")).toBeDefined();
   });
 
+  it("funil existe mas falta etapa: funil_incompleto; sem funil: sem detail", async () => {
+    etapas = etapas.filter((e) => e.slug !== "entregue");
+    expect((await roda("paid", "unpacked")).detail).toBe("funil_incompleto");
+  });
+
+  it("corrida na criação (índice único): relê o card e move o MESMO", async () => {
+    // o outro evento cria o card depois da leitura deste: a criação aqui bate no índice único.
+    vi.mocked(createLeadHandler).mockImplementationOnce((async (_a: unknown, ctx: Linha, input: Linha) => {
+      leads.push({ id: "lx", organization_id: ctx.organization_id, source: input.source, external_id: input.external_id, stage_id: "org-1-aguardando-pagamento" });
+      throw Object.assign(new Error("duplicate"), { code: "23505" });
+    }) as never);
+    getOrder.mockResolvedValue(pedido("paid", "unpacked"));
+    const res = await processPedido(evento());
+    expect(res.detail).toBe("card_movido");
+    expect(leads).toHaveLength(1);
+    expect(etapaDoCard()).toEqual(["org-1-pago-separando"]);
+  });
+
+  it("order/updated sem mudança de status não re-avança o card arrastado por humano", async () => {
+    await roda("paid", "unpacked");
+    leads[0]!.stage_id = "org-1-aguardando-pagamento"; // humano arrastou para trás
+    await roda("paid", "unpacked");
+    expect(etapaDoCard()).toEqual(["org-1-aguardando-pagamento"]);
+  });
+
+  it("o card é criado com via=pedido_loja (sem acordar o follow-up)", async () => {
+    await roda("paid", "unpacked");
+    expect(vi.mocked(createLeadHandler).mock.calls[0]![2]).toMatchObject({ via: "pedido_loja" });
+  });
+
+  it("cancelado leva o motivo canônico cancelled_by_store", async () => {
+    await roda("paid", "unpacked");
+    await roda("voided", "unpacked");
+    expect(vi.mocked(moveLeadHandler).mock.calls.at(-1)![3]).toMatchObject({ lost_reason: "cancelled_by_store" });
+  });
+
   it("o handler chama o card DEPOIS de gravar o pedido", async () => {
     let gravadoAntes = false;
     vi.mocked(createLeadHandler).mockImplementation((async () => {
@@ -229,5 +277,59 @@ describe("card do pedido", () => {
     }) as never);
     await roda("paid", "unpacked");
     expect(gravadoAntes).toBe(true);
+  });
+});
+
+describe("histórico do card (reason / motivo)", () => {
+  const reasons = () => vi.mocked(moveLeadHandler).mock.calls.map((c) => (c[3] as unknown as Linha).reason);
+
+  it("cada transição leva o reason do evento do pedido", async () => {
+    await roda("pending", "unpacked");
+    expect(vi.mocked(createLeadHandler).mock.calls[0]![2]).toMatchObject({
+      source_metadata: { evento: "Pedido #77 criado na loja, aguardando pagamento" },
+    });
+    await roda("paid", "unpacked");
+    getOrder.mockResolvedValue(pedido("paid", "shipped", { fulfillments: [{ tracking_info: { code: "BR123" } }] }));
+    await processPedido(evento());
+    await roda("paid", "delivered");
+    expect(reasons()).toEqual(["Pedido #77 pago", "Pedido #77 enviado (rastreio BR123)", "Pedido #77 entregue"]);
+  });
+
+  it("entregue leva won_reason; cancelado leva lost_reason canônico", async () => {
+    await roda("paid", "delivered");
+    expect(vi.mocked(moveLeadHandler).mock.calls[0]![3]).toMatchObject({ won_reason: "Pedido entregue" });
+    leads = [];
+    orders.clear();
+    vi.mocked(moveLeadHandler).mockClear();
+    await roda("paid", "shipped");
+    await roda("voided", "unpacked");
+    const ultimo = vi.mocked(moveLeadHandler).mock.calls.at(-1)![3] as unknown as Linha;
+    expect(ultimo).toMatchObject({ reason: "Pedido #77 cancelado", lost_reason: "cancelled_by_store" });
+    expect(CANONICOS).toContain(ultimo.lost_reason);
+  });
+
+  it("reembolsado tem texto próprio", async () => {
+    await roda("paid", "unpacked");
+    await roda("refunded", "unpacked");
+    expect(reasons().at(-1)).toBe("Pedido #77 reembolsado");
+  });
+
+  it("pedido que nasce cancelado cria o card sem recusa do banco", async () => {
+    const res = await roda("voided", "unpacked");
+    expect(res.detail).toBe("card_criado_e_movido");
+    expect(leads).toHaveLength(1);
+    expect(etapaDoCard()).toEqual(["org-1-cancelado-ou-com-problema"]);
+  });
+
+  it("nenhum texto leva telefone, e-mail ou nome do comprador", async () => {
+    getOrder.mockResolvedValue(
+      pedido("paid", "delivered", { contact_email: "maria@x.com", contact_name: "Maria Silva", customer: { id: 1, name: "Maria Silva" } }),
+    );
+    await processPedido(evento());
+    const tudo = JSON.stringify([
+      vi.mocked(createLeadHandler).mock.calls.map((c) => c[2]),
+      vi.mocked(moveLeadHandler).mock.calls.map((c) => c[3]),
+    ]);
+    expect(tudo).not.toMatch(/5511999998888|maria|Silva|@/i);
   });
 });

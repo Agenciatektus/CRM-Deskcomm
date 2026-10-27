@@ -91,7 +91,9 @@ export async function processPedido(row: EventRow): Promise<HandlerResult> {
       externalId: id,
       numero: cru["number"] != null ? String(cru["number"]) : null,
       status: gravado.status,
+      statusAnterior: atual?.status ?? null,
       totalCents: gravado.total_cents,
+      rastreio: gravado.tracking_code,
       contactId: atual?.contact_id ?? (casou && "contactId" in casou ? casou.contactId : null),
     });
     const detalhes = [
