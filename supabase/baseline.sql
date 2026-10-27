@@ -63136,6 +63136,42 @@ grant execute on function public.fn_marcar_limpeza_nativa(uuid, uuid, boolean)
 
 notify pgrst, 'reload schema';
 
+-- ---- Plano com IA propria (migration 9075) ----
+alter table public.cobranca_planos
+  add column if not exists ia_propria boolean not null default false;
+
+comment on column public.cobranca_planos.ia_propria is
+  'true = a empresa neste plano usa somente a credencial de IA cadastrada por ela; a chave de IA da instalacao nunca a serve. Migration 9075.';
+
+-- A instalacao pode servir IA a esta organizacao? Mesma leitura de fn_limite_do_plano:
+-- cobranca desligada ou organizacao sem assinatura = true (comportamento de sempre).
+-- Vale o plano_id vigente, nunca o agendado.
+create or replace function public.fn_org_pode_usar_ia_da_instalacao(p_org uuid)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.fn_cobranca_ligada() then
+    return true;
+  end if;
+  return not coalesce(
+    (select p.ia_propria
+       from public.cobranca_assinaturas a
+       join public.cobranca_planos p on p.id = a.plano_id
+      where a.organization_id = p_org),
+    false
+  );
+end;
+$$;
+
+revoke execute on function public.fn_org_pode_usar_ia_da_instalacao(uuid) from public, anon, authenticated;
+grant execute on function public.fn_org_pode_usar_ia_da_instalacao(uuid) to service_role;
+
+notify pgrst, 'reload schema';
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria
@@ -66433,40 +66469,3 @@ comment on column public.ad_insights_connections.allowed_ad_account_ids is
 
 comment on column public.ad_insights_connections.connected_by is
   'Usuario que conectou (OAuth) ou colou o token. So ele (ou platform admin) amplia as contas permitidas. Nulo = conexao antiga: so platform admin amplia. Migration 9074.';
-
-
--- ---- Plano com IA propria (migration 9075) ----
-alter table public.cobranca_planos
-  add column if not exists ia_propria boolean not null default false;
-
-comment on column public.cobranca_planos.ia_propria is
-  'true = a empresa neste plano usa somente a credencial de IA cadastrada por ela; a chave de IA da instalacao nunca a serve. Migration 9075.';
-
--- A instalacao pode servir IA a esta organizacao? Mesma leitura de fn_limite_do_plano:
--- cobranca desligada ou organizacao sem assinatura = true (comportamento de sempre).
--- Vale o plano_id vigente, nunca o agendado.
-create or replace function public.fn_org_pode_usar_ia_da_instalacao(p_org uuid)
-returns boolean
-language plpgsql
-stable
-security definer
-set search_path = ''
-as $$
-begin
-  if not public.fn_cobranca_ligada() then
-    return true;
-  end if;
-  return not coalesce(
-    (select p.ia_propria
-       from public.cobranca_assinaturas a
-       join public.cobranca_planos p on p.id = a.plano_id
-      where a.organization_id = p_org),
-    false
-  );
-end;
-$$;
-
-revoke execute on function public.fn_org_pode_usar_ia_da_instalacao(uuid) from public, anon, authenticated;
-grant execute on function public.fn_org_pode_usar_ia_da_instalacao(uuid) to service_role;
-
-notify pgrst, 'reload schema';
