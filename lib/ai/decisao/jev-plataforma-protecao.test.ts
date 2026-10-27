@@ -28,6 +28,8 @@ const banco = vi.hoisted(() => ({
 }));
 const logs = vi.hoisted(() => [] as Array<[string, string, Record<string, unknown> | undefined]>);
 
+const sentry = vi.hoisted(() => ({ captureMessage: vi.fn() }));
+vi.mock("@sentry/nextjs", () => sentry);
 vi.mock("@/lib/env", () => ({ env: ambiente }));
 vi.mock("@/lib/crypto/aes_gcm", () => ({ byteaToBuffer: (v: unknown) => v, decryptKey: () => "decifrada:propria" }));
 vi.mock("@/lib/logger", () => ({
@@ -165,6 +167,7 @@ beforeEach(() => {
   banco.rpcs.length = 0;
   banco.consultas.length = 0;
   logs.length = 0;
+  sentry.captureMessage.mockClear();
 });
 afterEach(() => vi.useRealTimers());
 
@@ -372,5 +375,30 @@ describe("kill-switch e elegibilidade", () => {
     const r1 = await chamar(B, vi.fn().mockResolvedValue(respostaOk()));
     const r2 = await chamar(B, vi.fn().mockResolvedValue(new Response("{}", { status: 402 })));
     expect(JSON.stringify([r1, r2, logs])).not.toContain(SEGREDO);
+  });
+});
+
+describe("aviso ao admin da plataforma no Sentry", () => {
+  it("o teto atingido e o disjuntor aberto viram captureMessage, sem a chave", async () => {
+    banco.uso.set(`${A}|${MES}`, 50);
+    await destinoDasTarefas(A, CLIMA);
+    await chamar(B, vi.fn().mockResolvedValue(new Response("{}", { status: 402 })));
+    const eventos = sentry.captureMessage.mock.calls.map(([m]) => m);
+    expect(eventos).toEqual(["jev_plataforma_teto_atingido", "jev_plataforma_disjuntor_aberto"]);
+    expect(JSON.stringify(sentry.captureMessage.mock.calls)).not.toContain(SEGREDO);
+  });
+
+  it("controle: abaixo do teto e sem falha de conta, nada vai ao Sentry", async () => {
+    await chamar(A, vi.fn().mockResolvedValue(respostaOk()));
+    expect(sentry.captureMessage).not.toHaveBeenCalled();
+  });
+
+  it("falha do Sentry não derruba o Jev", async () => {
+    sentry.captureMessage.mockImplementation(() => {
+      throw new Error("sentry fora");
+    });
+    banco.uso.set(`${A}|${MES}`, 50);
+    expect(await destinoDasTarefas(A, CLIMA)).toBeNull();
+    sentry.captureMessage.mockReset();
   });
 });

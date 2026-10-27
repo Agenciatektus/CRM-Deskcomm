@@ -30,6 +30,8 @@
  * e o próprio estado do disjuntor fica visível na linha de `platform_config`.
  * A chave da plataforma nunca entra em log.
  */
+import * as Sentry from "@sentry/nextjs";
+
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import type { createAdminClient } from "@/lib/supabase/admin";
@@ -69,11 +71,30 @@ export function zerarEstadoDaPlataforma(): void {
   disjuntor = null;
 }
 
+/**
+ * O alerta ao admin da plataforma, além do log: `Sentry.captureMessage` (o SDK que o
+ * servidor já usa, ex.: `lib/lgpd/sla-alarm.ts`; sem `SENTRY_DSN` ele não envia nada).
+ * Só nome do evento e números, nunca a chave. Nunca lança.
+ */
+function alertarNoSentry(evento: string, extras: Record<string, string | number>): void {
+  try {
+    Sentry.captureMessage(evento, { level: "error", tags: { evento }, extra: extras });
+  } catch {
+    // alerta é melhor-esforço
+  }
+}
+
 function avisarTeto(organizationId: string, mes: string, custo: number): void {
   const marca = `${organizationId}:${mes}`;
   if (tetoJaAvisado.has(marca)) return;
   tetoJaAvisado.add(marca);
   logger.error("jev_plataforma_teto_atingido", {
+    organizationId,
+    mes,
+    gastoUsdCents: custo,
+    tetoUsdCents: tetoMensalPorEmpresaCents(),
+  });
+  alertarNoSentry("jev_plataforma_teto_atingido", {
     organizationId,
     mes,
     gastoUsdCents: custo,
@@ -232,6 +253,7 @@ export async function abrirDisjuntorGlobal(
   if (!jaAberto) {
     // O aviso ao admin da plataforma (ver o cabeçalho): log estruturado, sem a chave.
     logger.error("jev_plataforma_disjuntor_aberto", { motivo, reabreEm: new Date(ate).toISOString() });
+    alertarNoSentry("jev_plataforma_disjuntor_aberto", { motivo, reabreEm: new Date(ate).toISOString() });
   }
 }
 
