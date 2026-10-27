@@ -5757,5 +5757,18 @@
   "Buscar por nome ou id": "按名称或 ID 搜索",
   "marcadas": "已选",
   "Primeira conta ativa": "第一个有效账户",
-  "Para liberar outras contas, peça a quem conectou a Meta ou ao suporte": "要开放其他账户，请联系连接 Meta 的人或支持团队"
+  "Para liberar outras contas, peça a quem conectou a Meta ou ao suporte": "要开放其他账户，请联系连接 Meta 的人或支持团队",
+  "Filtros salvos": "已保存的筛选",
+  "Carregando filtros salvos": "正在加载已保存的筛选",
+  "Não foi possível carregar os filtros salvos.": "无法加载已保存的筛选。",
+  "Nenhum filtro salvo ainda.": "还没有已保存的筛选。",
+  "Apagar este filtro?": "删除此筛选？",
+  "Apagar o filtro": "删除筛选",
+  "Salvar este filtro": "保存此筛选",
+  "Nome do filtro": "筛选名称",
+  "Não foi possível salvar o filtro.": "无法保存筛选。",
+  "Já existe um filtro salvo com esse nome.": "已存在同名的已保存筛选。",
+  "Limite de filtros salvos atingido.": "已达到已保存筛选的上限。",
+  "Filtro salvo não encontrado.": "未找到已保存的筛选。",
+  "Este filtro salvo não pôde ser aplicado.": "无法应用此已保存的筛选。"
 }
