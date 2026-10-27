@@ -41,7 +41,7 @@ function responder(c: Cadeia): Resposta {
       const campos = argumentos(c, "update")?.[0] as Record<string, unknown>;
       return "sessao_id" in campos && m.erroDaSessao ? { error: { code: m.erroDaSessao, message: "dup" } } : {};
     }
-    if (valorDoFiltro(c, "eq", "motivo") === "efeitos_pendentes" && valorDoFiltro(c, "eq", "id") === undefined) return { data: m.filaDeEfeitos };
+    if (String(argumentos(c, "or")?.[0] ?? "").includes("efeitos_pendentes")) return { data: m.filaDeEfeitos };
     if (valorDoFiltro(c, "eq", "email") !== undefined) return { data: m.irmas };
     if (valorDoFiltro(c, "eq", "id") !== undefined) return { data: m.compra };
     return { data: m.fila };
@@ -247,8 +247,10 @@ describe("processarComprasPendentes", () => {
     m.filaDeEfeitos = [{ id: `compra-${n}` }];
     m.compra = { id: `compra-${n}`, evento_id: `evt_${n}`, status: "criada", empresa_criada_id: `org-${n}`, tentativas: 1, email: "a@exemplo.com", nome_empresa: "Empresa", plano_chave: "pro" };
     const r = await processarComprasPendentes(banco.cliente as never, { adaptador: () => ({ lerCompra }) as never, sincronizar, aoCriar });
-    const fila = banco.cadeias.find((c) => c.tabela === "cobranca_compras" && valorDoFiltro(c, "eq", "motivo") === "efeitos_pendentes" && valorDoFiltro(c, "eq", "id") === undefined)!;
+    const fila = banco.cadeias.find((c) => c.tabela === "cobranca_compras" && String(argumentos(c, "or")?.[0] ?? "").includes("efeitos_pendentes"))!;
     expect(valorDoFiltro(fila, "eq", "status")).toBe("criada");
+    const ou = String(argumentos(fila, "or")?.[0]);
+    expect(ou).toMatch(/^motivo\.eq\.efeitos_pendentes,and\(motivo\.eq\.convite_em_curso,updated_at\.lt\.\d{4}-\d{2}-\d{2}T[\d:.]+Z\)$/);
     expect(argumentos(fila, "lt")).toEqual(["tentativas", TETO_DE_TENTATIVAS]);
     expect(aoCriar).toHaveBeenCalledTimes(1);
     expect(aoCriar).toHaveBeenCalledWith(`org-${n}`, expect.objectContaining({ id: `compra-${n}`, nome_empresa: "Empresa" }));
@@ -259,12 +261,20 @@ describe("processarComprasPendentes", () => {
     expect(r).toEqual({ lidas: 1, criadas: 0, falhas: 0 });
   });
 
+  it("repetirEfeitos lê a compra aceitando os DOIS motivos (pendente e convite em curso velho)", async () => {
+    m.filaDeEfeitos = [{ id: `compra-${n}` }];
+    m.compra = { id: `compra-${n}`, evento_id: `evt_${n}`, status: "criada", empresa_criada_id: `org-${n}`, tentativas: 1, email: "a@exemplo.com", nome_empresa: "Empresa", plano_chave: "pro" };
+    await processarComprasPendentes(banco.cliente as never, { aoCriar });
+    const leitura = banco.cadeias.find((c) => c.tabela === "cobranca_compras" && valorDoFiltro(c, "eq", "id") !== undefined && argumentos(c, "in") !== undefined)!;
+    expect(argumentos(leitura, "in")).toEqual(["motivo", ["efeitos_pendentes", "convite_em_curso"]]);
+  });
+
   it("retentativa que falha de novo: mantém o motivo, soma a tentativa e conta falha", async () => {
     m.filaDeEfeitos = [{ id: `compra-${n}` }];
     m.compra = { id: `compra-${n}`, evento_id: `evt_${n}`, status: "criada", empresa_criada_id: `org-${n}`, tentativas: 3, email: "a@exemplo.com", nome_empresa: "Empresa", plano_chave: "pro" };
     aoCriar.mockRejectedValue(new Error("convite fora"));
     const r = await processarComprasPendentes(banco.cliente as never, { aoCriar });
-    expect(ultima()).toEqual({ tentativas: 4 });
+    expect(ultima()).toEqual({ motivo: "efeitos_pendentes", tentativas: 4 });
     expect(r.falhas).toBe(1);
   });
 });

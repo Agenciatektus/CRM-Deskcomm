@@ -29,6 +29,10 @@ export const LIMITE_DE_COMPRAS_POR_RODADA = 20;
 export const TETO_DE_TENTATIVAS = 10;
 const JANELA_DO_MESMO_EMAIL_MS = 24 * 3600 * 1000;
 export const MOTIVO_DOS_EFEITOS_PENDENTES = "efeitos_pendentes";
+export const MOTIVO_DO_CONVITE_EM_CURSO = "convite_em_curso";
+/** Depois disso, um `convite_em_curso` é de um processo que morreu: a rodada retoma. */
+export const VALIDADE_DO_CONVITE_EM_CURSO_MS = 15 * 60 * 1000;
+export const limiteDoConviteEmCurso = (agora: Date = new Date()) => new Date(agora.getTime() - VALIDADE_DO_CONVITE_EM_CURSO_MS).toISOString();
 const FORMATO_DO_CLIENT_REFERENCE = /^[A-Za-z0-9_-]{1,200}$/;
 
 export interface CompraGravada {
@@ -252,7 +256,7 @@ async function repetirEfeitos(admin: SupabaseClient, compraId: string, deps: Dep
     .select(COLUNAS)
     .eq("id", compraId)
     .eq("status", "criada")
-    .eq("motivo", MOTIVO_DOS_EFEITOS_PENDENTES)
+    .in("motivo", [MOTIVO_DOS_EFEITOS_PENDENTES, MOTIVO_DO_CONVITE_EM_CURSO])
     .maybeSingle();
   if (error) throw new Error(`compra: leitura falhou (${error.code ?? "sem_codigo"})`);
   const compra = data as CompraGravada | null;
@@ -261,7 +265,7 @@ async function repetirEfeitos(admin: SupabaseClient, compraId: string, deps: Dep
     await deps.aoCriar?.(compra.empresa_criada_id, compra);
   } catch (e) {
     logger.error("cobranca.compra_ao_criar_falhou", { compra: compra.id, erro: e instanceof Error ? e.message : "desconhecido" });
-    await gravar(admin, compra.id, { tentativas: compra.tentativas + 1 });
+    await gravar(admin, compra.id, { motivo: MOTIVO_DOS_EFEITOS_PENDENTES, tentativas: compra.tentativas + 1 });
     return false;
   }
   await gravar(admin, compra.id, { motivo: null });
@@ -300,7 +304,7 @@ export async function processarComprasPendentes(admin: SupabaseClient, deps: Dep
     .from("cobranca_compras")
     .select("id")
     .eq("status", "criada")
-    .eq("motivo", MOTIVO_DOS_EFEITOS_PENDENTES)
+    .or(`motivo.eq.${MOTIVO_DOS_EFEITOS_PENDENTES},and(motivo.eq.${MOTIVO_DO_CONVITE_EM_CURSO},updated_at.lt.${limiteDoConviteEmCurso()})`)
     .lt("tentativas", TETO_DE_TENTATIVAS)
     .order("created_at", { ascending: true })
     .limit(LIMITE_DE_COMPRAS_POR_RODADA);

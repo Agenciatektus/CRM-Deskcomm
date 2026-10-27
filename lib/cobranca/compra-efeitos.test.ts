@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { bancoFalso, filtros, valorDoFiltro, type Cadeia, type Resposta } from "@/tests/helpers/banco-falso-da-cobranca";
+import { argumentos, bancoFalso, filtros, valorDoFiltro, type Cadeia, type Resposta } from "@/tests/helpers/banco-falso-da-cobranca";
 
 const h = vi.hoisted(() => ({ emitir: vi.fn(), avisar: vi.fn() }));
 vi.mock("@/lib/team/convites", () => ({ emitirConvite: h.emitir }));
+vi.mock("@/lib/branding/saida", () => ({ marcaDaSaida: vi.fn(async () => ({ nome: "Marca da Instalação" })) }));
 vi.mock("./emails", () => ({ avisarDonosDaInstalacao: h.avisar }));
 vi.mock("@/lib/env", () => ({ env: { NEXT_PUBLIC_APP_URL: "https://crm.exemplo.com/" } }));
 
@@ -13,10 +14,11 @@ const ORG = "org-passada-111";
 const EMAIL = "pagadora.secreta@exemplo.com";
 const compra = { id: "compra-9", email: EMAIL, nome_empresa: "Clínica Aurora", plano_chave: "plano-x" } as never;
 
-function montar({ donos = [{ user_id: "dono-antigo" }], convites = [] as Array<{ id: string }> } = {}) {
+function montar({ donos = [{ user_id: "dono-antigo" }], convites = [] as Array<{ id: string }>, trava = [{ id: "compra-9" }] as Array<{ id: string }> } = {}) {
   const banco = bancoFalso((c: Cadeia): Resposta => {
     if (c.tabela === "platform_admins") return { data: donos };
     if (c.tabela === "team_invites") return { data: convites };
+    if (c.tabela === "cobranca_compras" && c.passos.some((p) => p.metodo === "select")) return { data: trava };
     return {};
   });
   const admin = {
@@ -42,7 +44,7 @@ describe("efeitosDaCompra.aoCriar", () => {
       organizationId: ORG,
       orgName: "Clínica Aurora",
       inviterId: "dono-antigo",
-      inviterName: "Nome dono-antigo",
+      inviterName: "Marca da Instalação",
       requestId: "compra-compra-9",
     });
     const donos = banco.cadeias.find((c) => c.tabela === "platform_admins")!;
@@ -77,7 +79,67 @@ describe("efeitosDaCompra.aoCriar", () => {
   });
 });
 
+describe("efeitosDaCompra.aoCriar: trava e nome", () => {
+  const atualizacoes = (banco: ReturnType<typeof montar>["banco"]) => banco.cadeias.filter((c) => c.tabela === "cobranca_compras");
+
+  it("inviterName é o nome da marca, nunca o e-mail do dono", async () => {
+    const { efeitos } = montar();
+    await efeitos.aoCriar!(ORG, compra);
+    const nome = h.emitir.mock.calls[0]![1].inviterName as string;
+    expect(nome).toBe("Marca da Instalação");
+    expect(nome).not.toContain("@");
+    expect(nome).not.toContain("dono-antigo");
+  });
+
+  it("trava ANTES de emitir, com filtro de motivo, e só depois limpa", async () => {
+    const { banco, efeitos } = montar();
+    const ordem: string[] = [];
+    h.emitir.mockImplementation(async () => {
+      ordem.push(`emitir:${atualizacoes(banco).length}`);
+    });
+    await efeitos.aoCriar!(ORG, compra);
+    expect(ordem).toEqual(["emitir:1"]); // só a trava existia quando emitiu
+    const [trava, limpeza] = atualizacoes(banco);
+    expect(argumentos(trava!, "update")).toEqual([{ motivo: "convite_em_curso" }]);
+    expect(valorDoFiltro(trava!, "eq", "id")).toBe("compra-9");
+    expect(String(argumentos(trava!, "or")?.[0])).toMatch(/^motivo\.is\.null,motivo\.eq\.efeitos_pendentes,and\(motivo\.eq\.convite_em_curso,updated_at\.lt\./);
+    expect(argumentos(trava!, "select")).toEqual(["id"]);
+    expect(argumentos(limpeza!, "update")).toEqual([{ motivo: null }]);
+    expect(valorDoFiltro(limpeza!, "eq", "motivo")).toBe("convite_em_curso");
+    expect(h.avisar).toHaveBeenCalledTimes(1);
+  });
+
+  it("trava não obtida: não emite, não avisa, não limpa", async () => {
+    const { banco, efeitos } = montar({ trava: [] });
+    await efeitos.aoCriar!(ORG, compra);
+    expect(h.emitir).not.toHaveBeenCalled();
+    expect(h.avisar).not.toHaveBeenCalled();
+    expect(atualizacoes(banco)).toHaveLength(1);
+  });
+
+  it("emitir falha: lança e não limpa (o catch da compra grava efeitos_pendentes)", async () => {
+    const { banco, efeitos } = montar();
+    h.emitir.mockRejectedValue(new Error("smtp"));
+    await expect(efeitos.aoCriar!(ORG, compra)).rejects.toThrow("smtp");
+    expect(atualizacoes(banco)).toHaveLength(1);
+  });
+});
+
 describe("efeitosDaCompra.aoDuplicar", () => {
+  it("mesma_sessao é a mesma cobrança: não avisa", async () => {
+    const { efeitos } = montar();
+    await efeitos.aoDuplicar!(compra, "mesma_sessao");
+    expect(h.avisar).not.toHaveBeenCalled();
+    expect(h.emitir).not.toHaveBeenCalled();
+  });
+
+  it("cliente_ja_vinculado avisa para conferir e estornar", async () => {
+    const { efeitos } = montar();
+    await efeitos.aoDuplicar!(compra, "cliente_ja_vinculado");
+    expect(h.avisar).toHaveBeenCalledTimes(1);
+    expect(h.avisar.mock.calls[0]![1].corpo).toContain("estorne");
+  });
+
   it("só avisa o dono, sem convite e sem o e-mail cru", async () => {
     const { efeitos } = montar();
     await efeitos.aoDuplicar!(compra, "mesmo_email");
