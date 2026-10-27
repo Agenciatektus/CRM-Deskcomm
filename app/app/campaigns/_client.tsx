@@ -30,7 +30,8 @@ export function ListaDeCampanhas() {
   const role = activeOrg?.role;
   // Mesma exceção do servidor (require-role) e do Meta Ads: platform admin com escopo full, fora do suporte.
   const platformAdmin = escreveComoPlatformAdmin(user) && !user.support;
-  if (role && ROLE_RANK[role] < ROLE_RANK.manager && !platformAdmin) {
+  const rank = role ? ROLE_RANK[role] : ROLE_RANK.manager;
+  if (rank < ROLE_RANK.agent && !platformAdmin) {
     return (
       <Pagina>
         <CabecalhoDaPagina titulo={t("Campanhas")} />
@@ -42,10 +43,11 @@ export function ListaDeCampanhas() {
       </Pagina>
     );
   }
-  return <CampanhasDoGestor />;
+  // O agent só lê a lista (a API de detalhe e as ações seguem de manager+).
+  return <CampanhasDoGestor somenteLeitura={rank < ROLE_RANK.manager && !platformAdmin} />;
 }
 
-function CampanhasDoGestor() {
+function CampanhasDoGestor({ somenteLeitura }: { somenteLeitura: boolean }) {
   const t = useT();
   // A data segue quem está lendo, não o idioma de quem escreveu a tela.
   const idioma = useTagDeIdioma();
@@ -60,6 +62,7 @@ function CampanhasDoGestor() {
         titulo={t("Campanhas")}
         descricao={t("Escolha o público, escreva a mensagem e acompanhe quem recebeu.")}
         acoes={
+          somenteLeitura ? null : (
           <>
             <Button variant="outline" asChild>
               <Link href="/app/campaigns/settings">{t("Configuração")}</Link>
@@ -71,8 +74,15 @@ function CampanhasDoGestor() {
               </Link>
             </Button>
           </>
+          )
         }
       />
+
+      {somenteLeitura && (
+        <p className="text-sm text-muted-foreground">
+          {t("Você pode apenas visualizar as campanhas. Criar e disparar é com um gerente ou administrador.")}
+        </p>
+      )}
 
       <BarraDeFiltros ativos={status ? 1 : 0} aoLimpar={() => setStatus("")}>
         <label className="text-sm text-muted-foreground" htmlFor="filtro-status">
@@ -105,15 +115,16 @@ function CampanhasDoGestor() {
             subcopy={t(
               "Uma campanha fala com uma lista de contatos que você escolhe, no ritmo do número — nunca em rajada.",
             )}
-            primary={{ label: t("Nova campanha"), href: "/app/campaigns/new" }}
+            primary={somenteLeitura ? undefined : { label: t("Nova campanha"), href: "/app/campaigns/new" }}
           />
         }
       >
         <Card className="divide-y divide-border mb:rounded-none mb:border-x-0">
           {campanhas.map((c) => (
-            <Link
+            <Linha
               key={c.id}
               href={`/app/campaigns/${c.id}`}
+              somenteLeitura={somenteLeitura}
               className="flex flex-col gap-2 p-4 transition-colors hover:bg-surface-elevated sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="min-w-0">
@@ -137,7 +148,7 @@ function CampanhasDoGestor() {
                 <span className="text-sm text-muted-foreground">{quando(c, t, idioma)}</span>
                 <EstadoDaCampanha status={c.status} />
               </div>
-            </Link>
+            </Linha>
           ))}
         </Card>
         {q.hasNextPage && (
@@ -154,9 +165,13 @@ function CampanhasDoGestor() {
         )}
       </EstadoDaLista>
 
-      <BotaoDaTelaParaRota rotulo={t("Nova campanha")} href="/app/campaigns/new" />
+      {!somenteLeitura && <BotaoDaTelaParaRota rotulo={t("Nova campanha")} href="/app/campaigns/new" />}
     </Pagina>
   );
+}
+
+function Linha({ href, somenteLeitura, className, children }: { href: string; somenteLeitura: boolean; className: string; children: React.ReactNode }) {
+  return somenteLeitura ? <div className={className}>{children}</div> : <Link href={href} className={className}>{children}</Link>;
 }
 
 function rotulo(status: string): string {
