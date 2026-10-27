@@ -2,7 +2,7 @@ import { listSelectableChannels, type SelectableChannel } from "@/lib/channels/s
 import { createAdminClient } from "@/lib/supabase/admin";
 import { capacidadesPadraoDoOnboarding } from "./capacidades-padrao";
 import { escolherModeloDoProvedor } from "./escolher-modelo";
-import { chaveDePlataforma } from "@/lib/ai/runtime/agent";
+import { chaveDaInstalacaoParaOrg } from "@/lib/ai/runtime/agent";
 import { publishAgentVersion } from "./publish";
 interface AgenteDoOnboarding {
   id: string;
@@ -176,7 +176,8 @@ export async function publishFirstVersion(
 
     credentialId = (credencialDoProvedor?.id as string | undefined) ?? null;
 
-    if (!credentialId && !chaveDePlataforma(provider)) {
+    const inst = credentialId ? null : await chaveDaInstalacaoParaOrg(orgId, provider);
+    if (!credentialId && (!inst?.apiKey || inst.bloqueada)) {
       // Nada utilizável — mas pode haver uma chave colada esperando o provedor
       // confirmar. Nomear isso é o que separa "cole a chave" de "espere um
       // instante": são causas e conselhos diferentes, e sem o nome do provedor
@@ -252,7 +253,8 @@ export async function publishFirstVersion(
   // nenhum modelo utilizável é defeito de instalação que se resolve antes da
   // chave, e inverter isso mudaria a causa que a tela recebe para quem tem os
   // dois problemas — sem necessidade nenhuma para a #1007.
-  if (!credentialId && !chaveDePlataforma(provider)) {
+  const instalacao = credentialId ? null : await chaveDaInstalacaoParaOrg(orgId, provider);
+  if (!credentialId && (!instalacao?.apiKey || instalacao.bloqueada)) {
     return {
       published: false,
       reason: "sem_chave",

@@ -5,7 +5,7 @@
  * Returns a discriminated result so the caller maps validation errors to 422
  * with a stable error code, and unknown errors to 500.
  */
-import { chaveDePlataforma } from "@/lib/ai/runtime/agent";
+import { chaveDaInstalacaoParaOrg } from "@/lib/ai/runtime/agent";
 import { audit } from "@/lib/audit";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PUBLISH_ERROR_CODES, type PublishErrorCode } from "./validation";
@@ -60,8 +60,12 @@ export async function publishAgentVersion(
   if (readError || !version)
     return { ok: false, code: "version_not_found", message: "version_not_found" };
   const platform = version.credential_id === null;
-  if (platform && !chaveDePlataforma(version.provider))
-    return { ok: false, code: "credential_missing", message: "credential_missing" };
+  if (platform) {
+    // Plano com IA própria precisa de credencial própria: a chave da instalação não vale.
+    const inst = await chaveDaInstalacaoParaOrg(params.orgId, version.provider);
+    if (!inst.apiKey || inst.bloqueada)
+      return { ok: false, code: "credential_missing", message: "credential_missing" };
+  }
   const { data, error } = await admin.rpc("fn_publish_ai_agent_version", {
     p_org_id: params.orgId,
     p_agent_id: params.agentId,
