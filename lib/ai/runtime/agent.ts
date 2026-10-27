@@ -44,6 +44,10 @@ import { fetchParaDestinoDaOrganizacao } from "@/lib/automation/destinos-interno
 import { decidirElegibilidadeDaConversaViaSupabase } from "@/lib/ai/elegibilidade/consulta-supabase";
 import { ttlDaAutorizacaoMs } from "@/lib/ai/elegibilidade/gate";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  instalacaoPodeServirIaViaRpc,
+  MENSAGEM_IA_PROPRIA_SEM_CREDENCIAL,
+} from "@/lib/cobranca/ia-propria";
 import { audit } from "@/lib/audit";
 import type { McpAuthResult } from "@/lib/mcp/auth";
 import type { McpContext } from "@/lib/mcp/types";
@@ -175,6 +179,24 @@ export function chaveDePlataforma(provider: string): string | null {
   if (!nome) return null;
   const v = (process.env[nome] ?? "").trim();
   return v === "" ? null : v;
+}
+
+/**
+ * A chave da INSTALAÇÃO para esta empresa. Plano com IA própria nunca usa a
+ * chave do env: o banco responde (fail-closed) e, se não serve, devolve
+ * `bloqueada` sem chave. Só consulta quando existe chave no env; sem plano,
+ * comportamento de `chaveDePlataforma`.
+ */
+export async function chaveDaInstalacaoParaOrg(
+  organizationId: string,
+  provider: string,
+): Promise<{ apiKey: string | null; bloqueada: boolean }> {
+  const apiKey = chaveDePlataforma(provider);
+  if (!apiKey) return { apiKey: null, bloqueada: false };
+  if (!(await instalacaoPodeServirIaViaRpc(createAdminClient(), organizationId))) {
+    return { apiKey: null, bloqueada: true };
+  }
+  return { apiKey, bloqueada: false };
 }
 
 export function buildModel(
@@ -391,14 +413,17 @@ export async function runAgent(input: RunAgentInput): Promise<RunAgentResult> {
           .maybeSingle();
         if (data?.id) {
           const credential = await loadCredential(data.id, run.organization_id);
-          return { apiKey: credential.apiKey };
+          return { apiKey: credential.apiKey, bloqueada: false };
         }
       } catch {
         // Sem linha utilizável (ou `loadCredential` recusou): a escada cai no
         // `.env`, exatamente como o turno de produção cai.
       }
-      const daInstalacao = chaveDePlataforma(PROVEDOR_DE_RESERVA_DA_ASSINATURA);
-      return { apiKey: daInstalacao };
+      const daInstalacao = await chaveDaInstalacaoParaOrg(
+        run.organization_id,
+        PROVEDOR_DE_RESERVA_DA_ASSINATURA,
+      );
+      return daInstalacao;
     }
 
     if (version.provider === PROVEDOR_POR_ASSINATURA) {
@@ -421,7 +446,9 @@ export async function runAgent(input: RunAgentInput): Promise<RunAgentResult> {
           return await failRun(
             run,
             "credential_invalid",
-            `sem linha de login nem chave de reserva para ${version.provider}: conecte a assinatura do ChatGPT em IA › Credenciais`,
+            reserva.bloqueada
+              ? MENSAGEM_IA_PROPRIA_SEM_CREDENCIAL
+              : `sem linha de login nem chave de reserva para ${version.provider}: conecte a assinatura do ChatGPT em IA › Credenciais`,
             startedAt,
           );
         }
@@ -438,12 +465,17 @@ export async function runAgent(input: RunAgentInput): Promise<RunAgentResult> {
         return await failRun(run, `credential_${reason}`, "credential unavailable", startedAt);
       }
     } else {
-      const daInstalacao = chaveDePlataforma(version.provider);
+      const { apiKey: daInstalacao, bloqueada } = await chaveDaInstalacaoParaOrg(
+        run.organization_id,
+        version.provider,
+      );
       if (!daInstalacao) {
         return await failRun(
           run,
-          "credential_invalid",
-          `sem chave para ${version.provider}: cadastre em IA › Credenciais ou configure a chave desta instalação`,
+          bloqueada ? "ia_propria_sem_credencial" : "credential_invalid",
+          bloqueada
+            ? MENSAGEM_IA_PROPRIA_SEM_CREDENCIAL
+            : `sem chave para ${version.provider}: cadastre em IA › Credenciais ou configure a chave desta instalação`,
           startedAt,
         );
       }
