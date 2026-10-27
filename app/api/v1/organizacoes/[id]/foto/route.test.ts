@@ -98,14 +98,45 @@ describe("GET /api/v1/organizacoes/[id]/foto", () => {
       const original = await grande();
       vi.mocked(loadAuthUser).mockResolvedValue(usuario([ORG]));
       espiao(DA_ORG, original);
-      const res = await pedir(ORG, "?v=abc&w=64");
+      const res = await pedir(ORG, "?v=33333333&w=64");
       expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toBe("image/webp");
       expect(res.headers.get("cache-control")).toBe("private, max-age=31536000, immutable");
-      const meta = await sharp(Buffer.from(await res.arrayBuffer())).metadata();
+      const corpo = Buffer.from(await res.arrayBuffer());
+      const meta = await sharp(corpo).metadata();
       expect(meta.format).toBe("webp");
       expect(meta.width).toBe(64);
-      expect(64 * 64).toBeLessThan(original.length);
+      expect(corpo.byteLength).toBeLessThan(original.length);
+    });
+
+    it("v ausente ou errado: 200 mas NÃO imutável (cache curto, Vary mantido)", async () => {
+      vi.mocked(loadAuthUser).mockResolvedValue(usuario([ORG]));
+      espiao(DA_ORG, await grande());
+      for (const consulta of ["?w=64", "?v=outra&w=64"]) {
+        const res = await pedir(ORG, consulta);
+        expect(res.status).toBe(200);
+        expect(res.headers.get("cache-control")).not.toContain("immutable");
+        expect(res.headers.get("cache-control")).toBe("private, max-age=240");
+        expect(res.headers.get("vary")).toBe("Cookie");
+      }
+    });
+
+    it("erro no download cai no original (307), nunca 500", async () => {
+      vi.mocked(loadAuthUser).mockResolvedValue(usuario([ORG]));
+      espiao(DA_ORG, await grande());
+      const cliente = vi.mocked(createAdminClient)();
+      vi.mocked(createAdminClient).mockReturnValue({
+        from: cliente.from,
+        storage: {
+          from: () => ({
+            createSignedUrl: async () => ({ data: { signedUrl: "https://s.test/a" }, error: null }),
+            download: async () => {
+              throw new Error("timeout");
+            },
+          }),
+        },
+      } as unknown as ReturnType<typeof createAdminClient>);
+      expect((await pedir(ORG, "?v=33333333&w=64")).status).toBe(307);
     });
 
     it("w inválido ou ausente segue como hoje (307 para o original)", async () => {

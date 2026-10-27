@@ -45,5 +45,5 @@ export async function GET(
   const caminho = (data as { foto_path?: string | null } | null)?.foto_path ?? null;
   if (!caminho || !fotoDaOrganizacao(caminho, id)) return semFoto();
 
-  return servirFoto(caminho, larguraPedida(req));
+  return servirFoto(caminho, larguraPedida(req), req.nextUrl.searchParams.get("v"));
 }

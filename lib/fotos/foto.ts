@@ -102,7 +102,7 @@ export function caminhoNovoDaFoto(
  * foto troca o uuid do arquivo, e com ele a URL — quem trocou vê a foto nova na
  * hora, sem esperar o cache vencer.
  */
-function versao(caminho: string): string {
+export function versao(caminho: string): string {
   const nome = caminho.slice(caminho.lastIndexOf("/") + 1);
   return nome.slice(0, 8);
 }

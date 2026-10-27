@@ -21,6 +21,7 @@ import {
   LARGURAS_DE_FOTO,
   TAMANHO_MAXIMO_DA_FOTO,
   type TipoDeFoto,
+  versao,
 } from "./foto";
 
 type Traduzir = (texto: string) => string;
@@ -226,18 +227,22 @@ export function larguraPedida(req: Request): number | null {
   return (LARGURAS_DE_FOTO as readonly number[]).includes(w) ? w : null;
 }
 
-/** Cache do 200 redimensionado: a URL tem `?v=` que muda a cada troca. `private`: a rota é autenticada. */
-const CABECALHOS_DO_REDIMENSIONADO = {
-  "Content-Type": "image/webp",
-  "Cache-Control": "private, max-age=31536000, immutable",
-  Vary: "Cookie",
-};
+/**
+ * Cabeçalhos do 200 redimensionado. `immutable` só quando o `?v=` pedido é o do
+ * arquivo atual (a URL muda a cada troca); sem `v` ou `v` velho, cache curto como o
+ * redirect. `private`: a rota é autenticada.
+ */
+function cabecalhosDoRedimensionado(caminho: string, v: string | null): Record<string, string> {
+  const cache =
+    v === versao(caminho) ? "private, max-age=31536000, immutable" : `private, max-age=${CACHE_DO_REDIRECT}`;
+  return { "Content-Type": "image/webp", "Cache-Control": cache, Vary: "Cookie" };
+}
 
 /**
  * Baixa o original e devolve uma versão `largura` px em WebP (200). Qualquer falha
  * (download, sharp, imagem inválida) devolve `null` e a rota cai no original.
  */
-async function redimensionar(caminho: string, largura: number): Promise<Response | null> {
+async function redimensionar(caminho: string, largura: number, v: string | null): Promise<Response | null> {
   try {
     const sharp = await carregarSharp();
     if (!sharp) return null;
@@ -245,13 +250,14 @@ async function redimensionar(caminho: string, largura: number): Promise<Response
     if (!data) return null;
     const saida = await sharp(new Uint8Array(await data.arrayBuffer()), {
       failOn: "error",
-      limitInputPixels: LIMITE_DE_PIXELS,
+      limitInputPixels: 1100 * 1100, // o guardado tem no máximo 1024 de lado
     })
+      .timeout({ seconds: 3 })
       .rotate()
       .resize(largura, largura, { fit: "cover", withoutEnlargement: true })
       .webp({ quality: 80 })
       .toBuffer();
-    return new Response(new Uint8Array(saida), { status: 200, headers: CABECALHOS_DO_REDIMENSIONADO });
+    return new Response(new Uint8Array(saida), { status: 200, headers: cabecalhosDoRedimensionado(caminho, v) });
   } catch (e) {
     logger.warn("[fotos] redimensionar falhou, servindo o original", { detalhe: String(e) });
     return null;
@@ -262,9 +268,9 @@ async function redimensionar(caminho: string, largura: number): Promise<Response
  * Assina e redireciona. `private` não é detalhe: a autorização é por sessão, e
  * um cache compartilhado serviria a foto a quem a rota recusaria.
  */
-export async function servirFoto(caminho: string, largura?: number | null): Promise<Response> {
+export async function servirFoto(caminho: string, largura?: number | null, v?: string | null): Promise<Response> {
   if (largura) {
-    const pequena = await redimensionar(caminho, largura);
+    const pequena = await redimensionar(caminho, largura, v ?? null);
     if (pequena) return pequena;
   }
   const { data, error } = await createAdminClient()

@@ -12,7 +12,7 @@ describe("URL da foto com largura", () => {
   it("com largura acrescenta &w=", () => {
     expect(urlDaFotoDaOrganizacao(ORG, CAMINHO, 64)).toBe(`/api/v1/organizacoes/${ORG}/foto?v=33333333&w=64`);
   });
-  it("sem ?v= usa ?w=", () => {
+  it("sem caminho (sem ?v=) usa ?w=; essa URL não ganha cache imutável na rota", () => {
     expect(urlDaFotoDoUsuario(ORG, null, 64)).toBe(`/api/v1/usuarios/${ORG}/foto?w=64`);
   });
   it("sem foto continua null", () => {

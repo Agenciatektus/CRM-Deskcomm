@@ -58,5 +58,5 @@ export async function GET(
   const caminho = (data?.user?.app_metadata as Record<string, unknown> | undefined)?.avatar_path;
   if (typeof caminho !== "string" || !fotoDoUsuario(caminho, id)) return semFoto();
 
-  return servirFoto(caminho, larguraPedida(req));
+  return servirFoto(caminho, larguraPedida(req), req.nextUrl.searchParams.get("v"));
 }
