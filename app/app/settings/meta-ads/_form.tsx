@@ -154,6 +154,7 @@ export function FormularioDeMetaAds({
           diasParaVencer={diasParaVencer}
           precisaReconectar={precisaReconectar}
           oauthDisponivel={oauthDisponivel}
+          oauthFalta={oauthFalta}
           ocupado={isPending}
           onDesconectar={() => setConfirmarDesconexao(true)}
           idioma={idioma}

@@ -118,3 +118,14 @@ describe("tela de Meta Ads sem os blocos antigos", () => {
     expect(h).not.toContain("Token de acesso");
   });
 });
+
+describe("conectada por token colado sem login Meta na instalação", () => {
+  it("a faixa explica o que falta e não oferece Conectar", () => {
+    const h = renderToStaticMarkup(
+      <PainelDeStatusMeta {...base} via="manual" nome={null} oauthDisponivel={false} oauthFalta={["META_APP_ID"]} />,
+    );
+    expect(h).toContain("meta-nao-configurado");
+    expect(h).toContain("META_APP_ID");
+    expect(h).not.toContain("Conectar com Meta");
+  });
+});

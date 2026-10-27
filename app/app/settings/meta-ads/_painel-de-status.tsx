@@ -44,6 +44,7 @@ export function PainelDeStatusMeta({
   diasParaVencer,
   precisaReconectar,
   oauthDisponivel,
+  oauthFalta = [],
   ocupado,
   onDesconectar,
   idioma,
@@ -57,6 +58,8 @@ export function PainelDeStatusMeta({
   diasParaVencer: number | null;
   precisaReconectar: boolean;
   oauthDisponivel: boolean;
+  /** Variáveis de ambiente que faltam para o botão Conectar existir. */
+  oauthFalta?: string[];
   ocupado: boolean;
   onDesconectar: () => void;
   idioma: Idioma;
@@ -126,6 +129,16 @@ export function PainelDeStatusMeta({
         </div>
       </div>
 
+      {!oauthDisponivel && (
+        <p className="border-t border-border px-4 py-3 text-sm text-text-muted" data-testid="meta-nao-configurado">
+          {t(
+            "Conectar com a Meta ainda não está disponível nesta instalação. Quem instalou o sistema precisa configurar",
+          )}{" "}
+          <span className="font-mono text-xs">{oauthFalta.join(` ${t("e")} `)}</span>
+          {". "}
+          {t("Enquanto isso, você pode colar um token à mão abaixo.")}
+        </p>
+      )}
       {oauthDisponivel && via !== "oauth" && (
         <p className="border-t border-border px-4 py-3 text-sm" data-testid="meta-substitui-manual">
           {t("Conectar com a Meta substitui o token que está salvo agora.")}
