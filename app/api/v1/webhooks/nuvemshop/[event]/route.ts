@@ -19,6 +19,7 @@ import { audit } from "@/lib/audit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { slugToEvent } from "@/lib/nuvemshop/config";
 import { verifyHmac } from "@/lib/nuvemshop/oauth";
+import { invalidarProdutoDaLoja } from "@/lib/nuvemshop/cache-loja";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -101,6 +102,12 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<NextRespons
       metadata: { event, store_id: storeId },
     });
     return fail("unauthenticated", "invalid_signature", 401);
+  }
+
+  // Estoque ao vivo: produto mudou ou saiu, o saldo em cache (1 h) deixa de valer. Antes da
+  // checagem de idempotência (reentrega também invalida); nunca lança.
+  if (event === "product/updated" || event === "product/deleted") {
+    await invalidarProdutoDaLoja(integration.organization_id, String(body.id ?? ""));
   }
 
   const externalId = externalIdFor(event, body);
