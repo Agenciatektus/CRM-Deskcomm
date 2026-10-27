@@ -63172,6 +63172,25 @@ grant execute on function public.fn_org_pode_usar_ia_da_instalacao(uuid) to serv
 
 notify pgrst, 'reload schema';
 
+-- ---- Plano com IA incluida (migration 9076) ----
+alter table public.cobranca_planos
+  add column if not exists inclui_ia boolean not null default false;
+
+comment on column public.cobranca_planos.inclui_ia is
+  'true = a empresa neste plano recebe o Jev da plataforma (JEV_PLATFORM_API_KEY) sem cadastrar chave propria. Plano com ia_propria nunca recebe. Migration 9076.';
+
+-- O plano de R$ 397 com IA. Nao ha plano semeado em migration (os planos nascem pelo admin da cobranca):
+-- a marcacao e por preco, so em plano mensal vivo e que nao seja de IA propria. Idempotente: rodar de novo nao muda nada.
+update public.cobranca_planos
+   set inclui_ia = true
+ where preco_cents = 39700
+   and intervalo = 'mes'
+   and arquivado_em is null
+   and ia_propria = false
+   and inclui_ia = false;
+
+notify pgrst, 'reload schema';
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria

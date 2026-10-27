@@ -13,6 +13,7 @@ import { logger } from "@/lib/logger";
 
 import { MODELO_DO_JEV, type FalhaDaDecisao } from "./cliente";
 import { lerConfigDoJev, type ConfigDoJev, type EstadoDaTarefa } from "./config";
+import { configEfetivaDoJev, organizacaoElegivelAoJevNoPool } from "./elegibilidade";
 import { estadoEfetivoDaTarefa, type TarefaDoJev } from "./tarefas";
 import { codigoDoErroDoJev } from "./textos";
 
@@ -30,7 +31,7 @@ export async function configDaTarefaNoPool(
       "select settings from public.organizations where id = $1",
       [organizationId],
     );
-    return lerConfigDoJev(rows[0]?.settings);
+    return await configEfetivaDoJev(rows[0]?.settings, () => organizacaoElegivelAoJevNoPool(pool, organizationId));
   } catch (erro) {
     logger.warn("estado do Jev não pôde ser lido; a tarefa segue só com a IA de sempre", {
       organization_id: organizationId,

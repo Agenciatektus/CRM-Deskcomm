@@ -17154,6 +17154,8 @@ export const DICIONARIO: Traducoes = {
   "Mostrar às empresas": { es: "Mostrar a las empresas" },
   "IA própria": { es: "IA propia" },
   "Empresas neste plano usam somente a chave de IA cadastrada por elas. A chave de IA da instalação nunca é usada.": { es: "Las empresas de este plan usan solo la clave de IA registrada por ellas. La clave de IA de la instalación nunca se usa." },
+  "Inclui IA": { es: "Incluye IA" },
+  "Empresas neste plano recebem o Jev da plataforma sem cadastrar chave. Não vale junto com IA própria.": { es: "Las empresas de este plan reciben el Jev de la plataforma sin registrar clave. No vale junto con IA propia." },
   // ─── Cobrança do revendedor — configuração (PR 3a) ───
   "Provedor de cobrança dos seus clientes": { es: "Proveedor de cobro de tus clientes" },
   "Por onde as empresas desta instalação pagam a assinatura. É escolhido quando você conecta a chave em Cobrança › Conexão.": { es: "Por dónde las empresas de esta instalación pagan la suscripción. Se elige cuando conectas la clave en Cobro › Conexión." },

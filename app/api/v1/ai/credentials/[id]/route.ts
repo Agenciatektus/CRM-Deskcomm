@@ -40,7 +40,8 @@ import type { ProvedorComChave } from "@/lib/ai/pontos/provedores";
 import { rotacionarCredencial } from "@/lib/ai/credenciais/guardar";
 import { PROVEDOR_POR_ASSINATURA } from "@/lib/ai/pontos/provedores";
 import { gravarConfigDoJev, lerConfigDoJev } from "@/lib/ai/decisao/config";
-import { credencialEmUsoPeloJev } from "@/lib/ai/decisao/credencial";
+import { plataformaServeOJev } from "@/lib/ai/decisao/elegibilidade";
+import { credencialEmUsoPeloJev, fonteDaChaveDoJev } from "@/lib/ai/decisao/credencial";
 import { ORIGENS_DO_JEV, provedorDaCredencial } from "@/lib/ai/decisao/origem";
 import { logger } from "@/lib/logger";
 import {
@@ -381,6 +382,9 @@ async function desligarOJevSeFicouSemChave(p: {
   // TypeSafe velha de quem responde pela OpenRouter não desliga nada.
   if (provedorDaCredencial(config.origem) !== p.provedorExcluido) return false;
   if (credencialEmUsoPeloJev(credsRes.data ?? [], config.origem) !== null) return false;
+  // Apagar a chave PRÓPRIA volta para a da plataforma, e não desliga: a empresa
+  // elegível continua servida (só na origem TypeSafe, `fonteDaChaveDoJev`).
+  if (fonteDaChaveDoJev([], config.origem, await plataformaServeOJev(p.admin, p.orgId)) !== null) return false;
 
   const gravado = await gravarConfigDoJev({
     admin: p.admin,

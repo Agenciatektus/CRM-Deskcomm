@@ -4466,6 +4466,7 @@ export type Database = {
           arquivado_em: string | null
           created_at: string
           ia_propria: boolean
+          inclui_ia: boolean
           id: string
           intervalo: string
           max_assentos: number | null
@@ -4484,6 +4485,7 @@ export type Database = {
           arquivado_em?: string | null
           created_at?: string
           ia_propria?: boolean
+          inclui_ia?: boolean
           id?: string
           intervalo: string
           max_assentos?: number | null
@@ -4502,6 +4504,7 @@ export type Database = {
           arquivado_em?: string | null
           created_at?: string
           ia_propria?: boolean
+          inclui_ia?: boolean
           id?: string
           intervalo?: string
           max_assentos?: number | null

@@ -31,6 +31,8 @@ export interface PlanoDaTela {
   oferecido_ao_cliente: boolean;
   /** true = as empresas do plano usam só a chave de IA que elas cadastraram. */
   ia_propria: boolean;
+  /** true = as empresas do plano recebem o Jev da plataforma, sem cadastrar chave. */
+  inclui_ia: boolean;
   arquivado_em: string | null;
 }
 
@@ -43,9 +45,10 @@ interface Campos {
   max_canais: string;
   teto_ia: string;
   ia_propria: boolean;
+  inclui_ia: boolean;
 }
 
-const VAZIO: Campos = { nome: "", preco: "", intervalo: "mes", trial_dias: "14", max_assentos: "", max_canais: "", teto_ia: "", ia_propria: false };
+const VAZIO: Campos = { nome: "", preco: "", intervalo: "mes", trial_dias: "14", max_assentos: "", max_canais: "", teto_ia: "", ia_propria: false, inclui_ia: false };
 const AVISO_DE_CAMPOS =
   "Confira os campos do plano: preço a partir de R$ 5,00, teste grátis de 0 a 90 dias e limites a partir de 1.";
 
@@ -64,6 +67,7 @@ function corpoDoPlano(c: Campos) {
     max_canais: inteiroOuNulo(c.max_canais),
     teto_ia_usd_cents: c.teto_ia.trim() === "" ? null : centavos(c.teto_ia),
     ia_propria: c.ia_propria,
+    inclui_ia: c.inclui_ia,
   };
 }
 
@@ -77,6 +81,7 @@ function camposDe(p: PlanoDaTela): Campos {
     max_canais: p.max_canais === null ? "" : String(p.max_canais),
     teto_ia: p.teto_ia_usd_cents === null ? "" : decimal(p.teto_ia_usd_cents),
     ia_propria: p.ia_propria,
+    inclui_ia: p.inclui_ia,
   };
 }
 
@@ -94,7 +99,7 @@ export function PlanosDaInstalacao({ planos }: { planos: readonly PlanoDaTela[] 
   const [salvando, setSalvando] = useState(false);
   const brl = new Intl.NumberFormat(idioma, { style: "currency", currency: "BRL" });
   const usd = new Intl.NumberFormat(idioma, { style: "currency", currency: "USD" });
-  const campo = (k: Exclude<keyof Campos, "intervalo" | "ia_propria">) => ({
+  const campo = (k: Exclude<keyof Campos, "intervalo" | "ia_propria" | "inclui_ia">) => ({
     value: campos[k],
     onChange: (e: ChangeEvent<HTMLInputElement>) => setCampos({ ...campos, [k]: e.target.value }),
   });
@@ -193,6 +198,22 @@ export function PlanosDaInstalacao({ planos }: { planos: readonly PlanoDaTela[] 
             {t("Empresas neste plano usam somente a chave de IA cadastrada por elas. A chave de IA da instalação nunca é usada.")}
           </p>
         </div>
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <input
+              id="plano-inclui-ia"
+              type="checkbox"
+              className="size-4"
+              aria-describedby="plano-inclui-ia-dica"
+              checked={campos.inclui_ia}
+              onChange={(e) => setCampos({ ...campos, inclui_ia: e.target.checked })}
+            />
+            <Label htmlFor="plano-inclui-ia">{t("Inclui IA")}</Label>
+          </div>
+          <p id="plano-inclui-ia-dica" className="text-xs text-muted-foreground">
+            {t("Empresas neste plano recebem o Jev da plataforma sem cadastrar chave. Não vale junto com IA própria.")}
+          </p>
+        </div>
         <p className="text-xs text-muted-foreground">{t("Deixe um limite vazio para não limitar.")}</p>
         <div className="flex flex-wrap gap-2">
           <Button type="submit" disabled={salvando}>
@@ -234,6 +255,7 @@ export function PlanosDaInstalacao({ planos }: { planos: readonly PlanoDaTela[] 
                     {p.arquivado_em && <span className="ml-2 rounded-md bg-muted px-1.5 py-0.5 text-xs">{t("Arquivado")}</span>}
                     {!p.oferecido_ao_cliente && <span className="ml-2 rounded-md bg-muted px-1.5 py-0.5 text-xs">{t("Só você atribui")}</span>}
                     {p.ia_propria && <span className="ml-2 rounded-md bg-muted px-1.5 py-0.5 text-xs">{t("IA própria")}</span>}
+                    {p.inclui_ia && <span className="ml-2 rounded-md bg-muted px-1.5 py-0.5 text-xs">{t("Inclui IA")}</span>}
                   </p>
                   <p className="text-muted-foreground">
                     {brl.format(p.preco_cents / 100)} {p.intervalo === "mes" ? t("por mês") : t("por ano")} · {p.trial_dias} {t("dias de teste")}
