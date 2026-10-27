@@ -1,4 +1,5 @@
 // @vitest-environment node
+import sharp from "sharp";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
@@ -27,7 +28,7 @@ function usuario(orgs: string[], platformAdmin = false): AuthUser {
   } as unknown as AuthUser;
 }
 
-function espiao(caminho: string | null) {
+function espiao(caminho: string | null, original?: Buffer) {
   const builder = {
     select: () => builder,
     eq: () => builder,
@@ -35,14 +36,19 @@ function espiao(caminho: string | null) {
   };
   const client = {
     from: () => builder,
-    storage: { from: () => ({ createSignedUrl: async () => ({ data: { signedUrl: "https://s.test/a" }, error: null }) }) },
+    storage: {
+      from: () => ({
+        createSignedUrl: async () => ({ data: { signedUrl: "https://s.test/a" }, error: null }),
+        download: async () => ({ data: original ? new Blob([new Uint8Array(original)]) : null, error: null }),
+      }),
+    },
   };
   vi.mocked(createAdminClient).mockReturnValue(client as unknown as ReturnType<typeof createAdminClient>);
 }
 
-const pedir = async (id: string) => {
+const pedir = async (id: string, consulta = "") => {
   const { GET } = await import("./route");
-  return GET(new NextRequest(`http://localhost/api/v1/organizacoes/${id}/foto`), { params: Promise.resolve({ id }) });
+  return GET(new NextRequest(`http://localhost/api/v1/organizacoes/${id}/foto${consulta}`), { params: Promise.resolve({ id }) });
 };
 
 const DA_ORG = `organizacoes/${ORG}/33333333-3333-4333-8333-333333333333.webp`;
@@ -80,5 +86,79 @@ describe("GET /api/v1/organizacoes/[id]/foto", () => {
     vi.mocked(loadAuthUser).mockResolvedValue(null);
     espiao(DA_ORG);
     expect((await pedir(ORG)).status).toBe(401);
+  });
+
+  describe("?w=", () => {
+    const grande = () =>
+      sharp({ create: { width: 800, height: 800, channels: 3, background: "#c33" } })
+        .png({ compressionLevel: 0 })
+        .toBuffer();
+
+    it("w válido devolve 200 webp menor que o original, com cache imutável e privado", async () => {
+      const original = await grande();
+      vi.mocked(loadAuthUser).mockResolvedValue(usuario([ORG]));
+      espiao(DA_ORG, original);
+      const res = await pedir(ORG, "?v=33333333&w=64");
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe("image/webp");
+      expect(res.headers.get("cache-control")).toBe("private, max-age=31536000, immutable");
+      const corpo = Buffer.from(await res.arrayBuffer());
+      const meta = await sharp(corpo).metadata();
+      expect(meta.format).toBe("webp");
+      expect(meta.width).toBe(64);
+      expect(corpo.byteLength).toBeLessThan(original.length);
+    });
+
+    it("v ausente ou errado: 200 mas NÃO imutável (cache curto, Vary mantido)", async () => {
+      vi.mocked(loadAuthUser).mockResolvedValue(usuario([ORG]));
+      espiao(DA_ORG, await grande());
+      for (const consulta of ["?w=64", "?v=outra&w=64"]) {
+        const res = await pedir(ORG, consulta);
+        expect(res.status).toBe(200);
+        expect(res.headers.get("cache-control")).not.toContain("immutable");
+        expect(res.headers.get("cache-control")).toBe("private, max-age=240");
+        expect(res.headers.get("vary")).toBe("Cookie");
+      }
+    });
+
+    it("erro no download cai no original (307), nunca 500", async () => {
+      vi.mocked(loadAuthUser).mockResolvedValue(usuario([ORG]));
+      espiao(DA_ORG, await grande());
+      const cliente = vi.mocked(createAdminClient)();
+      vi.mocked(createAdminClient).mockReturnValue({
+        from: cliente.from,
+        storage: {
+          from: () => ({
+            createSignedUrl: async () => ({ data: { signedUrl: "https://s.test/a" }, error: null }),
+            download: async () => {
+              throw new Error("timeout");
+            },
+          }),
+        },
+      } as unknown as ReturnType<typeof createAdminClient>);
+      expect((await pedir(ORG, "?v=33333333&w=64")).status).toBe(307);
+    });
+
+    it("w inválido ou ausente segue como hoje (307 para o original)", async () => {
+      vi.mocked(loadAuthUser).mockResolvedValue(usuario([ORG]));
+      espiao(DA_ORG, await grande());
+      expect((await pedir(ORG, "?w=63")).status).toBe(307);
+      expect((await pedir(ORG, "?w=abc")).status).toBe(307);
+      expect((await pedir(ORG)).status).toBe(307);
+    });
+
+    it("falha do sharp (arquivo ilegível) cai no original, não em 500", async () => {
+      vi.mocked(loadAuthUser).mockResolvedValue(usuario([ORG]));
+      espiao(DA_ORG, Buffer.from("isto não é imagem"));
+      expect((await pedir(ORG, "?w=64")).status).toBe(307);
+    });
+
+    it("vínculo negado com w continua 404 e sem sessão 401", async () => {
+      vi.mocked(loadAuthUser).mockResolvedValue(usuario([OUTRA]));
+      espiao(DA_ORG, await grande());
+      expect((await pedir(ORG, "?w=64")).status).toBe(404);
+      vi.mocked(loadAuthUser).mockResolvedValue(null);
+      expect((await pedir(ORG, "?w=64")).status).toBe(401);
+    });
   });
 });
