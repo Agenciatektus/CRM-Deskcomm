@@ -23,6 +23,7 @@ import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
 import { roleAtLeast, type Role } from "@/lib/auth/types";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { env } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 
 import { GET, PATCH } from "./route";
@@ -84,6 +85,8 @@ interface Estado {
   /** `followup_flow_versions` com inscrição que ainda anda — o que o `!inner` devolve (`graph`). */
   versoesEmCurso: Linha[];
   consultas: Consulta[];
+  /** `cobranca_assinaturas` com o plano embutido; `null` = empresa isenta. */
+  assinatura: Linha | null;
 }
 
 let estado: Estado;
@@ -155,6 +158,8 @@ function cliente(tipo: Consulta["cliente"]) {
           return chain;
         },
         maybeSingle: async () => {
+          // A elegibilidade ao Jev da plataforma (`cobranca_assinaturas` + plano embutido).
+          if (tabela === "cobranca_assinaturas") return { data: estado.assinatura, error: null };
           expect(tabela).toBe("organizations");
           if (c.patch) estado.settings = c.patch.settings as Linha;
           return { data: { settings: estado.settings }, error: null };
@@ -215,7 +220,10 @@ beforeEach(() => {
     fluxos: [],
     versoesEmCurso: [],
     consultas: [],
+    assinatura: null,
   };
+  env.JEV_PLATFORM_API_KEY = "";
+  env.JEV_LIGADO_POR_PADRAO = "";
   vi.mocked(requireRole).mockImplementation(async (min) =>
     roleAtLeast(papel, min)
       ? ({
@@ -269,8 +277,9 @@ describe("GET /api/v1/ai/jev", () => {
       credencial_id: null,
       rotulo: null,
       erro_de_validacao: null,
+      fonte_da_chave: "nenhuma",
     });
-    expect(d.config).toEqual({ ligado: false, modo: "observacao", modo_roteador: "comparacao", aceite: null });
+    expect(d.config).toEqual({ ligado: false, modo: "observacao", modo_roteador: "comparacao", aceite: null, no_padrao: false });
     expect(d.tarefas.map((t: { id: string }) => t.id)).toEqual([
       "sentiment_classify",
       "jailbreak_detect",
@@ -1322,5 +1331,132 @@ describe("modo Jev com reserva sob demanda", () => {
     papel = "admin";
     expect((await mudar({ modo_roteador: "mais_rapido" })).status).toBe(422);
     expect(audit).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * O JEV DA PLATAFORMA na rota (fatia 2): a empresa no padrão aparece LIGADA, o
+ * aceite sintético não sai, desligar volta ao estado seguro e religar pede o
+ * aceite de verdade.
+ */
+describe("o Jev da plataforma na rota", () => {
+  const SEGREDO = "plataforma_segredo_nao_pode_vazar";
+  const ELEGIVEL = { estado: "ativa", plano: { inclui_ia: true, ia_propria: false } };
+
+  function servirPelaPlataforma(padrao: boolean) {
+    env.JEV_PLATFORM_API_KEY = SEGREDO;
+    env.JEV_LIGADO_POR_PADRAO = padrao ? "true" : "";
+    estado.assinatura = ELEGIVEL;
+    estado.settings = { branding: { app_name: "Loja" } };
+  }
+
+  it("GET: empresa no padrão aparece ligada, sem aceite sintético, com a fonte da chave, e a chave não sai", async () => {
+    servirPelaPlataforma(true);
+    const { corpo } = await ler();
+    const d = corpo.data;
+    expect(d.config).toMatchObject({ ligado: true, no_padrao: true, aceite: null, modo: "decide", modo_roteador: "sob_demanda" });
+    expect(d.chave).toMatchObject({ validada: true, existe: true, fonte_da_chave: "plataforma", credencial_id: null });
+    expect(d.plataforma_tem_jev).toBe(true);
+    const bruto = JSON.stringify(corpo);
+    expect(bruto).not.toContain(SEGREDO);
+    expect(bruto).not.toContain("00000000-0000-0000-0000-000000000000");
+    expect(bruto).not.toContain("1970");
+  });
+
+  it("GET (controle negativo): sem a env do padrão, a empresa segue desligada, mas a fonte da chave é a plataforma", async () => {
+    servirPelaPlataforma(false);
+    const d = (await ler()).corpo.data;
+    expect(d.config).toMatchObject({ ligado: false, no_padrao: false });
+    expect(d.chave.fonte_da_chave).toBe("plataforma");
+  });
+
+  it("GET (controle negativo): empresa isenta não vê a plataforma", async () => {
+    servirPelaPlataforma(true);
+    estado.assinatura = null;
+    const d = (await ler()).corpo.data;
+    expect(d.config.ligado).toBe(false);
+    expect(d.chave).toMatchObject({ validada: false, fonte_da_chave: "nenhuma" });
+  });
+
+  it("GET: chave própria validada vence a plataforma", async () => {
+    servirPelaPlataforma(true);
+    estado.credenciais = [credencial()];
+    expect((await ler()).corpo.data.chave.fonte_da_chave).toBe("propria");
+  });
+
+  it("PATCH desligar no padrão grava o estado SEGURO: sem aceite, tarefas observando, roteador em comparação", async () => {
+    servirPelaPlataforma(true);
+    const { status, corpo } = await mudar({ ligado: false });
+    expect(status).toBe(200);
+    expect(corpo.data.config).toMatchObject({ ligado: false, aceite: null, no_padrao: false });
+    const jev = estado.settings.jev as Linha;
+    expect(jev).toMatchObject({ ligado: false, aceite: null, modo: "observacao", modo_roteador: "comparacao" });
+    const estados = Object.values(jev.tarefas as Record<string, { estado: string }>).map((t) => t.estado);
+    expect(estados.length).toBeGreaterThan(0);
+    expect(new Set(estados)).toEqual(new Set(["observando"]));
+    expect(estado.settings.branding).toEqual({ app_name: "Loja" });
+    // desligada de verdade: o GET seguinte a mostra desligada, mesmo com a env do padrão ligada
+    expect((await ler()).corpo.data.config.ligado).toBe(false);
+  });
+
+  it("religar depois de desligar o padrão exige o aceite de verdade e entra observando, não decidindo", async () => {
+    servirPelaPlataforma(true);
+    await mudar({ ligado: false });
+    const semAceite = await mudar({ ligado: true });
+    expect(semAceite.status).toBe(422);
+    expect(semAceite.corpo.error.code).toBe("jev_exige_aceite");
+
+    const com = await mudar({ ligado: true, aceite_lgpd: true });
+    expect(com.status).toBe(200);
+    const jev = estado.settings.jev as Linha;
+    expect(jev).toMatchObject({ ligado: true, modo: "observacao", modo_roteador: "comparacao", aceite: { por: USUARIO } });
+    const estados = Object.values(jev.tarefas as Record<string, { estado: string }>).map((t) => t.estado);
+    expect(estados).not.toContain("decidindo");
+  });
+
+  it("PATCH de outra mudança no padrão (bloco noPadrao) pede o aceite real e o grava com quem aceitou", async () => {
+    servirPelaPlataforma(true);
+    const recusa = await mudar({ modo_roteador: "comparacao" });
+    expect(recusa.status).toBe(422);
+    expect(recusa.corpo.error.code).toBe("jev_exige_aceite");
+    expect(escritas()).toEqual([]);
+
+    const ok = await mudar({ modo_roteador: "comparacao", aceite_lgpd: true });
+    expect(ok.status).toBe(200);
+    const jev = estado.settings.jev as Linha;
+    expect(jev.aceite).toMatchObject({ por: USUARIO, alcance: "mensagem" });
+    expect((jev.aceite as { por: string }).por).not.toBe("00000000-0000-0000-0000-000000000000");
+  });
+
+  it("PATCH ligar: sem chave própria, a plataforma serve a empresa elegível (gate de fonteDaChaveDoJev)", async () => {
+    servirPelaPlataforma(false);
+    const { status } = await mudar({ ligado: true, aceite_lgpd: true });
+    expect(status).toBe(200);
+    expect((estado.settings.jev as Linha).ligado).toBe(true);
+  });
+
+  it.each([
+    ["empresa isenta", null],
+    ["plano sem IA", { estado: "ativa", plano: { inclui_ia: false, ia_propria: false } }],
+    ["assinatura cancelada", { estado: "cancelada", plano: { inclui_ia: true, ia_propria: false } }],
+  ])("PATCH ligar (controle negativo): %s não é servida e a recusa continua", async (_n, assinatura) => {
+    servirPelaPlataforma(false);
+    estado.assinatura = assinatura;
+    const { status, corpo } = await mudar({ ligado: true, aceite_lgpd: true });
+    expect(status).toBe(422);
+    expect(corpo.error.code).toBe("jev_exige_chave_validada");
+    expect(escritas()).toEqual([]);
+  });
+
+  it("PATCH trocar a origem para a TypeSafe sem chave própria: a plataforma serve; para a OpenRouter, nunca", async () => {
+    servirPelaPlataforma(false);
+    estado.settings = { jev: { ligado: true, modo: "observacao", origem: "openrouter", aceite: ACEITE_ANTIGO } };
+    const paraTypesafe = await mudar({ origem: "typesafe" });
+    expect(paraTypesafe.status).toBe(200);
+    expect((estado.settings.jev as Linha).origem).toBe("typesafe");
+
+    const paraOpenrouter = await mudar({ origem: "openrouter", aceite_lgpd: true });
+    expect(paraOpenrouter.status).toBe(422);
+    expect(paraOpenrouter.corpo.error.code).toBe("jev_exige_chave_validada");
   });
 });

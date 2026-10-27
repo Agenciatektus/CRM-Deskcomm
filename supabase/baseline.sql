@@ -63191,6 +63191,28 @@ update public.cobranca_planos
 
 notify pgrst, 'reload schema';
 
+-- ---- Plano com IA incluida: corretiva (migration 9077) ----
+update public.cobranca_planos
+   set inclui_ia = false
+ where preco_cents = 39700
+   and moeda <> 'BRL'
+   and inclui_ia = true;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conname = 'cobranca_planos_ia_exclusivos'
+       and conrelid = 'public.cobranca_planos'::regclass
+  ) then
+    alter table public.cobranca_planos
+      add constraint cobranca_planos_ia_exclusivos check (not (inclui_ia and ia_propria)) not valid;
+  end if;
+end
+$$;
+
+notify pgrst, 'reload schema';
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria
