@@ -33,7 +33,14 @@ import { ORIGEM_DA_PLANILHA } from "./planilha";
  * diz de onde o NEGÓCIO veio e é lido pelas métricas de origem do funil;
  * `metadata.via` diz COMO a linha nasceu e é lido só por quem decide reagir.
  */
-export const ORIGENS_DE_CRIACAO_EM_LOTE: readonly string[] = [ORIGEM_DA_PLANILHA, ORIGEM_CAMPANHA];
+/** Card de pedido da loja (Nuvemshop): a compra de quem já é contato não pode virar abordagem de follow-up. */
+export const ORIGEM_PEDIDO_DA_LOJA = "pedido_loja";
+
+export const ORIGENS_DE_CRIACAO_EM_LOTE: readonly string[] = [
+  ORIGEM_DA_PLANILHA,
+  ORIGEM_CAMPANHA,
+  ORIGEM_PEDIDO_DA_LOJA,
+];
 
 /** Este `lead.created` nasceu de uma criação em lote? */
 export function criacaoEmLote(via: unknown): boolean {
