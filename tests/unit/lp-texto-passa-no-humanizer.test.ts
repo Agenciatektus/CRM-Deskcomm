@@ -32,6 +32,7 @@ function folhas(valor: unknown): string[] {
 // checagens de número, e tem teste próprio.
 const TEXTOS = [
   C.HERO,
+  C.OBRIGADO,
   C.VIDEO,
   C.FAIXA_ROTULO,
   C.FAIXA_APOIO,

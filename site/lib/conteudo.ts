@@ -635,3 +635,18 @@ export const CTA_FINAL = {
 
 export const META_DESCRICAO =
   "CRM de WhatsApp e Instagram com atendente de IA. Planos de R$ 157 e R$ 397 por mês, com implantação opcional pela Tektus por R$ 1.297 em até 3x sem juros.";
+
+/** Página para onde a Stripe leva quem acabou de pagar. Sem prazo prometido: o convite chega quando a conta é criada. */
+export const OBRIGADO = {
+  titulo: "Obrigado por assinar",
+  texto: "Se o pagamento foi aprovado, o recibo chega no e-mail que você informou.",
+  passosTitulo: "O que acontece agora",
+  passos: [
+    "A Tektus cria a conta da sua empresa com os dados do pagamento.",
+    "O convite de acesso chega nesse mesmo e-mail.",
+    "Você entra, conecta o WhatsApp e o Instagram e começa a atender.",
+  ],
+  semConvite: "Se o convite não chegar, olhe a caixa de spam ou chame a Tektus no WhatsApp.",
+  botao: "Falar com a Tektus no WhatsApp",
+  mensagem: "Oi, acabei de assinar o Verdash CRM e ainda não recebi o convite de acesso.",
+} as const;
