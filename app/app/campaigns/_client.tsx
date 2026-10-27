@@ -15,13 +15,40 @@ import { BarraDeFiltros, BotaoDaTelaParaRota, CabecalhoDaPagina, EstadoDaLista, 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Escolha } from "@/components/ui/escolha";
+import { useAuth } from "@/hooks/auth/AuthProvider";
 import { useCampanhas } from "@/hooks/campanhas/useCampanhas";
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
 import { useT } from "@/hooks/i18n/useT";
 import { Megaphone, Plus } from "@/lib/ui/icons";
+import { escreveComoPlatformAdmin, roleAtLeast, type Role } from "@/lib/auth/types";
 import { STATUS_DA_CAMPANHA } from "@/lib/campanhas/tipos";
 
+/** A API deixa `agent`+ LER a lista (somente leitura); criar, editar e disparar é `manager`. Abaixo de agent (403), a tela diz isso em vez de "Erro ao carregar". */
 export function ListaDeCampanhas() {
+  const t = useT();
+  const { user, activeOrg } = useAuth();
+  const role = activeOrg?.role;
+  // Mesma exceção do servidor (require-role) e do Meta Ads: platform admin com escopo full, fora do suporte.
+  const platformAdmin = escreveComoPlatformAdmin(user) && !user.support;
+  // Sem papel conhecido, o servidor decide (trata como manager).
+  const atLeast = (min: Role) => !role || roleAtLeast(role, min);
+  if (!atLeast("agent") && !platformAdmin) {
+    return (
+      <Pagina>
+        <CabecalhoDaPagina titulo={t("Campanhas")} />
+        <EmptyState
+          icon={Megaphone}
+          headline={t("Você não tem permissão para ver nem criar campanhas.")}
+          subcopy={t("Peça a um gerente ou administrador da organização.")}
+        />
+      </Pagina>
+    );
+  }
+  // O agent só lê a lista (a API de detalhe e as ações seguem de manager+).
+  return <CampanhasDoGestor somenteLeitura={!atLeast("manager") && !platformAdmin} />;
+}
+
+function CampanhasDoGestor({ somenteLeitura }: { somenteLeitura: boolean }) {
   const t = useT();
   // A data segue quem está lendo, não o idioma de quem escreveu a tela.
   const idioma = useTagDeIdioma();
@@ -36,6 +63,7 @@ export function ListaDeCampanhas() {
         titulo={t("Campanhas")}
         descricao={t("Escolha o público, escreva a mensagem e acompanhe quem recebeu.")}
         acoes={
+          somenteLeitura ? null : (
           <>
             <Button variant="outline" asChild>
               <Link href="/app/campaigns/settings">{t("Configuração")}</Link>
@@ -47,8 +75,15 @@ export function ListaDeCampanhas() {
               </Link>
             </Button>
           </>
+          )
         }
       />
+
+      {somenteLeitura && (
+        <p className="text-sm text-muted-foreground">
+          {t("Você pode apenas visualizar as campanhas. Criar e disparar é com um gerente ou administrador.")}
+        </p>
+      )}
 
       <BarraDeFiltros ativos={status ? 1 : 0} aoLimpar={() => setStatus("")}>
         <label className="text-sm text-muted-foreground" htmlFor="filtro-status">
@@ -81,15 +116,16 @@ export function ListaDeCampanhas() {
             subcopy={t(
               "Uma campanha fala com uma lista de contatos que você escolhe, no ritmo do número — nunca em rajada.",
             )}
-            primary={{ label: t("Nova campanha"), href: "/app/campaigns/new" }}
+            primary={somenteLeitura ? undefined : { label: t("Nova campanha"), href: "/app/campaigns/new" }}
           />
         }
       >
         <Card className="divide-y divide-border mb:rounded-none mb:border-x-0">
           {campanhas.map((c) => (
-            <Link
+            <Linha
               key={c.id}
               href={`/app/campaigns/${c.id}`}
+              somenteLeitura={somenteLeitura}
               className="flex flex-col gap-2 p-4 transition-colors hover:bg-surface-elevated sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="min-w-0">
@@ -113,7 +149,7 @@ export function ListaDeCampanhas() {
                 <span className="text-sm text-muted-foreground">{quando(c, t, idioma)}</span>
                 <EstadoDaCampanha status={c.status} />
               </div>
-            </Link>
+            </Linha>
           ))}
         </Card>
         {q.hasNextPage && (
@@ -130,9 +166,13 @@ export function ListaDeCampanhas() {
         )}
       </EstadoDaLista>
 
-      <BotaoDaTelaParaRota rotulo={t("Nova campanha")} href="/app/campaigns/new" />
+      {!somenteLeitura && <BotaoDaTelaParaRota rotulo={t("Nova campanha")} href="/app/campaigns/new" />}
     </Pagina>
   );
+}
+
+function Linha({ href, somenteLeitura, className, children }: { href: string; somenteLeitura: boolean; className: string; children: React.ReactNode }) {
+  return somenteLeitura ? <div className={className}>{children}</div> : <Link href={href} className={className}>{children}</Link>;
 }
 
 function rotulo(status: string): string {
