@@ -2,9 +2,11 @@
  * GET /api/v1/campaigns — a lista.
  * POST /api/v1/campaigns — cria um rascunho.
  *
- * Papel: `manager` para tudo. Disparar para uma lista de gente não é gesto de
- * `viewer` nem de `agent`, e a RLS de `campaigns` (migration 0375) exige o mesmo
- * papel — a porta HTTP e a do PostgREST concordam.
+ * Papel: `manager` para escrever (POST). Disparar para uma lista de gente não é
+ * gesto de `viewer` nem de `agent`, e a RLS de escrita de `campaigns` (migration
+ * 0375) exige o mesmo papel. A LISTA (GET) abre para `agent` em somente leitura
+ * (decisão do Peterson, 27/10/2026), sem `passos` (textos das mensagens do 2º
+ * toque); a RLS de leitura já é "membro da org".
  *
  * Paginação: keyset sobre (created_at DESC, id DESC), o mesmo formato de
  * `lead-captures`.
@@ -16,6 +18,7 @@ import type { NextRequest } from "next/server";
 import { fail, ok } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
+import { ROLE_RANK } from "@/lib/auth/types";
 import { FILTRO_VAZIO } from "@/lib/campanhas/audiencia";
 import { gravarPool } from "@/lib/campanhas/pool-de-numeros";
 import {
@@ -37,13 +40,16 @@ const COLUNAS_DA_LISTA =
   // `entrada_continua` vai na LISTA (9039) porque "Na lista: 0" numa campanha
   // contínua se lê como campanha quebrada: sem o modo, a tela não tem como
   // explicar o zero.
-  "pipeline_id, stage_id, agent_id, passos, entrada_continua";
+  "pipeline_id, stage_id, agent_id, entrada_continua";
+// `passos` carrega o texto das mensagens de follow-up: só quem edita (manager+) recebe.
+const COLUNAS_DO_GESTOR = `${COLUNAS_DA_LISTA}, passos`;
 
 export async function GET(req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
-  const authz = await requireRole("manager", { requestId, resource: "campaigns" });
+  const authz = await requireRole("agent", { requestId, resource: "campaigns" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
+  const colunas = ROLE_RANK[authz.org.role] >= ROLE_RANK.manager ? COLUNAS_DO_GESTOR : COLUNAS_DA_LISTA;
 
   const params = Object.fromEntries(new URL(req.url).searchParams.entries());
   const parsed = listarCampanhasSchema.safeParse(params);
@@ -58,7 +64,7 @@ export async function GET(req: NextRequest): Promise<Response> {
   const supabase = await createClient();
   let query = supabase
     .from("campaigns")
-    .select(COLUNAS_DA_LISTA)
+    .select(colunas)
     .eq("organization_id", authz.org.orgId)
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
