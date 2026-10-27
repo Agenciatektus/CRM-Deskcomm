@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { setActiveOrg } from "@/app/actions/shell/setActiveOrg";
+import { comLargura } from "@/lib/fotos/foto";
 
 /** A sigla da organização (`.rail-tenant`): as iniciais das duas primeiras palavras. */
 export function siglaDaOrganizacao(nome: string | null | undefined): string {
@@ -52,7 +53,7 @@ function ImagemOuSigla({ foto, sigla, classe }: { foto: string | null; sigla: st
   return (
     // eslint-disable-next-line @next/next/no-img-element -- a URL é a rota que confere o vínculo e assina
     <img
-      src={foto}
+      src={comLargura(foto, 64)} // ícone de até 32px; 64 cobre tela 2x
       alt=""
       aria-hidden
       data-testid="foto-da-organizacao"
