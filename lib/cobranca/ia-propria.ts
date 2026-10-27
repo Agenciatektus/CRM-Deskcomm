@@ -39,3 +39,29 @@ export async function instalacaoPodeServirIa(db: Consultavel, orgId: string): Pr
     return false;
   }
 }
+
+/** Cliente com `rpc` (supabase-js); tipagem mínima para não acoplar ao schema gerado. */
+interface ComRpc {
+  rpc: (fn: never, args: never) => PromiseLike<{ data: unknown; error: { message: string } | null }>;
+}
+
+/**
+ * Mesma pergunta de `instalacaoPodeServirIa`, para os caminhos que falam com o
+ * banco por supabase-js (embeddings). Mesma função SQL, mesma falha FECHADA.
+ */
+export async function instalacaoPodeServirIaViaRpc(admin: unknown, orgId: string): Promise<boolean> {
+  try {
+    const { data, error } = await (admin as ComRpc).rpc(
+      'fn_org_pode_usar_ia_da_instalacao' as never,
+      { p_org: orgId } as never,
+    );
+    if (error) throw new Error(error.message);
+    return data === true;
+  } catch (err) {
+    console.error('[ia-propria] leitura falhou; instalação não serve IA (fail-closed)', {
+      orgId,
+      erro: err instanceof Error ? err.message.slice(0, 200) : 'desconhecido',
+    });
+    return false;
+  }
+}

@@ -8,10 +8,12 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { MENSAGEM_IA_PROPRIA_SEM_CREDENCIAL } from "@/lib/cobranca/ia-propria";
 import {
   EXPLICACAO_DA_ORIGEM,
   FamiliaDaBaseIlegivelError,
   familiaDaBase,
+  iaPropriaVedaAInstalacao,
   provedorDaBase,
   resolverChaveDeEmbedding,
   type ProvedorDaBase,
@@ -90,6 +92,9 @@ export async function montarEstadoDaChave(
     avisos: [
       ...(chave?.avisos ?? []),
       ...(familiaIlegivel ? [AVISO_DA_FAMILIA_ILEGIVEL] : []),
+      ...(chave === null && (await iaPropriaVedaAInstalacao(organizationId))
+        ? [MENSAGEM_IA_PROPRIA_SEM_CREDENCIAL]
+        : []),
     ],
     provedor,
     familia_sem_chave: familia !== null && chave === null ? familia : null,
