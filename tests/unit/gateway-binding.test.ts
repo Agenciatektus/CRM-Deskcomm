@@ -14,6 +14,10 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// Fora do assunto deste teste: a instalação serve a org (sem plano com IA própria).
+vi.mock("@/lib/cobranca/ia-propria", async (orig) =>
+  (await import("@/tests/helpers/ia-propria-instalacao-serve")).instalacaoServeAOrg(await orig()));
+
 const bindings = vi.hoisted(() => ({ linha: null as Record<string, unknown> | null }));
 const credenciais = vi.hoisted(() => ({ linha: null as Record<string, unknown> | null }));
 

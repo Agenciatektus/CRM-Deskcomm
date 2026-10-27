@@ -30,6 +30,10 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// Fora do assunto deste teste: a instalação serve a org (sem plano com IA própria).
+vi.mock("@/lib/cobranca/ia-propria", async (orig) =>
+  (await import("@/tests/helpers/ia-propria-instalacao-serve")).instalacaoServeAOrg(await orig()));
+
 const envMock: Record<string, string> = {};
 vi.mock("@/lib/env", () => ({
   get env() {
