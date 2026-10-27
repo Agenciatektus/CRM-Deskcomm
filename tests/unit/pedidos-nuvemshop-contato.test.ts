@@ -275,12 +275,36 @@ describe("comprador novo", () => {
     expect(gravado()?.contact_id).toBe("c9");
   });
 
-  it("erro do insert: só o código no detail, sem telefone nem e-mail", async () => {
+  it("erro do insert não perde o pedido: grava sem contato, detail só com o código", async () => {
     erroNoInsert = { code: "42501" };
     getOrder.mockResolvedValue(pedido({ contact_phone: "+5511999998888", contact_email: "m@x.com" }));
     const r = await processPedido(evento);
-    expect(r).toMatchObject({ status: "error", detail: "contato_criar:42501" });
+    expect(r).toMatchObject({ status: "ok", detail: "contato_nao_criado:42501" });
     expect(JSON.stringify(r)).not.toMatch(/99999|m@x\.com/);
+    expect(gravado()).toBeDefined();
+    expect(gravado()).not.toHaveProperty("contact_id");
+  });
+
+  it("e-mail fora do CHECK (joao@gmail) é descartado; cria só com o telefone", async () => {
+    getOrder.mockResolvedValue(pedido({ contact_phone: "+5511999998888", contact_email: "joao@gmail" }));
+    await processPedido(evento);
+    expect(contatosCriados[0]).toMatchObject({ phone_number: "+5511999998888", email: null });
+  });
+
+  it("e-mail inválido e sem telefone: não cria", async () => {
+    getOrder.mockResolvedValue(pedido({ contact_email: "joao@gmail" }));
+    await processPedido(evento);
+    expect(contatosCriados).toHaveLength(0);
+  });
+
+  it("nome sem controle/bidi e cortado por code point", async () => {
+    getOrder.mockResolvedValue(
+      pedido({ contact_phone: "+5511999998888", contact_name: `Ana\n‮Bo${"😀".repeat(300)}` }),
+    );
+    await processPedido(evento);
+    const nome = contatosCriados[0]?.name as string;
+    expect(nome).not.toMatch(/[\n‮]/);
+    expect([...nome]).toHaveLength(200);
   });
 });
 

@@ -6,7 +6,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizePhoneBR, phoneLookupVariants } from "@/lib/channels/phone-variants";
 
-export type CasamentoDeContato = { contactId: string; criado?: true } | { motivo: "contato_ambiguo" } | null;
+export type CasamentoDeContato = { contactId: string; criado?: true } | { motivo: string } | null;
 
 const texto = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 
@@ -44,11 +44,13 @@ export async function casarContato(
 }
 
 const UNICO_VIOLADO = "23505";
+// Mesma regex do CHECK `contacts_email_format`: e-mail fora dela derrubaria o insert.
+const EMAIL_VALIDO = /^[^@\s]+@[^@\s]+\.[^@\s]+$/i;
 
 /**
  * Casa; se ninguém bate e há telefone ou e-mail, cria o contato do comprador.
- * Ambíguo nunca cria (duplicaria). Contato novo nasce SEM consentimento (`consent: {}`):
- * comprar na loja não autoriza mensagem de marketing. Sem `emit_event`: não dispara
+ * Ambíguo nunca cria (duplicaria). Contato novo nasce com `consent: {}` (sem
+ * opt-in registrado; os gates do produto só barram quem recusou). Sem `emit_event`: não dispara
  * automação de "contato criado" para quem só comprou no site.
  */
 export async function contatoDoPedido(
@@ -61,15 +63,18 @@ export async function contatoDoPedido(
 
   const telefone = normalizePhoneBR(pedido["contact_phone"]);
   const email = texto(pedido["contact_email"]).toLowerCase();
-  if (!telefone && !email) return null;
+  const emailOk = EMAIL_VALIDO.test(email) ? email : "";
+  if (!telefone && !emailOk) return null;
+  // Sem caractere de controle/bidi e cortado por code point (nunca no meio de um emoji).
+  const nome = [...texto(pedido["contact_name"]).replace(/[\p{Cc}\p{Cf}]/gu, " ")].slice(0, 200).join("").trim();
 
   const { data, error } = await admin
     .from("contacts")
     .insert({
       organization_id: organizationId,
-      name: texto(pedido["contact_name"]).slice(0, 200) || null,
+      name: nome || null,
       phone_number: telefone,
-      email: email || null,
+      email: emailOk || null,
       source: "nuvemshop",
       source_metadata: { via: "pedido_loja" },
       consent: {},
@@ -79,7 +84,8 @@ export async function contatoDoPedido(
   if (error) {
     // Corrida com outro evento do mesmo comprador: o índice único barrou, então ele já existe.
     if (error.code === UNICO_VIOLADO) return casarContato(admin, organizationId, pedido);
-    throw new Error(`contato_criar:${error.code ?? "erro"}`);
+    // Falha ao criar o contato não pode perder o pedido: grava sem contato e avisa (sem PII).
+    return { motivo: `contato_nao_criado:${error.code ?? "erro"}` };
   }
   return { contactId: (data as { id: string }).id, criado: true };
 }
