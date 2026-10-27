@@ -21,13 +21,17 @@
  */
 import { readFileSync } from "node:fs";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   capacidadeEhConhecida,
   modelCapabilities,
 } from "@/lib/agent-engine/edge/llm/capabilities";
 import { llmEdgeConfigFromEnv } from "@/lib/agent-engine/edge/llm/credentials";
+
+// Fora do assunto deste teste: a instalação serve a org (sem plano com IA própria).
+vi.mock("@/lib/cobranca/ia-propria", async (orig) =>
+  (await import("@/tests/helpers/ia-propria-instalacao-serve")).instalacaoServeAOrg(await orig()));
 
 describe("a chave da OpenRouter chega ao seam", () => {
   it("llmEdgeConfigFromEnv carrega OPENROUTER_API_KEY", () => {
@@ -48,7 +52,8 @@ describe("a chave da OpenRouter chega ao seam", () => {
     // decifragem AES — está coberto no invariante com Postgres real. Aqui o
     // alvo é a existência do RAMO, que é o que faltava.
     const fonte = readFileSync("lib/agent-engine/edge/llm/credentials.ts", "utf8");
-    expect(fonte).toMatch(/provider === 'openrouter' && cfg\.openrouterApiKey/);
+    // A escada do env virou ternário na trava de IA própria (9075); o ramo segue lá.
+    expect(fonte).toMatch(/provider === 'openrouter'\s*(?:&&|\?)\s*cfg\.openrouterApiKey/);
   });
 });
 

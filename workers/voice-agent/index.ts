@@ -64,6 +64,7 @@ import { ehOperante } from "@/lib/organizacao/operante";
 import { registrarChamadaDeIa } from "@/lib/ai/usage/registrar-chamada";
 import { logger } from "@/lib/logger";
 import { linhaDaLigacao } from "./uso-da-sessao";
+import { mensagemSemChaveDaVoz } from "@/lib/cobranca/ia-propria";
 
 const supabaseAdmin = createAdminClient();
 
@@ -379,6 +380,12 @@ export async function handleAudioSocketConnection(socket: net.Socket, uuid: stri
     return;
   }
 
+  if (!agent.apiKey) {
+    console.error(`[audiosocket] sem chave de IA utilizável pra org ${callRow.organization_id} (${mensagemSemChaveDaVoz(agent.motivoSemChave)})`);
+    socket.end();
+    return;
+  }
+
   // Mesmo acervo que o agente de texto (WhatsApp) já usa — reaproveita
   // resolverAcervoDoAgente/buscarConhecimento em vez de reimplementar RAG
   // pro canal de voz. NÃO aguardado aqui: dispara em paralelo com a abertura
@@ -403,6 +410,7 @@ export async function handleAudioSocketConnection(socket: net.Socket, uuid: stri
     voiceSpeed: agent.voiceSpeed,
     voiceModel: agent.voiceModel,
     apiKey: agent.apiKey,
+    motivoSemChave: agent.motivoSemChave,
     onTranscriptTurn: (turn) => appendAudioSocketTranscriptTurn(uuid, turn),
     onCallEnded: () => finalizeAudioSocketCall(uuid),
     knowledgeSourceIdsPromise,

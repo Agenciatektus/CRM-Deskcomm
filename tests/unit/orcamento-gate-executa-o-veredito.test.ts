@@ -45,6 +45,10 @@ import {
 } from "@/lib/agent-engine/edge/llm/run-model-call";
 import { esquecerMemoDosModulos } from "@/lib/instalacao/modulos";
 
+// Fora do assunto deste teste: a instalação serve a org (sem plano com IA própria).
+vi.mock("@/lib/cobranca/ia-propria", async (orig) =>
+  (await import("@/tests/helpers/ia-propria-instalacao-serve")).instalacaoServeAOrg(await orig()));
+
 // A chave da cobrança é lida com memo de processo (MEMO_DO_MODULO_MS): sem
 // esquecer, o primeiro caso decidiria a chave de todos os outros.
 beforeEach(() => esquecerMemoDosModulos());

@@ -225,6 +225,10 @@ describe("o seam instancia o modelo do agente, não o do padrão da org", () => 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
+// Fora do assunto deste teste: a instalação serve a org (sem plano com IA própria).
+vi.mock("@/lib/cobranca/ia-propria", async (orig) =>
+  (await import("@/tests/helpers/ia-propria-instalacao-serve")).instalacaoServeAOrg(await orig()));
+
 /** Read the actual object owning purpose; braces in prompts cannot alter its boundary. */
 function objetosComPurpose(fonte: string) {
   const ast = ts.createSourceFile("source.ts", fonte, ts.ScriptTarget.Latest, true);

@@ -27,6 +27,10 @@ import {
 import { esquecerCatalogoEconomico } from "@/lib/agent-engine/edge/llm/binding-do-ponto";
 import { runModelCall } from "@/lib/agent-engine/edge/llm/run-model-call";
 
+// Fora do assunto deste teste: a instalação serve a org (sem plano com IA própria).
+vi.mock("@/lib/cobranca/ia-propria", async (orig) =>
+  (await import("@/tests/helpers/ia-propria-instalacao-serve")).instalacaoServeAOrg(await orig()));
+
 const m = (
   provider: string,
   model_id: string,
