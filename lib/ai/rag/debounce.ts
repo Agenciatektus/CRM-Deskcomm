@@ -42,7 +42,7 @@ let _fallbackWarned = false;
 /** Teto NOSSO para a ida ao Redis. Ver o cabeçalho: sem ele, a promise não volta. */
 const TIMEOUT_MS = 2_000;
 
-function getRedis(): Redis | null {
+export function getRedis(): Redis | null {
   if (_redis) return _redis;
 
   const url = env.UPSTASH_REDIS_REST_URL;

@@ -198,7 +198,7 @@ function stripHtml(html: string): string {
  * `lib/nuvemshop/api-client.ts`, então o idioma não é fixo; como esse dado não
  * é gravado na conexão, a saída é usar o texto que existir.
  */
-function localizedText(value: unknown): string {
+export function localizedText(value: unknown): string {
   if (typeof value === "string") return value;
   if (value && typeof value === "object" && !Array.isArray(value)) {
     const pt = (value as { pt?: unknown }).pt;
@@ -265,7 +265,7 @@ export function campoIlegivel(value: unknown): boolean {
  * dependia da ordem das chaves — `{value: "M", name: "Tamanho"}` sairia
  * `M: M`. Ramo morto que convidava acoplamento acidental.
  */
-function nomesDosAtributos(attributes: unknown): string[] {
+export function nomesDosAtributos(attributes: unknown): string[] {
   if (!Array.isArray(attributes)) return [];
   return attributes.map((a) => localizedText(a));
 }
@@ -288,7 +288,7 @@ function nomesDosAtributos(attributes: unknown): string[] {
  * passa a ser chute: sai só o valor. Dizer `Tamanho: M, Azul` seria afirmar
  * metade de um par que ninguém sustenta.
  */
-function atributosDaVariante(
+export function atributosDaVariante(
   v: NuvemshopProductVariant,
   nomes: string[],
 ): string {

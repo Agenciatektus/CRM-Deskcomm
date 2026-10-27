@@ -52,11 +52,17 @@ describe("o catálogo da loja chega ao acervo", () => {
   });
 
   it("⭐ o indexador procura a loja por um status que a tabela aceita", () => {
+    // A leitura da credencial mora em `lib/nuvemshop/credenciais.ts` (o worker e a consulta
+    // de estoque ao vivo a dividem); o worker só precisa continuar usando-a.
     const worker = ler("workers/rag-indexer.ts");
-    expect(worker).toContain('.eq("status", "healthy")');
+    const credenciais = ler("lib/nuvemshop/credenciais.ts");
+    expect(worker).toContain("credenciaisDaLoja");
+    expect(worker).toContain('from "@/lib/nuvemshop/credenciais"');
+    expect(worker).not.toMatch(/function credenciaisDaLoja/);
+    expect(credenciais).toContain('.eq("status", "healthy")');
     // `active` nunca esteve no CHECK de tenant_integrations: connecting,
     // healthy, token_expired, scope_missing, disconnected, rate_limited, error.
-    expect(worker).not.toContain('.eq("status", "active")');
+    expect(credenciais).not.toContain('.eq("status", "active")');
   });
 
   it("⭐ a conexão dispara a carga inicial, e o worker sabe recebê-la", () => {
@@ -90,7 +96,8 @@ describe("o catálogo da loja chega ao acervo", () => {
    */
 
   it("⭐ a credencial é decifrada com o argumento que a função tem", () => {
-    const worker = ler("workers/rag-indexer.ts");
+    // A decifragem mora em `lib/nuvemshop/credenciais.ts` (compartilhada com a consulta ao vivo).
+    const worker = ler("lib/nuvemshop/credenciais.ts");
     // `fn_decrypt_oauth(ciphertext bytea)` — um argumento. Pedia-se
     // `p_organization_id`/`p_integration_id`, que não existem em assinatura
     // nenhuma: a credencial voltava nula e o catálogo ficava vazio em silêncio.
