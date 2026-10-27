@@ -1,5 +1,5 @@
 /**
- * Grava o pedido da Nuvemshop em `orders` (só ingestão: sem contato, card ou funil).
+ * Grava o pedido da Nuvemshop em `orders` (sem card ou funil; liga ao contato existente, sem criar).
  *
  * O webhook chega duplicado e fora de ordem, então o pedido é RELIDO na API e o
  * estado nunca regride (`semRegredir`). Service role: todo filtro leva
@@ -11,6 +11,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { eventLogTypeFor, SUBSCRIBED_EVENTS } from "./config";
 import { NuvemshopApiClient } from "./api-client";
 import { credenciaisDaLoja } from "./credenciais";
+import { casarContato } from "./pedido-contato";
 import { mapearPedido, PedidoInvalidoError, semRegredir, type PedidoRow } from "./pedido-mapper";
 
 export const PEDIDOS_HANDLER_KEY = "nuvemshop-pedidos.v1";
@@ -29,7 +30,7 @@ const r = (status: HandlerResult["status"], detail?: string): HandlerResult => (
 type Atual = Pick<
   PedidoRow,
   "status" | "fulfillment_status" | "tracking_code" | "updated_at_remote"
-> & { is_anonymized: boolean };
+> & { is_anonymized: boolean; contact_id: string | null };
 
 export async function processPedido(row: EventRow): Promise<HandlerResult> {
   const id = row.payload["id"] != null ? String(row.payload["id"]) : "";
@@ -52,7 +53,7 @@ export async function processPedido(row: EventRow): Promise<HandlerResult> {
     };
     const { data, error: errLeitura } = await admin
       .from("orders")
-      .select("status, fulfillment_status, tracking_code, updated_at_remote, is_anonymized")
+      .select("status, fulfillment_status, tracking_code, updated_at_remote, is_anonymized, contact_id")
       .match(chave)
       .maybeSingle();
     if (errLeitura) return r("error", `leitura:${errLeitura.code ?? "erro"}`);
@@ -69,14 +70,19 @@ export async function processPedido(row: EventRow): Promise<HandlerResult> {
       return r("skipped", "pedido_mais_antigo");
     }
 
+    // Só casa quando a linha ainda não tem contato; o que já casou nunca é trocado nem zerado.
+    // Sem a chave `contact_id` no upsert a coluna fica como está.
+    const casou = atual?.contact_id ? null : await casarContato(admin, row.organization_id, cru);
+    const contato = casou && "contactId" in casou ? { contact_id: casou.contactId } : {};
+
     const { error } = await admin
       .from("orders")
       .upsert(
-        { ...chave, ...semRegredir(novo, atual), updated_at: new Date().toISOString() },
+        { ...chave, ...semRegredir(novo, atual), ...contato, updated_at: new Date().toISOString() },
         { onConflict: "organization_id,external_provider,external_id" },
       );
     if (error) return r("error", `gravacao:${error.code ?? "erro"}`);
-    return r("ok");
+    return casou && "motivo" in casou ? r("ok", casou.motivo) : r("ok");
   } catch (err) {
     // Dado ruim não muda na próxima tentativa: pula em vez de ficar em retry.
     if (err instanceof PedidoInvalidoError) return r("skipped", err.message);
