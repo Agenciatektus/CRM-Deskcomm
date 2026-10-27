@@ -40,6 +40,20 @@ describe("EscolhaDeFluxo", () => {
     fireEvent.click(screen.getByRole("button", { name: nome }));
     expect(onFechar).toHaveBeenCalled();
     expect(push).toHaveBeenCalledWith(`/app/connections?aba=${aba}`);
+    expect(onFechar.mock.invocationCallOrder[0]).toBeLessThan(push.mock.invocationCallOrder[0]!);
+  });
+
+  it("Esc fecha o popup", () => {
+    const { onFechar } = abrir();
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(onFechar).toHaveBeenCalled();
+  });
+
+  it("ArrowUp na primeira linha volta para a última", () => {
+    abrir();
+    const linhas = screen.getAllByRole("button").filter((b) => b.hasAttribute("data-linha"));
+    fireEvent.keyDown(linhas[0]!, { key: "ArrowUp" });
+    expect(linhas[linhas.length - 1]).toHaveFocus();
   });
 
   it("o foco abre na linha do WhatsApp e as setas percorrem as linhas", () => {
