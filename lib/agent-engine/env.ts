@@ -60,6 +60,7 @@ const envSchema = z.object({
   // linha de cima: `loadEnv` remove do `parsed.data` o que o schema não declara.
   JEV_PLATFORM_API_KEY: z.string().optional(),
   JEV_LIGADO_POR_PADRAO: z.string().optional(),
+  JEV_TETO_MENSAL_POR_EMPRESA_USD_CENTS: z.string().optional(),
   // `AGENT_DEFAULT_MODEL` morava aqui, com `.default('claude-sonnet-4-5')` —
   // um default da Anthropic escrito no schema de ambiente de um produto que
   // também opera com OpenAI. NÃO EXISTIA CONSUMIDOR: nem `loadEnv` nem
