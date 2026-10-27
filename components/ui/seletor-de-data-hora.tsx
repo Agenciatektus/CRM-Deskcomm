@@ -75,7 +75,7 @@ export function SeletorDeDataHora({
   const soHora = modo === "hora";
   const soData = modo === "data";
   const livre = passado || soHora;
-  const [mes, setMes] = useState(() => valor ?? min ?? agora);
+  const [mes, setMes] = useState(() => valor ?? (min && min > agora ? min : agora));
   const [dia, setDia] = useState<Date | null>(soHora ? (valor ?? agora) : valor);
   const [hora, setHora] = useState<[number, number] | null>(valor ? [valor.getHours(), valor.getMinutes()] : null);
   const [outro, setOutro] = useState("");
