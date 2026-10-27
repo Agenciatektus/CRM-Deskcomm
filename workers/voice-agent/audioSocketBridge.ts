@@ -29,6 +29,7 @@
 import WebSocket from "ws";
 import type { Socket } from "node:net";
 import { pcm16ToUlaw, ulawToPcm16 } from "@/lib/voip/ulaw";
+import { erroDeVozSemChave, type MotivoSemChaveDaVoz } from "@/lib/cobranca/ia-propria";
 import { somarUsoDaResposta, usoVazio, type UsoDaSessao } from "./uso-da-sessao";
 
 // Fallback só pra quem ainda não configurou nada na aba Voz do agente
@@ -79,6 +80,8 @@ export interface AudioSocketCallContext {
   voiceModel?: string;
   /** Chave da OpenAI pra esta org -- ver resolverChaveOpenAiDaVoz em lib/ai/agents.ts. */
   apiKey?: string;
+  /** Por que `apiKey` veio vazia (escolhe a mensagem de erro). */
+  motivoSemChave?: MotivoSemChaveDaVoz;
   onTranscriptTurn: (turn: { speaker: "agent" | "customer"; text: string }) => void;
   onCallEnded: () => void;
   /**
@@ -169,7 +172,10 @@ export class AudioSocketCallBridge {
     private ctx: AudioSocketCallContext,
   ) {
     this.realtimeModel = ctx.voiceModel ?? REALTIME_MODEL_FALLBACK;
-    const apiKey = ctx.apiKey || process.env.OPENAI_API_KEY!;
+    // Sem fallback ao env aqui: a chave vem de resolverChaveOpenAiDaVoz (lib/ai/agents.ts),
+    // que já aplica a regra do plano com IA própria.
+    const apiKey = ctx.apiKey;
+    if (!apiKey) throw erroDeVozSemChave(ctx.motivoSemChave);
     const realtimeUrl = `wss://api.openai.com/v1/realtime?model=${this.realtimeModel}`;
     this.realtimeWs = new WebSocket(realtimeUrl, {
       headers: { Authorization: `Bearer ${apiKey}` },

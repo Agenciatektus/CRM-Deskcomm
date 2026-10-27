@@ -14,7 +14,11 @@ vi.mock("@/lib/ai/catalogo/modelos-da-assinatura", () => ({
 vi.mock("@/lib/ai/agents/publish", () => ({ publishAgentVersion: mocks.publish }));
 vi.mock("@/lib/ai/agents/create-draft", () => ({ createMcpAgentDraft: mocks.create }));
 vi.mock("@/lib/audit", () => ({ audit: mocks.audit }));
-vi.mock("@/lib/ai/runtime/agent", () => ({ chaveDePlataforma: mocks.platform }));
+vi.mock("@/lib/ai/runtime/agent", () => ({
+  chaveDePlataforma: mocks.platform,
+  // Sem plano com IA própria: a chave da instalação é a de plataforma, como antes da 9075.
+  chaveDaInstalacaoParaOrg: async (_org: string, provider: string) => ({ apiKey: mocks.platform(provider), bloqueada: false }),
+}));
 vi.mock("@/lib/ai/agents/capacidades-padrao", () => ({
   capacidadesPadraoDoOnboarding: () => [
     "crm_get_lead",
@@ -33,6 +37,10 @@ import {
 } from "@/lib/prospecting/agent-setup";
 import { prospectingAgentSetupSchema } from "@/lib/prospecting/agent-setup-schema";
 import { writeRouterMembers } from "@/lib/ai/agents/router-members";
+
+// Fora do assunto deste teste: a instalação serve a org (sem plano com IA própria).
+vi.mock("@/lib/cobranca/ia-propria", async (orig) =>
+  (await import("@/tests/helpers/ia-propria-instalacao-serve")).instalacaoServeAOrg(await orig()));
 
 const org = "10000000-0000-4000-8000-000000000001";
 const channel = "10000000-0000-4000-8000-000000000002";

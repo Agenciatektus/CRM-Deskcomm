@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
 import { createClient } from "@/lib/supabase/server";
 import { lerRetratoDaInstalacao } from "@/lib/instalacao/retrato";
+import { instalacaoPodeServirIaViaRpc } from "@/lib/cobranca/ia-propria";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { SetupAiForm } from "./_form";
 import { InteligenciaDele } from "./_inteligencia";
 import { capacidadesPadraoDoOnboarding } from "@/lib/ai/agents/capacidades-padrao";
@@ -33,7 +35,11 @@ export default async function SetupAiPage() {
   const idioma = user.idioma;
 
   const supabase = await createClient();
-  const retrato = await lerRetratoDaInstalacao({ supabase, orgId: activeOrg.orgId });
+  const retrato = await lerRetratoDaInstalacao({
+    supabase,
+    orgId: activeOrg.orgId,
+    instalacaoPodeServirIa: () => instalacaoPodeServirIaViaRpc(createAdminClient(), activeOrg.orgId),
+  });
 
   const porNome = new Map(TOOL_CATALOG.map((c) => [c.name, c]));
   const capacidades = capacidadesPadraoDoOnboarding()

@@ -166,4 +166,30 @@ describe("o retrato da instalação", () => {
     });
     expect(r.empresa.aindaSemNomeProprio).toBe(true);
   });
+
+  it("plano com IA propria: chave da instalacao no env NAO vira origem (controle negativo: sem plano vira)", async () => {
+    const base = {
+      supabase: clientFalso(tabelas([])),
+      orgId: ORG,
+      ambiente: { ...SEM_AMBIENTE, ANTHROPIC_API_KEY: "sk-ant-xxx" },
+    };
+    const comPlano = await lerRetratoDaInstalacao({ ...base, instalacaoPodeServirIa: async () => false });
+    expect(comPlano.inteligencia.origemDaChave).toBe("nenhuma");
+    expect(comPlano.inteligencia.iaPropria).toBe(true);
+    expect(comPlano.inteligencia.prontaParaPublicar).toBe(false);
+    const semPlano = await lerRetratoDaInstalacao({ ...base, instalacaoPodeServirIa: async () => true });
+    expect(semPlano.inteligencia.origemDaChave).toBe("instalacao");
+    expect(semPlano.inteligencia.iaPropria).toBe(false);
+  });
+
+  it("plano com IA propria e credencial validada: continua origem org", async () => {
+    const r = await lerRetratoDaInstalacao({
+      supabase: clientFalso(tabelas([{ ...CRED, validated_at: "2026-08-13T00:00:00Z" }])),
+      orgId: ORG,
+      ambiente: SEM_AMBIENTE,
+      instalacaoPodeServirIa: async () => false,
+    });
+    expect(r.inteligencia.origemDaChave).toBe("org");
+    expect(r.inteligencia.iaPropria).toBe(true);
+  });
 });

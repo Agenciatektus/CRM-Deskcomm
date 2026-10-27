@@ -26,6 +26,7 @@ import {
 } from "@/lib/agent-engine/edge/llm/credentials";
 import { createDefaultRegistry } from "@/lib/agent-engine/edge/llm/providers";
 import { createPool } from "@/lib/agent-engine/db/pool";
+import { instalacaoPodeServirIa } from "@/lib/cobranca/ia-propria";
 import { env } from "@/lib/env";
 import type { EventRow, HandlerResult } from "@/lib/event-log/dispatcher";
 import { deriveMediaText, type DeriveDeps } from "@/lib/messaging/media/derive";
@@ -384,6 +385,9 @@ export async function deriveMessageMedia(row: EventRow): Promise<HandlerResult> 
           : null,
       // Imagem e documento não passam pela escada: não resolvem a OpenAI à toa.
       chaveOpenai: precisaTranscricao ? chaveOpenai : undefined,
+      // Plano com IA própria: o serviço de transcrição da instalação não ouve
+      // esta empresa (migration 9075; falha fechada no helper).
+      instalacaoServe: () => instalacaoPodeServirIa(derivePool(), row.organization_id),
     });
     logger.info("[media-derive] transcrição resolvida", {
       organization_id: row.organization_id,

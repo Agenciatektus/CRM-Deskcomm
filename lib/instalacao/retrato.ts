@@ -25,6 +25,12 @@ export interface RetratoDaInstalacao {
      * cadastrar de novo o que já está lá.
      */
     chaveEmVerificacao: boolean;
+    /**
+     * Plano com IA própria: a empresa só usa a credencial dela, nunca a chave da
+     * instalação. Sem credencial validada, `origemDaChave` fica "nenhuma" (não
+     * "instalacao") e este campo diz o porquê.
+     */
+    iaPropria: boolean;
     /** `id` para quem precisa DECIFRÁ-LA (a prova de saldo). O resto é só rótulo. */
     chaveDaOrg: { id: string; label: string; final: string } | null;
     modeloCurado: string | null;
@@ -53,6 +59,11 @@ export interface DependenciasDoRetrato {
    * exige o client de serviço, e este módulo não deve escolher isso sozinho.
    */
   contarCanais?: () => Promise<{ total: number; conectados: number } | null>;
+  /**
+   * `instalacaoPodeServirIa` para esta org (fail-closed). Ausente = a instalação
+   * serve (comportamento de antes do plano com IA própria).
+   */
+  instalacaoPodeServirIa?: () => Promise<boolean>;
 }
 
 export async function lerRetratoDaInstalacao(
@@ -114,9 +125,12 @@ export async function lerRetratoDaInstalacao(
     .eq("is_archived", false)
     .maybeSingle();
 
+  const iaPropria = deps.instalacaoPodeServirIa ? !(await deps.instalacaoPodeServirIa()) : false;
+
+  // Em plano com IA própria a chave da instalação NUNCA vale, mesmo presente no env.
   const origemDaChave: RetratoDaInstalacao["inteligencia"]["origemDaChave"] = credencial
     ? "org"
-    : ambiente.chavesDeProvedor[provider] === true
+    : !iaPropria && ambiente.chavesDeProvedor[provider] === true
       ? "instalacao"
       : "nenhuma";
 
@@ -132,6 +146,7 @@ export async function lerRetratoDaInstalacao(
       rotulo: PROVEDOR_POR_ID.get(provider)?.rotulo ?? provider,
       origemDaChave,
       chaveEmVerificacao: emVerificacao,
+      iaPropria,
       chaveDaOrg: credencial
         ? {
             id: credencial.id as string,

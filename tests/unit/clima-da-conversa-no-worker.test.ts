@@ -62,6 +62,10 @@ import { traduzir } from "@/lib/i18n/dicionario";
 import type { EventRow } from "@/lib/event-log/dispatcher";
 import { processSentiment } from "@/workers/ai-sentiment-worker";
 
+// Fora do assunto deste teste: a instalação serve a org (sem plano com IA própria).
+vi.mock("@/lib/cobranca/ia-propria", async (orig) =>
+  (await import("@/tests/helpers/ia-propria-instalacao-serve")).instalacaoServeAOrg(await orig()));
+
 type Linha = Record<string, unknown>;
 /** As tabelas que os casos afirmam são nomeadas; o resto nasce vazio sob demanda. */
 interface Banco {

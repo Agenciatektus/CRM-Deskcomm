@@ -9,7 +9,7 @@ import { listarModelosDaAssinaturaOuVazio } from "@/lib/ai/catalogo/modelos-da-a
 import { capacidadesPadraoDoOnboarding } from "@/lib/ai/agents/capacidades-padrao";
 import { versionCreateSchema } from "@/lib/ai/agents/validation";
 import { lockRouter, writeRouterMembers } from "@/lib/ai/agents/router-members";
-import { chaveDePlataforma } from "@/lib/ai/runtime/agent";
+import { chaveDaInstalacaoParaOrg } from "@/lib/ai/runtime/agent";
 import { PROVIDERS } from "@/lib/ai/agents/validation";
 import { provedorOferecido } from "@/lib/ai/pontos/provedores-oferecidos";
 import { capabilitiesOf } from "@/lib/channels/capabilities";
@@ -90,12 +90,10 @@ export async function resolveSetupModel(
     [orgId, channelId],
   );
   for (const row of published.rows) {
-    if (
-      !PROVIDERS.includes(row.provider) ||
-      !oferece(row.provider) ||
-      (!row.credential_id && !chaveDePlataforma(row.provider))
-    ) {
-      continue;
+    if (!PROVIDERS.includes(row.provider) || !oferece(row.provider)) continue;
+    if (!row.credential_id) {
+      const inst = await chaveDaInstalacaoParaOrg(orgId, row.provider);
+      if (!inst.apiKey || inst.bloqueada) continue;
     }
     const modeloDaAssinatura =
       row.provider === "openai-assinatura"
@@ -126,7 +124,10 @@ export async function resolveSetupModel(
   for (const provider of providers) {
     if (!PROVIDERS.includes(provider) || !oferece(provider)) continue;
     const credential = credentials.rows.find((c) => c.provider === provider);
-    if (!credential && !chaveDePlataforma(provider)) continue;
+    if (!credential) {
+      const inst = await chaveDaInstalacaoParaOrg(orgId, provider);
+      if (!inst.apiKey || inst.bloqueada) continue;
+    }
     if (provider === "openai-assinatura") {
       const models = await catalogoDaAssinatura();
       const selected = escolherModeloDoProvedor(models);

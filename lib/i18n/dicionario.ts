@@ -4732,6 +4732,9 @@ export const DICIONARIO: Traducoes = {
   "não há chave OpenAI nem modelo de conversa com capacidade audio nesta organização": {
     es: "no hay clave de OpenAI ni modelo de conversación con capacidad audio en esta organización",
   },
+  "Esta empresa usa IA própria: cadastre a chave de IA da empresa para ativar.": {
+    es: "Esta empresa usa IA propia: registra la clave de IA de la empresa para activar.",
+  },
   "a escada de transcrição não foi resolvida nesta chamada — não há o que anunciar": {
     es: "la escalera de transcripción no se resolvió en esta llamada — no hay nada que anunciar",
   },
@@ -17149,6 +17152,8 @@ export const DICIONARIO: Traducoes = {
   "Só você atribui": { es: "Solo usted lo asigna" },
   "Esconder das empresas": { es: "Ocultar a las empresas" },
   "Mostrar às empresas": { es: "Mostrar a las empresas" },
+  "IA própria": { es: "IA propia" },
+  "Empresas neste plano usam somente a chave de IA cadastrada por elas. A chave de IA da instalação nunca é usada.": { es: "Las empresas de este plan usan solo la clave de IA registrada por ellas. La clave de IA de la instalación nunca se usa." },
   // ─── Cobrança do revendedor — configuração (PR 3a) ───
   "Provedor de cobrança dos seus clientes": { es: "Proveedor de cobro de tus clientes" },
   "Por onde as empresas desta instalação pagam a assinatura. É escolhido quando você conecta a chave em Cobrança › Conexão.": { es: "Por dónde las empresas de esta instalación pagan la suscripción. Se elige cuando conectas la clave en Cobro › Conexión." },

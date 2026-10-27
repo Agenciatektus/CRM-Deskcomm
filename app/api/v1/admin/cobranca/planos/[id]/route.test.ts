@@ -83,6 +83,31 @@ describe("PATCH /api/v1/admin/cobranca/planos/[id]", () => {
     expect(updates()).toEqual([]);
   });
 
+  it("ia_propria enviado chega ao update; ligar não consulta assinantes", async () => {
+    expect((await PATCH(...pedido({ ia_propria: true }))).status).toBe(200);
+    expect(argumentos(updates()[0]!, "update")?.[0]).toMatchObject({ ia_propria: true, updated_by: h.ator });
+    expect(consultouAssinantes()).toBe(false);
+    expect(h.audit).toHaveBeenCalledWith(
+      expect.objectContaining({ metadata: expect.objectContaining({ ia_propria: true }) }),
+    );
+  });
+
+  it("ia_propria false explícito chega ao update (desligar)", async () => {
+    expect((await PATCH(...pedido({ ia_propria: false }))).status).toBe(200);
+    expect(argumentos(updates()[0]!, "update")?.[0]).toMatchObject({ ia_propria: false });
+  });
+
+  it("PATCH sem ia_propria não o zera: o update não carrega a coluna", async () => {
+    expect((await PATCH(...pedido({ nome: "Essencial" }))).status).toBe(200);
+    const payload = argumentos(updates()[0]!, "update")?.[0] as Record<string, unknown>;
+    expect("ia_propria" in payload).toBe(false);
+  });
+
+  it("ia_propria que não é booleano → 400", async () => {
+    expect((await PATCH(...pedido({ ia_propria: "sim" }))).status).toBe(400);
+    expect(updates()).toEqual([]);
+  });
+
   it("mudar o preço SEM assinante grava", async () => {
     expect((await PATCH(...pedido({ preco_cents: 5990 }))).status).toBe(200);
     expect(argumentos(updates()[0]!, "update")?.[0]).toMatchObject({ preco_cents: 5990 });

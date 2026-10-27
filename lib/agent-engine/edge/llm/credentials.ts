@@ -23,6 +23,10 @@ import { PROVEDOR_DE_RESERVA_DA_ASSINATURA } from '@/lib/ai/pontos/reserva-da-as
 import type { TokensDoCodex } from '@/lib/ai/pontos/pkce-da-assinatura';
 import { z } from 'zod';
 
+import {
+  IaPropriaSemCredencialError,
+  instalacaoPodeServirIa,
+} from '@/lib/cobranca/ia-propria';
 import { byteaToBuffer, decryptKey } from '@/lib/crypto/aes_gcm';
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
@@ -439,17 +443,25 @@ export async function resolveOrgLlmConfig(
       tag: byteaToBuffer(cred.api_key_tag),
     });
     origemDaChave = 'credencial_da_organizacao';
-  } else if (provider === 'anthropic' && cfg.anthropicApiKey) {
-    apiKey = cfg.anthropicApiKey;
-    origemDaChave = 'chave_da_instalacao';
-  } else if (provider === 'openai' && cfg.openaiApiKey) {
-    apiKey = cfg.openaiApiKey;
-    origemDaChave = 'chave_da_instalacao';
-  } else if (provider === 'openrouter' && cfg.openrouterApiKey) {
-    apiKey = cfg.openrouterApiKey;
-    origemDaChave = 'chave_da_instalacao';
   } else {
-    throw new LlmNotConfiguredError();
+    const chaveDaInstalacao =
+      provider === 'anthropic'
+        ? cfg.anthropicApiKey
+        : provider === 'openai'
+          ? cfg.openaiApiKey
+          : provider === 'openrouter'
+            ? cfg.openrouterApiKey
+            : undefined;
+    if (!chaveDaInstalacao) {
+      throw new LlmNotConfiguredError();
+    }
+    // Plano com IA própria (migration 9075): a chave da instalação NUNCA serve
+    // esta empresa. Consulta só quando a escada ia cair no env; falha fechada.
+    if (!(await instalacaoPodeServirIa(db, organizationId))) {
+      throw new IaPropriaSemCredencialError();
+    }
+    apiKey = chaveDaInstalacao;
+    origemDaChave = 'chave_da_instalacao';
   }
 
   // O ENDEREÇO do provedor personalizado (#1642), na mesma linha da chave que
