@@ -4461,6 +4461,68 @@ export type Database = {
           },
         ]
       }
+      cobranca_compras: {
+        Row: {
+          client_reference_id: string | null
+          created_at: string
+          email: string | null
+          evento_id: string
+          id: string
+          modo: string | null
+          motivo: string | null
+          nome_empresa: string | null
+          organization_id: string | null
+          plano_chave: string | null
+          provedor: string
+          sessao_id: string | null
+          status: string
+          tentativas: number
+          updated_at: string
+        }
+        Insert: {
+          client_reference_id?: string | null
+          created_at?: string
+          email?: string | null
+          evento_id: string
+          id?: string
+          modo?: string | null
+          motivo?: string | null
+          nome_empresa?: string | null
+          organization_id?: string | null
+          plano_chave?: string | null
+          provedor: string
+          sessao_id?: string | null
+          status?: string
+          tentativas?: number
+          updated_at?: string
+        }
+        Update: {
+          client_reference_id?: string | null
+          created_at?: string
+          email?: string | null
+          evento_id?: string
+          id?: string
+          modo?: string | null
+          motivo?: string | null
+          nome_empresa?: string | null
+          organization_id?: string | null
+          plano_chave?: string | null
+          provedor?: string
+          sessao_id?: string | null
+          status?: string
+          tentativas?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cobranca_compras_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cobranca_planos: {
         Row: {
           arquivado_em: string | null

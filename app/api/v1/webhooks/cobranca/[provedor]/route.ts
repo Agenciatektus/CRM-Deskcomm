@@ -9,6 +9,11 @@
  * reemitir; linha que ficou `received`/`error` → segue de novo (reemitir é
  * inofensivo: o consumidor relê). Cliente desconhecido → `error` e 200: a
  * reconciliação cura. Falha no emit → 503, e o provedor reentrega.
+ *
+ * Exceção atrás da flag VENDA_DIRETA: `checkout.session.completed` da Stripe de
+ * cliente desconhecido grava uma linha em `cobranca_compras` (status `recebida`),
+ * fecha o ponteiro como `processed` e responde 200. Flag desligada, ou outro tipo
+ * ou provedor, segue o caminho de sempre, sem nem ler a flag.
  */
 import { randomUUID } from "node:crypto";
 
@@ -21,6 +26,7 @@ import { segredoDoWebhook } from "@/lib/cobranca/configuracao";
 import { ipDoCliente } from "@/lib/http/ip-do-cliente";
 import { adaptador } from "@/lib/cobranca/provedores";
 import type { SinalDoWebhook } from "@/lib/cobranca/provedores/contrato";
+import { vendaDiretaLigada } from "@/lib/cobranca/venda-direta";
 import { PROVEDORES_DE_COBRANCA, type ProvedorDeCobranca } from "@/lib/cobranca/vocabulario";
 import { moduloLigado } from "@/lib/instalacao/modulos";
 import { logger } from "@/lib/logger";
@@ -118,6 +124,24 @@ export async function POST(req: NextRequest, { params }: Rota) {
   const linha = await gravarPonteiro(admin, provedor, sinal, assinatura);
   if (linha === "erro") return fail("internal_error", "Não foi possível registrar o aviso.", 500, { requestId });
   if (linha.status === "processed") return ok({ duplicado: true }, { requestId });
+  if (!org && provedor === "stripe" && sinal.tipo === "checkout.session.completed" && (await vendaDiretaLigada(admin))) {
+    // Venda direta: a compra por link de pagamento ainda não tem empresa. Só o ponteiro
+    // vira linha (evento_id único: a reentrega cai no conflito e não duplica); quem
+    // decide e relê na API é o processador. Nada além de {id,type} é lido do corpo.
+    const { error: erroDaCompra } = await admin
+      .from("cobranca_compras")
+      .upsert({ provedor, evento_id: sinal.eventoId, status: "recebida" }, { onConflict: "evento_id", ignoreDuplicates: true });
+    if (erroDaCompra) {
+      logger.error("cobranca.compra_nao_registrada", { provedor, codigo: erroDaCompra.code ?? null });
+      return fail("unavailable", "Tente de novo em instantes.", 503, { requestId });
+    }
+    await admin
+      .from("webhook_events_log")
+      .update({ status: "processed", processed_at: agora })
+      .eq("id", linha.id)
+      .is("organization_id", null);
+    return ok({ compra: "registrada" }, { requestId });
+  }
   if (!org) {
     await admin
       .from("webhook_events_log")

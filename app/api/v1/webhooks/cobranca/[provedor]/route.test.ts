@@ -28,7 +28,14 @@ import { POST } from "./route";
 
 const ORG = "cccccccc-0000-4000-8000-000000000001";
 
-interface Mundo { duplicado: boolean; statusExistente: string; dona: { organization_id: string } | null; emit: Resposta }
+interface Mundo {
+  duplicado: boolean;
+  statusExistente: string;
+  dona: { organization_id: string } | null;
+  emit: Resposta;
+  flag: string | null;
+  compra: Resposta;
+}
 let m: Mundo;
 
 function responder(c: Cadeia): Resposta {
@@ -39,6 +46,8 @@ function responder(c: Cadeia): Resposta {
     return { data: null };
   }
   if (c.tabela === "cobranca_assinaturas") return { data: m.dona };
+  if (c.tabela === "platform_config") return { data: m.flag === null ? null : { valor: m.flag } };
+  if (c.tabela === "cobranca_compras") return m.compra;
   return {};
 }
 
@@ -67,7 +76,7 @@ beforeEach(() => {
   h.sinal = { eventoId: "evt_1", tipo: "invoice.paid", clienteRef: "cus_1" };
   h.permitido = true;
   h.baldes = [];
-  m = { duplicado: false, statusExistente: "received", dona: { organization_id: ORG }, emit: { data: "ev-1" } };
+  m = { duplicado: false, statusExistente: "received", dona: { organization_id: ORG }, emit: { data: "ev-1" }, flag: null, compra: {} };
   h.banco = bancoFalso(responder, () => m.emit);
 });
 
@@ -199,5 +208,114 @@ describe("webhook da cobrança pelo Asaas (PR 3b)", () => {
     h.permitido = false;
     expect((await doAsaas({ "asaas-access-token": TOKEN_ASAAS })).status).toBe(200);
     expect(h.baldes).toEqual([]);
+  });
+});
+
+describe("venda direta: compra da LP de cliente desconhecido (fatia 2)", () => {
+  const compras = () => h.banco.cadeias.filter((c) => c.tabela === "cobranca_compras");
+  const flagLida = () => h.banco.cadeias.filter((c) => c.tabela === "platform_config");
+  const checkout = (id: string, clienteRef = "cus_novo") => {
+    h.sinal = { eventoId: id, tipo: "checkout.session.completed", clienteRef };
+  };
+
+  it("(a) flag desligada: mesma resposta e mesmos writes de antes, nenhuma linha de compra", async () => {
+    checkout("evt_a_desligada");
+    m.dona = null;
+    m.flag = "desligado";
+    const res = await pedido();
+    expect(res.status).toBe(200);
+    expect(JSON.stringify(await res.json())).toContain("cliente_desconhecido");
+    expect(argumentos(doLog("update")[0]!, "update")?.[0]).toMatchObject({ status: "error", error_message: "cliente_desconhecido" });
+    expect(compras()).toEqual([]);
+    expect(emits()).toEqual([]);
+  });
+
+  it("(a) flag ausente: igual a desligada", async () => {
+    checkout("evt_a_ausente");
+    m.dona = null;
+    m.flag = null;
+    expect((await pedido()).status).toBe(200);
+    expect(compras()).toEqual([]);
+    expect(argumentos(doLog("update")[0]!, "update")?.[0]).toMatchObject({ status: "error", error_message: "cliente_desconhecido" });
+  });
+
+  it("(a) a flag nem é lida para outro tipo de evento, nem para cliente conhecido", async () => {
+    h.sinal = { eventoId: "evt_a_outro_tipo", tipo: "invoice.paid", clienteRef: "cus_novo" };
+    m.dona = null;
+    m.flag = "ligado";
+    await pedido();
+    checkout("evt_a_conhecido", "cus_1");
+    m.dona = { organization_id: ORG };
+    await pedido();
+    expect(flagLida()).toEqual([]);
+    expect(compras()).toEqual([]);
+  });
+
+  it("(b) flag ligada + checkout.session.completed desconhecido: 1 linha recebida com o id do ponteiro, 200, ponteiro fechado", async () => {
+    checkout("evt_b_unico");
+    m.dona = null;
+    m.flag = "ligado";
+    const res = await pedido();
+    expect(res.status).toBe(200);
+    expect(compras()).toHaveLength(1);
+    expect(argumentos(compras()[0]!, "upsert")).toEqual([
+      { provedor: "stripe", evento_id: "evt_b_unico", status: "recebida" },
+      { onConflict: "evento_id", ignoreDuplicates: true },
+    ]);
+    expect(argumentos(doLog("update")[0]!, "update")?.[0]).toMatchObject({ status: "processed" });
+    expect(JSON.stringify(h.banco.cadeias)).not.toContain("cliente_desconhecido");
+    expect(emits()).toEqual([]);
+  });
+
+  it("(c) reentrega com o ponteiro já processado: 200 e nenhuma segunda compra", async () => {
+    checkout("evt_c_reentrega");
+    m.dona = null;
+    m.flag = "ligado";
+    await pedido();
+    m.duplicado = true;
+    m.statusExistente = "processed";
+    const res = await pedido();
+    expect(res.status).toBe(200);
+    expect(compras()).toHaveLength(1);
+  });
+
+  it("(c) reentrega com o ponteiro ainda received: o upsert ignora o conflito (ignoreDuplicates) e responde 200", async () => {
+    checkout("evt_c_received");
+    m.dona = null;
+    m.flag = "ligado";
+    m.duplicado = true;
+    m.statusExistente = "received";
+    const res = await pedido();
+    expect(res.status).toBe(200);
+    expect(argumentos(compras()[0]!, "upsert")?.[1]).toEqual({ onConflict: "evento_id", ignoreDuplicates: true });
+  });
+
+  it("falha ao gravar a compra: 503 e o ponteiro fica received (a Stripe reentrega)", async () => {
+    checkout("evt_falha_compra");
+    m.dona = null;
+    m.flag = "ligado";
+    m.compra = { error: { code: "XX000", message: "boom" } };
+    expect((await pedido()).status).toBe(503);
+    expect(doLog("update")).toEqual([]);
+  });
+
+  it("(d) flag ligada, mas outro tipo de evento da Stripe: caminho antigo", async () => {
+    h.sinal = { eventoId: "evt_d_outro", tipo: "customer.subscription.deleted", clienteRef: "cus_novo" };
+    m.dona = null;
+    m.flag = "ligado";
+    expect((await pedido()).status).toBe(200);
+    expect(argumentos(doLog("update")[0]!, "update")?.[0]).toMatchObject({ status: "error", error_message: "cliente_desconhecido" });
+    expect(compras()).toEqual([]);
+    expect(flagLida()).toEqual([]);
+  });
+
+  it("(d) flag ligada, provedor asaas com o mesmo tipo: caminho antigo", async () => {
+    checkout("evt_d_asaas");
+    m.dona = null;
+    m.flag = "ligado";
+    expect((await doAsaas({ "asaas-access-token": TOKEN_ASAAS })).status).toBe(200);
+    expect(argumentos(doLog("update")[0]!, "update")?.[0]).toMatchObject({ status: "error", error_message: "cliente_desconhecido" });
+    expect(compras()).toEqual([]);
+    expect(flagLida()).toEqual([]);
   });
 });
