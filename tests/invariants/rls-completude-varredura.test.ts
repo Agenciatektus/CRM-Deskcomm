@@ -109,6 +109,11 @@ const PROVA_PROPRIA: readonly Excecao[] = [
       "tests/invariants/meta-alertas-enviados-e-server-side.test.ts — server-side only (RLS ligada, zero policies, revoke all de anon/authenticated, migration 9073): dedup dos alertas da Meta; anon e authenticated barrados com `permission denied` em select/insert/update/delete, service_role com privilégio. Não entra em TABLES: o controle positivo de authenticated não existe por desenho.",
   },
   {
+    tabela: "inbox_filtros_salvos",
+    razao:
+      "tests/invariants/inbox-filtros-salvos-rls.test.ts — JWT real: o usuário só lê, insere e apaga a PRÓPRIA linha da PRÓPRIA org (colega da mesma org e outra org: 0 linhas, insert forjado barrado pelo with check), sem update (permission denied), anon barrado, nome único por usuário e teto de 20 no banco, migration 9079. Fica fora de TABLES: rls-isolation é congelado e a policy é por usuário, não por org.",
+  },
+  {
     tabela: "verdash_fzap_pastas",
     razao:
       "tests/invariants/verdash-pastas-fzap-e-server-side.test.ts — server-side only (RLS ligada, zero policies, revoke all de anon/authenticated, migration 9067): token da pasta do FZAP; anon e authenticated barrados com `permission denied` em select/insert/update/delete, service_role com privilégio.",
