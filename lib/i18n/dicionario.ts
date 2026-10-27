@@ -4917,8 +4917,8 @@ export const DICIONARIO: Traducoes = {
   "O Jev usa esta chave. Sem ela, ele passa a usar o Jev da plataforma e continua ligado.": {
     es: "Jev usa esta clave. Sin ella, pasa a usar el Jev de la plataforma y sigue activado.",
   },
-  "Usando o Jev da plataforma. Cadastre a sua chave para usar a sua conta.": {
-    es: "Usando el Jev de la plataforma. Registra tu clave para usar tu cuenta.",
+  "Usando o Jev da plataforma. As mensagens processadas pelo Jev são enviadas à TypeSafe AI, nos Estados Unidos, pela conta da Tektus. Cadastre a sua chave para usar a sua conta.": {
+    es: "Usando el Jev de la plataforma. Los mensajes procesados por Jev se envían a TypeSafe AI, en Estados Unidos, por la cuenta de Tektus. Registra tu clave para usar tu cuenta.",
   },
   "Marque o aceite do envio das mensagens à TypeSafe AI antes de mudar o Jev.": {
     es: "Marca la aceptación del envío de mensajes a TypeSafe AI antes de cambiar Jev.",

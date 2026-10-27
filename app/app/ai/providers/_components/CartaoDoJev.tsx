@@ -516,7 +516,7 @@ export function CartaoDoJev({
           OpenRouter, e a chave é a mesma da conversa. */}
       {dados.chave.fonte_da_chave === "plataforma" && (
         <p className="mt-3 text-xs text-muted-foreground" data-testid="jev-da-plataforma">
-          {t("Usando o Jev da plataforma. Cadastre a sua chave para usar a sua conta.")}
+          {t("Usando o Jev da plataforma. As mensagens processadas pelo Jev são enviadas à TypeSafe AI, nos Estados Unidos, pela conta da Tektus. Cadastre a sua chave para usar a sua conta.")}
         </p>
       )}
       {dados.chave.validada && dados.chave.fonte_da_chave !== "plataforma" && (

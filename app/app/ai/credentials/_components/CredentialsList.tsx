@@ -105,7 +105,7 @@ export function CredentialsList({
     jev?.plataformaTemJev === true && (jev.origem ?? "typesafe") === "typesafe" && doJev === null;
   const avisoDaPlataforma = usandoOJevDaPlataforma ? (
     <p className="text-sm text-muted-foreground" data-testid="jev-da-plataforma">
-      {t("Usando o Jev da plataforma. Cadastre a sua chave para usar a sua conta.")}
+      {t("Usando o Jev da plataforma. As mensagens processadas pelo Jev são enviadas à TypeSafe AI, nos Estados Unidos, pela conta da Tektus. Cadastre a sua chave para usar a sua conta.")}
     </p>
   ) : null;
 
