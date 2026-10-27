@@ -63253,6 +63253,91 @@ $$;
 revoke execute on function public.fn_jev_plataforma_registrar(uuid, numeric) from public, anon, authenticated;
 grant execute on function public.fn_jev_plataforma_registrar(uuid, numeric) to service_role;
 
+-- ---- Compras por link de pagamento (migration 9080) ----
+create table if not exists public.cobranca_compras (
+  id uuid primary key default gen_random_uuid(),
+  provedor text not null check (provedor in ('stripe', 'asaas')),
+  modo text check (modo in ('teste', 'producao')),
+  evento_id text not null unique,
+  sessao_id text unique,
+  status text not null default 'recebida'
+    check (status in ('recebida', 'aguardando_pagamento', 'recusada', 'duplicada', 'criada', 'falhou')),
+  motivo text,
+  email text,
+  nome_empresa text,
+  plano_chave text,
+  client_reference_id text check (client_reference_id ~ '^[A-Za-z0-9_-]{1,200}$'),
+  empresa_criada_id uuid references public.organizations(id) on delete set null,
+  tentativas integer not null default 0 check (tentativas >= 0),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+comment on table public.cobranca_compras is
+  'Compras feitas por link de pagamento, antes de a empresa existir (migration 9080). Da INSTALACAO: RLS ligada sem policy, so service_role. A rota do webhook so grava o ponteiro (evento_id); o resto vem da releitura no provedor. Migration 9080.';
+
+alter table public.cobranca_compras enable row level security;
+revoke all on public.cobranca_compras from anon, authenticated;
+grant select, insert, update, delete on public.cobranca_compras to service_role;
+
+drop trigger if exists trg_cobranca_compras_touch on public.cobranca_compras;
+create trigger trg_cobranca_compras_touch
+  before update on public.cobranca_compras
+  for each row execute function public.fn_touch_updated_at();
+
+-- ---- fatia 3 da compra pela landing (migration 9081): cria a empresa a partir da compra ----
+-- Mesmo corpo da migration 9081. Fica ANTES da VARREDURA anon porque cria funcao.
+
+create or replace function public.fn_cobranca_org_da_compra(
+  p_compra uuid,
+  p_nome text,
+  p_slug text,
+  p_plano uuid,
+  p_modo text,
+  p_cliente text,
+  p_assinatura text
+) returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_compra public.cobranca_compras%rowtype;
+  v_org uuid;
+begin
+  select * into v_compra from public.cobranca_compras where id = p_compra for update;
+  if not found then
+    raise exception 'compra_inexistente' using errcode = 'P0002';
+  end if;
+  if v_compra.empresa_criada_id is not null then
+    return v_compra.empresa_criada_id;
+  end if;
+
+  if exists (select 1 from public.organizations o where o.slug = p_slug::citext) then
+    raise exception 'slug_em_uso' using errcode = '22023';
+  end if;
+
+  insert into public.organizations (display_name, legal_name, slug, status, settings, created_by)
+    values (p_nome, p_nome, p_slug::citext, 'active', '{}'::jsonb, null)
+    returning id into v_org;
+
+  insert into public.cobranca_assinaturas
+    (organization_id, plano_id, estado, trial_ate, pagamento_inicial_pendente, periodo_pago_desde,
+     provedor, modo, provedor_cliente_id, provedor_assinatura_id)
+    values (v_org, p_plano, 'ativa', null, false, now(),
+     'stripe', p_modo, p_cliente, nullif(p_assinatura, ''));
+
+  update public.cobranca_compras
+     set empresa_criada_id = v_org, status = 'criada'
+   where id = p_compra;
+
+  return v_org;
+end;
+$$;
+
+revoke execute on function public.fn_cobranca_org_da_compra(uuid, text, text, uuid, text, text, text) from public, anon, authenticated;
+grant execute on function public.fn_cobranca_org_da_compra(uuid, text, text, uuid, text, text, text) to service_role;
+
 notify pgrst, 'reload schema';
 
 -- ---- Filtros salvos do Inbox (migration 9079) ----
@@ -66620,3 +66705,5 @@ comment on column public.ad_insights_connections.allowed_ad_account_ids is
 
 comment on column public.ad_insights_connections.connected_by is
   'Usuario que conectou (OAuth) ou colou o token. So ele (ou platform admin) amplia as contas permitidas. Nulo = conexao antiga: so platform admin amplia. Migration 9074.';
+
+notify pgrst, 'reload schema';
