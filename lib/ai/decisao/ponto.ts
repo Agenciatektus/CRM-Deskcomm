@@ -219,7 +219,11 @@ export async function chaveDasTarefas(
   organizationId: string,
   tarefas: readonly TarefaDoJev[],
 ): Promise<string | null> {
-  return (await destinoDasTarefas(organizationId, tarefas))?.chave ?? null;
+  const destino = await destinoDasTarefas(organizationId, tarefas);
+  // A chave da PLATAFORMA nunca sai por aqui: quem pega só a string não passa por
+  // `decidirNoPonto`, que é onde o gasto entra no teto e o 401/402 abre o disjuntor
+  // global. Um chamador novo que precise dela usa `destinoDasTarefas` + `decidirNoPonto`.
+  return destino === null || destino.daPlataforma === true ? null : destino.chave;
 }
 
 /** A chave para a tarefa daquele ponto — `chaveDasTarefas` com ela só. */
@@ -361,9 +365,18 @@ async function aposChamadaDaPlataforma(
       if (destino.sondaDoDisjuntor) await fecharDisjuntorGlobal(admin);
       return resultado;
     }
-    if (resultado.motivo === "sem_credito" || resultado.motivo === "credencial_invalida") {
-      await abrirDisjuntorGlobal(admin, resultado.motivo);
+    // SÓ 401 e 402 são a conta da instalação. `cliente.ts` traduz também 403 para
+    // `credencial_invalida` e todo 4xx não documentado (404, 409, 413...) para
+    // `sem_credito`: se esses abrissem o global, uma mensagem de um contato
+    // derrubaria o Jev de todas as empresas por 15 minutos.
+    if (resultado.status === 401 || resultado.status === 402) {
+      await abrirDisjuntorGlobal(admin, resultado.status === 402 ? "sem_credito" : "credencial_invalida");
       return { ok: false, motivo: "disjuntor_aberto", exigeAcao: false, defeitoNosso: false, status: null };
+    }
+    if (resultado.motivo === "sem_credito" || resultado.motivo === "credencial_invalida") {
+      // Outro 4xx com a chave da plataforma: a empresa não tem conta para conferir, e nada disso
+      // pede ação dela. Cai calada na IA de sempre, sem abrir o global.
+      return { ok: false, motivo: "provedor_indisponivel", exigeAcao: false, defeitoNosso: false, status: resultado.status };
     }
   } catch (erro) {
     logger.warn("o pós-chamada do Jev da plataforma falhou", {

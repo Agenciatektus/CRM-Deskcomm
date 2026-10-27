@@ -280,6 +280,25 @@ describe("disjuntor global", () => {
     expect(r).toMatchObject({ ok: false, motivo: "sem_credito", exigeAcao: true });
   });
 
+  it.each([403, 404, 409, 413, 415])(
+    "um %i com a chave da plataforma NÃO abre o disjuntor global (uma mensagem não derruba o Jev de todas)",
+    async (status) => {
+      const r = await chamar(A, vi.fn().mockResolvedValue(new Response("{}", { status })));
+      expect(r).toMatchObject({ ok: false, motivo: "provedor_indisponivel", exigeAcao: false });
+      expect(banco.disjuntor).toBeNull();
+      expect(logs.filter(([, m]) => m === "jev_plataforma_disjuntor_aberto")).toHaveLength(0);
+      expect((await destinoDasTarefas(B, CLIMA))?.daPlataforma).toBe(true);
+    },
+  );
+
+  it("chaveDasTarefas e chaveDaOrganizacao nunca devolvem a chave da plataforma", async () => {
+    const { chaveDaOrganizacao, chaveDasTarefas } = await import("@/lib/ai/decisao/ponto");
+    expect(await chaveDasTarefas(A, CLIMA)).toBeNull();
+    expect(await chaveDaOrganizacao(A, "sentiment_classify")).toBeNull();
+    banco.proprias.add(A);
+    expect(await chaveDasTarefas(A, CLIMA)).toBe("decifrada:propria");
+  });
+
   it("controle: falha que não é da conta (500) não abre o disjuntor", async () => {
     const r = await chamar(A, vi.fn().mockResolvedValue(new Response("{}", { status: 500 })));
     expect(r).toMatchObject({ ok: false, motivo: "provedor_indisponivel" });
@@ -293,13 +312,15 @@ describe("disjuntor global", () => {
     const fetchA = vi.fn().mockResolvedValue(respostaOk());
     const fetchB = vi.fn();
     // A ganha a tentativa; B, no mesmo instante, ainda vê aberto.
-    const [ra, rb] = [await chamar(A, fetchA), await chamar(B, fetchB)];
+    const ra = await chamar(A, fetchA);
     expect(ra.ok).toBe(true);
     expect(fetchA).toHaveBeenCalledTimes(1);
-    // B só chegou depois de A fechar (sequencial), então já é servida: o que não pode é ter havido DUAS tentativas simultâneas
-    expect(rb.ok === false || fetchB.mock.calls.length <= 1).toBe(true);
+    // Sucesso da tentativa fecha para todos: a linha some e B (que veio depois) é servida.
     expect(banco.disjuntor).toBeNull();
-    expect((await destinoDasTarefas(B, CLIMA))?.daPlataforma).toBe(true);
+    fetchB.mockResolvedValue(respostaOk());
+    const rb = await chamar(B, fetchB);
+    expect(rb.ok).toBe(true);
+    expect(fetchB).toHaveBeenCalledTimes(1);
   });
 
   it("meia-abertura: dois processos disputando, só um ganha a tentativa", async () => {
