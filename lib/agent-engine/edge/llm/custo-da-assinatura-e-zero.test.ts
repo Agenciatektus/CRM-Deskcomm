@@ -19,6 +19,13 @@ import { costCents, custoGravavel, provedorSemCustoPorToken } from "@/lib/agent-
 import { runModelCall } from "@/lib/agent-engine/edge/llm/run-model-call";
 import { PROVEDOR_POR_ASSINATURA } from "@/lib/ai/pontos/provedores";
 
+// Plano com IA própria (migration 9075) fica fora deste teste: a instalação serve a org.
+vi.mock("@/lib/cobranca/ia-propria", async (orig) => ({
+  ...(await orig<typeof import("@/lib/cobranca/ia-propria")>()),
+  instalacaoPodeServirIa: async () => true,
+}));
+
+
 vi.mock("ai", () => ({
   generateText: vi.fn(),
   streamText: vi.fn(),
