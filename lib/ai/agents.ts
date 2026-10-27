@@ -6,6 +6,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { AGENT_CONFIG_DEFAULTS, agentConfigSchema } from "@/lib/ai/guardrails-schema";
 import { byteaToBuffer, decryptKey } from "@/lib/crypto/aes_gcm";
+import { instalacaoPodeServirIaViaRpc } from "@/lib/cobranca/ia-propria";
 
 export interface VoiceAgentConfig {
   id: string;
@@ -30,13 +31,14 @@ export interface VoiceAgentConfig {
  * A chave OpenAI ativa e validada desta org, cadastrada em IA > Credenciais --
  * mesma tabela/decrypt que o resto do produto usa (ver lib/ai/embeddings/chave.ts,
  * que resolve o mesmo tipo de chave pra embeddings). Sem credencial de org, cai
- * na chave do .env do servidor -- nunca deixa a ligação sem chave nenhuma.
+ * na chave do .env do servidor, SALVO em plano com IA própria (o banco veda a
+ * chave da instalação; falha fechada). Devolve "" quando não há chave utilizável.
  *
  * Desempate determinístico pela mais antiga (não "a mais recente"): com duas
  * chaves cadastradas e nenhuma escolha explícita, variar sozinho no dia em que
  * alguém cadastra uma segunda é pior que sempre usar a mesma.
  */
-async function resolverChaveOpenAiDaVoz(organizationId: string): Promise<string> {
+export async function resolverChaveOpenAiDaVoz(organizationId: string): Promise<string> {
   try {
     const admin = createAdminClient();
     const { data } = await admin
@@ -62,6 +64,7 @@ async function resolverChaveOpenAiDaVoz(organizationId: string): Promise<string>
     // aconteceu no INFO deste arquivo se aplicável; não vale a pena arriscar
     // ecoar detalhe de credencial no log do worker.
   }
+  if (!(await instalacaoPodeServirIaViaRpc(createAdminClient(), organizationId))) return "";
   return process.env.OPENAI_API_KEY ?? "";
 }
 

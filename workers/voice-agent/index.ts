@@ -64,6 +64,7 @@ import { ehOperante } from "@/lib/organizacao/operante";
 import { registrarChamadaDeIa } from "@/lib/ai/usage/registrar-chamada";
 import { logger } from "@/lib/logger";
 import { linhaDaLigacao } from "./uso-da-sessao";
+import { MENSAGEM_IA_PROPRIA_SEM_CREDENCIAL } from "@/lib/cobranca/ia-propria";
 
 const supabaseAdmin = createAdminClient();
 
@@ -375,6 +376,12 @@ export async function handleAudioSocketConnection(socket: net.Socket, uuid: stri
   const agent = await getActiveVoiceAgent(callRow.organization_id);
   if (!agent) {
     console.error(`[audiosocket] nenhum agente de voz ativo pra org ${callRow.organization_id}`);
+    socket.end();
+    return;
+  }
+
+  if (!agent.apiKey) {
+    console.error(`[audiosocket] sem chave de IA utilizável pra org ${callRow.organization_id} (${MENSAGEM_IA_PROPRIA_SEM_CREDENCIAL})`);
     socket.end();
     return;
   }

@@ -46,6 +46,7 @@ afterEach(() => {
 function abrir() {
   ponte = new AudioSocketCallBridge(socketDeBrinquedo() as never, {
     callId: "call1",
+    apiKey: "chave-ficticia",
     organizationId: "org1",
     agentInstructions: "",
     voice: "marin",
