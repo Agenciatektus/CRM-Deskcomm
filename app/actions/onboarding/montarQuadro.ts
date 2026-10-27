@@ -13,7 +13,8 @@ import { generateText } from "ai";
 
 import { audit } from "@/lib/audit";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { buildModel, chaveDePlataforma } from "@/lib/ai/runtime/agent";
+import { buildModel, chaveDaInstalacaoParaOrg } from "@/lib/ai/runtime/agent";
+import { MENSAGEM_IA_PROPRIA_SEM_CREDENCIAL } from "@/lib/cobranca/ia-propria";
 import { loadCredential } from "@/lib/ai/credentials";
 import { slugDeNome } from "@/lib/leads/stage-editing";
 import {
@@ -81,7 +82,9 @@ async function cerebroDoFuncionario(
     }
   }
 
-  const daInstalacao = chaveDePlataforma(provider);
+  // Plano com IA própria nunca gera com a chave da instalação.
+  const { apiKey: daInstalacao, bloqueada } = await chaveDaInstalacaoParaOrg(orgId, provider);
+  if (bloqueada) return { erro: MENSAGEM_IA_PROPRIA_SEM_CREDENCIAL };
   if (!daInstalacao) return { erro: `esta instalação não tem chave de ${provider}` };
   return { provider, model, apiKey: daInstalacao };
 }
