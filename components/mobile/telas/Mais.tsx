@@ -174,7 +174,8 @@ export function MenuMais({ aberto, aoMudar }: { aberto: boolean; aoMudar: (abert
                     </div>
                   ) : null}
                   <ul className={`${CARTAO} divide-y divide-border`}>
-                    {secao.items.map((item) => (
+                    {/* Perfil já tem porta própria: o cartão do topo (lápis). */}
+                    {secao.items.filter((item) => item.href !== "/app/settings/profile").map((item) => (
                       <Linha
                         key={item.href}
                         href={item.href}
