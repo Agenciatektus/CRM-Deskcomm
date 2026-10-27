@@ -297,7 +297,7 @@ export function ConversationListItem({
   const comSelecao = (conteudo: ReactNode) =>
     onAlternarSelecao ? (
       <div className={cn("relative flex w-full items-stretch", selecionado && "bg-accent-soft")}>
-        <span className="flex shrink-0 items-start pl-2 pt-3">
+        <span className="flex shrink-0 items-start pl-3 pr-2 pt-3">
           <input
             type="checkbox"
             checked={selecionado}
