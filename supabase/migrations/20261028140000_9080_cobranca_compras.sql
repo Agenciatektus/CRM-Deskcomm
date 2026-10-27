@@ -20,7 +20,7 @@ create table if not exists public.cobranca_compras (
   nome_empresa text,
   plano_chave text,
   client_reference_id text check (client_reference_id ~ '^[A-Za-z0-9_-]{1,200}$'),
-  organization_id uuid references public.organizations(id) on delete set null,
+  empresa_criada_id uuid references public.organizations(id) on delete set null,
   tentativas integer not null default 0 check (tentativas >= 0),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

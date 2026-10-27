@@ -4471,7 +4471,7 @@ export type Database = {
           modo: string | null
           motivo: string | null
           nome_empresa: string | null
-          organization_id: string | null
+          empresa_criada_id: string | null
           plano_chave: string | null
           provedor: string
           sessao_id: string | null
@@ -4488,7 +4488,7 @@ export type Database = {
           modo?: string | null
           motivo?: string | null
           nome_empresa?: string | null
-          organization_id?: string | null
+          empresa_criada_id?: string | null
           plano_chave?: string | null
           provedor: string
           sessao_id?: string | null
@@ -4505,7 +4505,7 @@ export type Database = {
           modo?: string | null
           motivo?: string | null
           nome_empresa?: string | null
-          organization_id?: string | null
+          empresa_criada_id?: string | null
           plano_chave?: string | null
           provedor?: string
           sessao_id?: string | null
@@ -4515,8 +4515,8 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "cobranca_compras_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: "cobranca_compras_empresa_criada_id_fkey"
+            columns: ["empresa_criada_id"]
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]

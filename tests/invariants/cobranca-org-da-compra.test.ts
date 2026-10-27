@@ -74,7 +74,7 @@ describe("a compra por link de pagamento vira empresa, uma vez só", () => {
     expect(sql(`select count(*) from public.organizations where slug::text = 'sonda-compra-${SUF}';`)).toBe("1");
     expect(sql(`select count(*) from public.cobranca_assinaturas where provedor_cliente_id = '${CLIENTE_A}';`)).toBe("1");
     expect(
-      sql(`select status || ':' || (organization_id = '${a}')::text from public.cobranca_compras where id = '${COMPRA_A}';`),
+      sql(`select status || ':' || (empresa_criada_id = '${a}')::text from public.cobranca_compras where id = '${COMPRA_A}';`),
     ).toBe("criada:true");
     expect(sql(`select estado || ':' || provedor || ':' || modo from public.cobranca_assinaturas where organization_id = '${a}';`)).toBe(
       "ativa:stripe:teste",
@@ -87,7 +87,7 @@ describe("a compra por link de pagamento vira empresa, uma vez só", () => {
     expect(erro).not.toBeNull();
     expect(erro).toMatch(/23505|duplicate key|cobranca_assinaturas_cliente/);
     expect(sql(`select count(*) from public.organizations where slug::text = 'sonda-compra-${SUF}-b';`)).toBe("0");
-    expect(sql(`select coalesce(organization_id::text, 'NULO') || ':' || status from public.cobranca_compras where id = '${COMPRA_B}';`)).toBe(
+    expect(sql(`select coalesce(empresa_criada_id::text, 'NULO') || ':' || status from public.cobranca_compras where id = '${COMPRA_B}';`)).toBe(
       "NULO:recebida",
     );
   });

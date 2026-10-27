@@ -30,8 +30,8 @@ begin
   if not found then
     raise exception 'compra_inexistente' using errcode = 'P0002';
   end if;
-  if v_compra.organization_id is not null then
-    return v_compra.organization_id;
+  if v_compra.empresa_criada_id is not null then
+    return v_compra.empresa_criada_id;
   end if;
 
   if exists (select 1 from public.organizations o where o.slug = p_slug::citext) then
@@ -49,7 +49,7 @@ begin
      'stripe', p_modo, p_cliente, nullif(p_assinatura, ''));
 
   update public.cobranca_compras
-     set organization_id = v_org, status = 'criada'
+     set empresa_criada_id = v_org, status = 'criada'
    where id = p_compra;
 
   return v_org;

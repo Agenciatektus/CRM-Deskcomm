@@ -59,7 +59,7 @@ beforeEach(() => {
   aoCriar.mockReset();
   n += 1;
   m = {
-    compra: { id: `compra-${n}`, evento_id: `evt_${n}`, status: "recebida", organization_id: null, tentativas: 0, email: null, nome_empresa: null, plano_chave: null },
+    compra: { id: `compra-${n}`, evento_id: `evt_${n}`, status: "recebida", empresa_criada_id: null, tentativas: 0, email: null, nome_empresa: null, plano_chave: null },
     mapa: JSON.stringify({ [`chave_${n}`]: `plano-${n}` }),
     intervaloDoPlano: "mes",
     irmas: [],
@@ -112,8 +112,8 @@ describe("processarCompra", () => {
     expect(gravacoes()[0]).toEqual({
       sessao_id: `cs_test_${n}`, modo: "teste", email: `comprador${n}@exemplo.com`, nome_empresa: `Empresa ${n} Ltda`, plano_chave: `chave_${n}`, client_reference_id: `afiliado_${n}`,
     });
-    expect(ultima()).toMatchObject({ status: "criada", organization_id: `org-${n}` });
-    expect(aoCriar).toHaveBeenCalledWith(`org-${n}`, expect.objectContaining({ id: `compra-${n}`, organization_id: `org-${n}` }));
+    expect(ultima()).toMatchObject({ status: "criada", empresa_criada_id: `org-${n}` });
+    expect(aoCriar).toHaveBeenCalledWith(`org-${n}`, expect.objectContaining({ id: `compra-${n}`, empresa_criada_id: `org-${n}` }));
   });
 
   it("client_reference_id fora do formato vira null; nome em branco e e-mail ausente recusam", async () => {
@@ -206,7 +206,7 @@ describe("processarCompra", () => {
 
   it("⭐ segunda execução de compra já criada, recusada ou duplicada: nada é relido nem criado", async () => {
     for (const status of ["criada", "recusada", "duplicada"]) {
-      m.compra = { ...m.compra, status, organization_id: status === "criada" ? `org-${n}` : null };
+      m.compra = { ...m.compra, status, empresa_criada_id: status === "criada" ? `org-${n}` : null };
       expect(await rodar()).toEqual({ tipo: "ja_resolvida", status });
     }
     expect(banco.rpcs).toEqual([]);
@@ -245,7 +245,7 @@ describe("processarComprasPendentes", () => {
 
   it("retentativa: criada com efeitos_pendentes roda SÓ aoCriar (sem RPC, sem releitura) e limpa o motivo", async () => {
     m.filaDeEfeitos = [{ id: `compra-${n}` }];
-    m.compra = { id: `compra-${n}`, evento_id: `evt_${n}`, status: "criada", organization_id: `org-${n}`, tentativas: 1, email: "a@exemplo.com", nome_empresa: "Empresa", plano_chave: "pro" };
+    m.compra = { id: `compra-${n}`, evento_id: `evt_${n}`, status: "criada", empresa_criada_id: `org-${n}`, tentativas: 1, email: "a@exemplo.com", nome_empresa: "Empresa", plano_chave: "pro" };
     const r = await processarComprasPendentes(banco.cliente as never, { adaptador: () => ({ lerCompra }) as never, sincronizar, aoCriar });
     const fila = banco.cadeias.find((c) => c.tabela === "cobranca_compras" && valorDoFiltro(c, "eq", "motivo") === "efeitos_pendentes" && valorDoFiltro(c, "eq", "id") === undefined)!;
     expect(valorDoFiltro(fila, "eq", "status")).toBe("criada");
@@ -261,7 +261,7 @@ describe("processarComprasPendentes", () => {
 
   it("retentativa que falha de novo: mantém o motivo, soma a tentativa e conta falha", async () => {
     m.filaDeEfeitos = [{ id: `compra-${n}` }];
-    m.compra = { id: `compra-${n}`, evento_id: `evt_${n}`, status: "criada", organization_id: `org-${n}`, tentativas: 3, email: "a@exemplo.com", nome_empresa: "Empresa", plano_chave: "pro" };
+    m.compra = { id: `compra-${n}`, evento_id: `evt_${n}`, status: "criada", empresa_criada_id: `org-${n}`, tentativas: 3, email: "a@exemplo.com", nome_empresa: "Empresa", plano_chave: "pro" };
     aoCriar.mockRejectedValue(new Error("convite fora"));
     const r = await processarComprasPendentes(banco.cliente as never, { aoCriar });
     expect(ultima()).toEqual({ tentativas: 4 });

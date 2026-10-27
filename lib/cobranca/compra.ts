@@ -35,7 +35,7 @@ export interface CompraGravada {
   id: string;
   evento_id: string;
   status: string;
-  organization_id: string | null;
+  empresa_criada_id: string | null;
   tentativas: number;
   email: string | null;
   nome_empresa: string | null;
@@ -67,7 +67,7 @@ export type ResultadoDaCompra =
   | { tipo: "falhou" };
 
 const TERMINAIS = new Set(["criada", "recusada", "duplicada"]);
-const COLUNAS = "id, evento_id, status, organization_id, tentativas, email, nome_empresa, plano_chave";
+const COLUNAS = "id, evento_id, status, empresa_criada_id, tentativas, email, nome_empresa, plano_chave";
 
 /** `a***@dominio`: o e-mail nunca vai cru para o log. */
 export function mascararEmail(email: string | null): string {
@@ -226,10 +226,10 @@ export async function processarCompra(
 
     const r = await sincronizarOrg(admin, orgId, deps.cobranca);
     if (r.tipo === "falhou") throw new Error(`compra: sincronização falhou (${r.erro})`);
-    await gravar(admin, compra.id, { status: "criada", motivo: null, organization_id: orgId });
-    logger.info("cobranca.compra_criada", { compra: compra.id, organization_id: orgId });
+    await gravar(admin, compra.id, { status: "criada", motivo: null, empresa_criada_id: orgId });
+    logger.info("cobranca.compra_criada", { compra: compra.id, empresa_criada_id: orgId });
     try {
-      await deps.aoCriar?.(orgId, { ...atual, status: "criada", organization_id: orgId });
+      await deps.aoCriar?.(orgId, { ...atual, status: "criada", empresa_criada_id: orgId });
     } catch (e) {
       logger.error("cobranca.compra_ao_criar_falhou", { compra: compra.id, erro: e instanceof Error ? e.message : "desconhecido" });
       // A empresa existe, o convite não saiu: a rodada repassa só o gancho (motivo `efeitos_pendentes`).
@@ -256,9 +256,9 @@ async function repetirEfeitos(admin: SupabaseClient, compraId: string, deps: Dep
     .maybeSingle();
   if (error) throw new Error(`compra: leitura falhou (${error.code ?? "sem_codigo"})`);
   const compra = data as CompraGravada | null;
-  if (!compra?.organization_id) return true;
+  if (!compra?.empresa_criada_id) return true;
   try {
-    await deps.aoCriar?.(compra.organization_id, compra);
+    await deps.aoCriar?.(compra.empresa_criada_id, compra);
   } catch (e) {
     logger.error("cobranca.compra_ao_criar_falhou", { compra: compra.id, erro: e instanceof Error ? e.message : "desconhecido" });
     await gravar(admin, compra.id, { tentativas: compra.tentativas + 1 });
