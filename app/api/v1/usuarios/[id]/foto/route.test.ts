@@ -45,9 +45,9 @@ function espiao({ vinculo, caminho }: { vinculo: boolean; caminho: string | null
   return { filtros };
 }
 
-const pedir = async (id: string) => {
+const pedir = async (id: string, consulta = "") => {
   const { GET } = await import("./route");
-  return GET(new NextRequest(`http://localhost/api/v1/usuarios/${id}/foto`), { params: Promise.resolve({ id }) });
+  return GET(new NextRequest(`http://localhost/api/v1/usuarios/${id}/foto${consulta}`), { params: Promise.resolve({ id }) });
 };
 
 describe("GET /api/v1/usuarios/[id]/foto", () => {
@@ -101,5 +101,12 @@ describe("GET /api/v1/usuarios/[id]/foto", () => {
   it("id que não é uuid: 404 sem consultar nada", async () => {
     espiao({ vinculo: true, caminho: null });
     expect((await pedir("../x")).status).toBe(404);
+  });
+
+  it("com ?w=64: colega de outra org → 404 e sem sessão → 401", async () => {
+    espiao({ vinculo: false, caminho: `usuarios/${COLEGA}/33333333-3333-4333-8333-333333333333.png` });
+    expect((await pedir(COLEGA, "?v=33333333&w=64")).status).toBe(404);
+    vi.mocked(loadAuthUser).mockResolvedValue(null);
+    expect((await pedir(COLEGA, "?v=33333333&w=64")).status).toBe(401);
   });
 });

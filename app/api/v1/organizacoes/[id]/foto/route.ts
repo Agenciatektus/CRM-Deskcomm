@@ -12,7 +12,7 @@ import { z } from "zod";
 import { fail } from "@/lib/api/wrappers";
 import { loadAuthUser } from "@/lib/auth/server";
 import { fotoDaOrganizacao } from "@/lib/fotos/foto";
-import { semFoto, servirFoto } from "@/lib/fotos/servidor";
+import { larguraPedida, semFoto, servirFoto } from "@/lib/fotos/servidor";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 const idSchema = z.string().uuid();
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   ctx: { params: Promise<{ id: string }> },
 ): Promise<Response> {
   const requestId = randomUUID();
@@ -45,5 +45,5 @@ export async function GET(
   const caminho = (data as { foto_path?: string | null } | null)?.foto_path ?? null;
   if (!caminho || !fotoDaOrganizacao(caminho, id)) return semFoto();
 
-  return servirFoto(caminho);
+  return servirFoto(caminho, larguraPedida(req), req.nextUrl.searchParams.get("v"));
 }
