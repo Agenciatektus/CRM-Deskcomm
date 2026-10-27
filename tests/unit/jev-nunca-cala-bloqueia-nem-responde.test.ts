@@ -116,6 +116,13 @@ function importsDeQuemEnvia(arquivo: string, texto: string): string[] {
 
 const TABELAS_DA_CONVERSA = new Set(["messages", "conversations", "contacts"]);
 const ESCRITAS = new Set(["insert", "update", "upsert", "delete"]);
+/**
+ * `.rpc()` reprova sempre, EXCETO as funções abaixo, cujo corpo foi lido: nenhuma
+ * toca `messages`, `conversations` nem `contacts`.
+ *  - `fn_jev_plataforma_registrar` (migration 9078): só faz upsert em `jev_plataforma_uso`
+ *    (gasto do Jev com a chave da plataforma, por empresa e mês).
+ */
+const RPCS_PERMITIDAS = new Set(["fn_jev_plataforma_registrar"]);
 
 function fonteDe(texto: string): ts.SourceFile {
   return ts.createSourceFile("x.ts", texto, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
@@ -237,7 +244,11 @@ function escritasNaConversa(texto: string): string[] {
     if (ts.isCallExpression(no) && ts.isPropertyAccessExpression(no.expression)) {
       const metodo = no.expression.name.text;
       if (metodo === "rpc") {
-        achadas.push(`rpc (linha ${linhaDe(no)}): a cerca não vê o que a função escreve`);
+        const nome = no.arguments[0];
+        // Permitida só a função cujo corpo a cerca CONHECE: nome literal e na lista.
+        if (!(nome && ts.isStringLiteralLike(nome) && RPCS_PERMITIDAS.has(nome.text))) {
+          achadas.push(`rpc (linha ${linhaDe(no)}): a cerca não vê o que a função escreve`);
+        }
       } else if (ESCRITAS.has(metodo)) {
         const tabela = tabelaDaCadeia(no.expression.expression, new Set());
         if (tabela !== null && (TABELAS_DA_CONVERSA.has(tabela) || tabela === TABELA_DESCONHECIDA)) {
@@ -398,6 +409,10 @@ describe("o Jev nunca cala, bloqueia nem responde o cliente", () => {
     expect(escritasNaConversa(`const q = admin.from("contacts");\nawait q.update({ x: 1 });`)).toHaveLength(1);
     expect(escritasNaConversa(`const t = "messages";\nawait admin.from(t).insert({ body });`)).toHaveLength(1);
     expect(escritasNaConversa(`await admin.rpc("fn_qualquer", { p: 1 });`)).toHaveLength(1);
+    // A permitida passa; outra função continua reprovada (controle negativo).
+    expect(escritasNaConversa(`await admin.rpc("fn_jev_plataforma_registrar", { p_org: 1 });`)).toHaveLength(0);
+    expect(escritasNaConversa(`await admin.rpc("fn_jev_plataforma_registrar_outra", { p: 1 });`)).toHaveLength(1);
+    expect(escritasNaConversa(`await admin.rpc(nome, { p: 1 });`)).toHaveLength(1);
     // Um `Set.delete` não é escrita no banco (o aviso tem um).
     expect(escritasNaConversa(`const vistos = new Set<string>();\nvistos.delete(id);`)).toEqual([]);
 

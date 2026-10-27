@@ -34,6 +34,7 @@
  * default.
  */
 import { allowlistedFetch, buildAllowlist } from "@/lib/agent-engine/edge/egress";
+import { costCents } from "@/lib/agent-engine/edge/llm/pricing";
 import { byteaToBuffer, decryptKey } from "@/lib/crypto/aes_gcm";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -41,6 +42,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { baseDaApiDoJev, decidir, TETO_PADRAO_MS, type Pergunta, type ResultadoDaDecisao } from "./cliente";
 import { type IdDaTarefa } from "./config";
 import { chaveDaPlataforma, configEfetivaDoJev, organizacaoElegivelAoJev } from "./elegibilidade";
+import {
+  abrirDisjuntorGlobal,
+  estadoDoDisjuntorGlobal,
+  fecharDisjuntorGlobal,
+  registrarUsoDaPlataforma,
+  tetoAtingido,
+} from "./plataforma";
 import { ORIGEM_PADRAO, provedorDaCredencial, type OrigemDoJev } from "./origem";
 import { estadoEfetivoDaTarefa, TAREFAS_DO_JEV, type TarefaDoJev } from "./tarefas";
 
@@ -93,6 +101,8 @@ export interface DestinoDaChave {
    * (fatia 3) separa por aqui.
    */
   daPlataforma?: true;
+  /** A chamada é a tentativa da meia-abertura do disjuntor global: o resultado fecha ou reabre. */
+  sondaDoDisjuntor?: true;
 }
 
 /**
@@ -167,12 +177,22 @@ export async function destinoDasTarefas(
       .maybeSingle();
     if (error) throw error;
     if (!data) {
-      // Sem chave própria. FATIA 3: o teto de gasto por empresa, o disjuntor
-      // global e o aviso ao admin entram AQUI, antes de devolver a da plataforma.
+      // Sem chave própria. Só a origem TypeSafe, só empresa elegível, e só se a
+      // conta compartilhada está protegida (`./plataforma.ts`): teto do mês da
+      // empresa e disjuntor global. Qualquer trava fechada = null, a IA de
+      // sempre, sem erro e sem rede.
       if (origem !== "typesafe") return null;
       const daPlataforma = chaveDaPlataforma();
       if (daPlataforma === null || !(await ehElegivel())) return null;
-      return { chave: daPlataforma, origem, daPlataforma: true };
+      if (await tetoAtingido(admin, organizationId)) return null;
+      const disjuntor = await estadoDoDisjuntorGlobal(admin);
+      if (disjuntor === "aberto") return null;
+      return {
+        chave: daPlataforma,
+        origem,
+        daPlataforma: true,
+        ...(disjuntor === "tentativa" ? { sondaDoDisjuntor: true as const } : {}),
+      };
     }
     return {
       chave: decryptKey({
@@ -199,7 +219,11 @@ export async function chaveDasTarefas(
   organizationId: string,
   tarefas: readonly TarefaDoJev[],
 ): Promise<string | null> {
-  return (await destinoDasTarefas(organizationId, tarefas))?.chave ?? null;
+  const destino = await destinoDasTarefas(organizationId, tarefas);
+  // A chave da PLATAFORMA nunca sai por aqui: quem pega só a string não passa por
+  // `decidirNoPonto`, que é onde o gasto entra no teto e o 401/402 abre o disjuntor
+  // global. Um chamador novo que precise dela usa `destinoDasTarefas` + `decidirNoPonto`.
+  return destino === null || destino.daPlataforma === true ? null : destino.chave;
 }
 
 /** A chave para a tarefa daquele ponto — `chaveDasTarefas` com ela só. */
@@ -297,7 +321,7 @@ export async function decidirNoPonto(
       { allowlist, fetchImpl: deps.fetchImpl, log: logger },
     );
 
-  return decidir(
+  const resultado = await decidir(
     {
       chave: destino.chave,
       estado: entrada.estado,
@@ -308,4 +332,57 @@ export async function decidirNoPonto(
     },
     { fetchImpl: fetchContido, baseUrl: base },
   );
+  return destino.daPlataforma === true
+    ? aposChamadaDaPlataforma(entrada.organizationId, destino, resultado)
+    : resultado;
+}
+
+/**
+ * O que acontece depois de uma chamada feita com a chave da PLATAFORMA: o gasto
+ * entra no teto da empresa, e a falha da CONTA da instalação (402 ou 401) abre o
+ * disjuntor global. Essa falha não é da empresa, que não tem conta na TypeSafe:
+ * ela volta como `disjuntor_aberto` (nada de "confira o saldo na sua conta", nem
+ * pedido de ação), e a IA de sempre assume calada. Nunca lança.
+ */
+async function aposChamadaDaPlataforma(
+  organizationId: string,
+  destino: DestinoDaChave,
+  resultado: ResultadoDaDecisao,
+): Promise<ResultadoDaDecisao> {
+  try {
+    const admin = createAdminClient();
+    if (resultado.ok) {
+      await registrarUsoDaPlataforma(
+        admin,
+        organizationId,
+        costCents(resultado.modelo, {
+          inputTokens: resultado.uso.tokensDeEntrada,
+          outputTokens: resultado.uso.tokensDeSaida,
+          cacheReadTokens: 0,
+          cacheWriteTokens: 0,
+        }),
+      );
+      if (destino.sondaDoDisjuntor) await fecharDisjuntorGlobal(admin);
+      return resultado;
+    }
+    // SÓ 401 e 402 são a conta da instalação. `cliente.ts` traduz também 403 para
+    // `credencial_invalida` e todo 4xx não documentado (404, 409, 413...) para
+    // `sem_credito`: se esses abrissem o global, uma mensagem de um contato
+    // derrubaria o Jev de todas as empresas por 15 minutos.
+    if (resultado.status === 401 || resultado.status === 402) {
+      await abrirDisjuntorGlobal(admin, resultado.status === 402 ? "sem_credito" : "credencial_invalida");
+      return { ok: false, motivo: "disjuntor_aberto", exigeAcao: false, defeitoNosso: false, status: null };
+    }
+    if (resultado.motivo === "sem_credito" || resultado.motivo === "credencial_invalida") {
+      // Outro 4xx com a chave da plataforma: a empresa não tem conta para conferir, e nada disso
+      // pede ação dela. Cai calada na IA de sempre, sem abrir o global.
+      return { ok: false, motivo: "provedor_indisponivel", exigeAcao: false, defeitoNosso: false, status: resultado.status };
+    }
+  } catch (erro) {
+    logger.warn("o pós-chamada do Jev da plataforma falhou", {
+      organizationId,
+      erro: erro instanceof Error ? erro.name : typeof erro,
+    });
+  }
+  return resultado;
 }
