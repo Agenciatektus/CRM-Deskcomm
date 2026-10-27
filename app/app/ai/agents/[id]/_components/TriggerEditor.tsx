@@ -106,7 +106,6 @@ export function TriggerEditor({ value, onChange, disabled, organizationTimezone 
               >
                 <input
                   type="checkbox"
-                  className="h-3.5 w-3.5 accent-primary"
                   checked={checked}
                   onChange={() =>
                     onChange({

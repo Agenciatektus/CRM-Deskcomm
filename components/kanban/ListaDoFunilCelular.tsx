@@ -87,7 +87,7 @@ export function ListaDoFunilCelular({ leads, stages, ownerNames, selectedIds, on
             >
               <label className={cn("absolute top-3 right-3 grid size-11 place-items-center", !selecionando && "sr-only")}>
                 <span className="sr-only">{`${t("Selecionar")} ${nome}`}</span>
-                <input type="checkbox" checked={marcado} onChange={() => alterna(l.id)} className="size-5 accent-(--color-accent)" />
+                <input type="checkbox" checked={marcado} onChange={() => alterna(l.id)} className="size-5" />
               </label>
               <Link href={`/app/leads/${l.id}`} onClick={aoTocar(l.id)} className="grid grid-cols-[44px_minmax(0,1fr)] gap-3 p-3.5 pr-14">
                 <AvatarDoLead

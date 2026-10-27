@@ -161,7 +161,7 @@ function DetalheDaFonte({
                   <label className="flex items-center gap-2" title={ehDoCliente ? t("Coluna que identifica o cliente: precisa ficar liberada") : undefined}>
                     <input
                       type="checkbox"
-                      className="h-4 w-4 shrink-0 rounded-md border-border accent-primary"
+                      className="shrink-0"
                       checked={marcada}
                       disabled={ehDoCliente || (marcada && marcadas.size <= 1)}
                       onChange={() => aplicar((l) => alternarColuna(l, tabela, coluna, colunaDoCliente))}
@@ -332,7 +332,6 @@ export function PainelDeFontes({ connectionId, canWrite, colunaDoCliente, aberto
                     <label className="flex items-center gap-2 text-sm">
                       <input
                         type="checkbox"
-                        className="h-4 w-4 rounded-md border-border accent-primary"
                         checked={soViews}
                         onChange={(e) => setSoViews(e.target.checked)}
                       />
@@ -402,7 +401,7 @@ export function PainelDeFontes({ connectionId, canWrite, colunaDoCliente, aberto
                                 <div className="flex items-center gap-2 px-2 py-1.5">
                                   <input
                                     type="checkbox"
-                                    className="h-4 w-4 shrink-0 rounded-md border-border accent-primary"
+                                    className="shrink-0"
                                     checked={fonte !== undefined}
                                     onChange={() => aplicar((l) => alternarTabela(l, tabela, colunaDoCliente))}
                                     aria-label={`${t("Liberar")} ${nomeCompleto}`}

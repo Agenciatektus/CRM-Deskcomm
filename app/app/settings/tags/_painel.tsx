@@ -345,7 +345,6 @@ export function PainelDeTags({
             type="checkbox"
             checked={todasMarcadas}
             onChange={alternarTodas}
-            className="size-4 accent-(--color-accent)"
           />
           {t("Selecionar todas")}
         </label>
@@ -366,7 +365,6 @@ export function PainelDeTags({
                     }}
                     onChange={alternarTodas}
                     disabled={selecionaveis.length === 0}
-                    className="size-4 accent-(--color-accent)"
                   />
                   {t("Etiqueta")}
                 </span>
@@ -391,7 +389,7 @@ export function PainelDeTags({
                       aria-label={`${t("Selecionar")} ${linha.tag}`}
                       checked={marcadas.has(chave(linha.tag))}
                       onChange={() => alternar(linha.tag)}
-                      className="mr-2 size-4 align-middle accent-(--color-accent)"
+                      className="mr-2 align-middle"
                     />
                   )}
                   {/* A cor do SERVIDOR, não a do cache do chip: esta lista acabou

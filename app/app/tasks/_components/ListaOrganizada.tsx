@@ -119,7 +119,7 @@ export function ListaOrganizada({
                   aria-label={`${t("Selecionar todas de")} ${g.titulo}`}
                   checked={todas}
                   onChange={() => aoSelecionarGrupo(ids, !todas)}
-                  className="ml-3 size-4 shrink-0 accent-(--color-accent)"
+                  className="ml-3 shrink-0"
                 />
               )}
               <div className="min-w-0 flex-1">

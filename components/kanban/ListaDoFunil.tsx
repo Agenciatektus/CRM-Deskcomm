@@ -92,7 +92,6 @@ export function ListaDoFunil({ leads, stages, ownerNames, ordem, selectedIds, on
                 aria-label={t("Selecionar todos")}
                 checked={todos}
                 onChange={() => onSelectionChange(todos ? [] : linhas.map((l) => l.id))}
-                className="size-4 accent-(--color-accent)"
               />
             </th>
             {COLUNAS_DA_LISTA.map((c) => {
@@ -119,7 +118,7 @@ export function ListaDoFunil({ leads, stages, ownerNames, ordem, selectedIds, on
             return (
               <tr key={l.id} onClick={clicaLinha(l.id)} className={cn("border-b border-border last:border-0 hover:bg-hover", onAbrir && "cursor-pointer", marcados.has(l.id) && "bg-accent/5")}>
                 <td className="px-3 py-2">
-                  <input type="checkbox" aria-label={`${t("Selecionar")} ${nome}`} checked={marcados.has(l.id)} onChange={() => alterna(l.id)} className="size-4 accent-(--color-accent)" />
+                  <input type="checkbox" aria-label={`${t("Selecionar")} ${nome}`} checked={marcados.has(l.id)} onChange={() => alterna(l.id)} />
                 </td>
                 <td className="max-w-64 px-3 py-2">
                   <Link href={`/app/leads/${l.id}`} onClick={clicaNome(l.id)} className="flex min-w-0 items-center gap-2.5 hover:underline">
