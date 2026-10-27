@@ -265,9 +265,9 @@ export function FormularioDeMetaAds({
               )}
               <p className="text-xs text-muted-foreground">
                 {conectada
-                  ? t(
+                  ? `${t(
                       "Já existe um token guardado. Deixe em branco para mantê-lo, ou cole um novo para substituir.",
-                    )
+                    )}${via !== "oauth" ? ` ${t("Precisa da permissão ads_read.")}` : ""}`
                   : t("Precisa da permissão ads_read.")}
               </p>
             </div>
