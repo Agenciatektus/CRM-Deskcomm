@@ -7,7 +7,7 @@
  * para o operador. Sem este teste o campo viaja do banco até aqui sem ninguém
  * conferir a última ponta — e a prévia volta a cortar calada.
  */
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { NovaCampanha } from "./_client";
@@ -64,5 +64,42 @@ describe("prévia da nova campanha: o aviso do teto de 20.000", () => {
   it("recorte inteiro: nenhum aviso — o campo não vira ruído", () => {
     render(<NovaCampanha />);
     expect(screen.queryByText(AVISO)).not.toBeInTheDocument();
+  });
+});
+
+describe("nova campanha: critérios de compra no filtro", () => {
+  function preencher(rotulo: string | RegExp, valor: string, indice = 0) {
+    fireEvent.change(screen.getAllByLabelText(rotulo)[indice]!, { target: { value: valor } });
+  }
+  function filtroEnviado() {
+    fireEvent.click(screen.getByRole("button", { name: "Ver quantas pessoas" }));
+    return previa.mutate.mock.calls.at(-1)![0].audience_filter;
+  }
+
+  beforeEach(() => previa.mutate.mockClear());
+
+  it("há pelo menos 60 + excluir há no máximo 30 chegam no payload", () => {
+    render(<NovaCampanha />);
+    preencher("Última compra há pelo menos (dias)", "60", 0);
+    preencher("Última compra há no máximo (dias)", "30", 1);
+    const f = filtroEnviado();
+    expect(f.ultima_compra_ha_dias_min).toBe(60);
+    expect(f.excluir.ultima_compra_ha_dias_max).toBe(30);
+  });
+
+  it("gasto 150,00 vira 15000 centavos; bloco excluir vazio manda null", () => {
+    render(<NovaCampanha />);
+    preencher("Gasto total mínimo (R$)", "150,00", 0);
+    const f = filtroEnviado();
+    expect(f.gasto_min_centavos).toBe(15000);
+    expect(f.excluir).toBeNull();
+  });
+
+  it("sem nenhum critério, 'Ver quantas pessoas' fica desligado; com um campo de compra, liga", () => {
+    render(<NovaCampanha />);
+    const botao = screen.getByRole("button", { name: "Ver quantas pessoas" });
+    expect(botao).toBeDisabled();
+    preencher("Gasto total mínimo (R$)", "10", 0);
+    expect(botao).toBeEnabled();
   });
 });
