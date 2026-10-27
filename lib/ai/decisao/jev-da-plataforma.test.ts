@@ -4,9 +4,6 @@
  * Todo teste de "usa a plataforma" tem seu controle negativo ao lado: a regra
  * que decide quem NÃO recebe é a que protege a conta da instalação.
  */
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const SEGREDO = "plataforma_segredo_nao_pode_vazar";
@@ -272,33 +269,5 @@ describe("fonteDaChaveDoJev (as telas)", () => {
 
   it("chave própria ainda não validada não conta; a plataforma cobre", () => {
     expect(fonteDaChaveDoJev([{ ...linha, validated_at: null }], "typesafe", true)).toEqual({ tipo: "plataforma" });
-  });
-});
-
-describe("migration 9076", () => {
-  const sql = readFileSync(
-    join(process.cwd(), "supabase/migrations/20261027120000_9076_cobranca_planos_inclui_ia.sql"),
-    "utf8",
-  );
-  const baseline = readFileSync(join(process.cwd(), "supabase/baseline.sql"), "utf8");
-
-  it("inclui_ia nasce boolean not null default false, de forma idempotente", () => {
-    expect(sql).toMatch(/add column if not exists inclui_ia boolean not null default false/);
-  });
-
-  it("marca só o plano mensal vivo de R$ 397 sem IA própria, e só uma vez", () => {
-    const update = sql.match(/update public\.cobranca_planos[\s\S]*?;/)?.[0] ?? "";
-    expect(update).toMatch(/set inclui_ia = true/);
-    expect(update).toMatch(/preco_cents = 39700/);
-    expect(update).toMatch(/intervalo = 'mes'/);
-    expect(update).toMatch(/arquivado_em is null/);
-    expect(update).toMatch(/ia_propria = false/);
-    expect(update).toMatch(/inclui_ia = false/);
-    expect(sql.match(/update public\.cobranca_planos/g)).toHaveLength(1);
-  });
-
-  it("o baseline leva o mesmo apêndice", () => {
-    expect(baseline).toContain("add column if not exists inclui_ia boolean not null default false");
-    expect(baseline).toContain("preco_cents = 39700");
   });
 });

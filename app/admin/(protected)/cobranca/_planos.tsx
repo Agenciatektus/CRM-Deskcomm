@@ -191,7 +191,7 @@ export function PlanosDaInstalacao({ planos }: { planos: readonly PlanoDaTela[] 
               className="size-4"
               aria-describedby="plano-ia-propria-dica"
               checked={campos.ia_propria}
-              onChange={(e) => setCampos({ ...campos, ia_propria: e.target.checked })}
+              onChange={(e) => setCampos({ ...campos, ia_propria: e.target.checked, inclui_ia: e.target.checked ? false : campos.inclui_ia })}
             />
             <Label htmlFor="plano-ia-propria">{t("IA própria")}</Label>
           </div>
@@ -207,7 +207,7 @@ export function PlanosDaInstalacao({ planos }: { planos: readonly PlanoDaTela[] 
               className="size-4"
               aria-describedby="plano-inclui-ia-dica"
               checked={campos.inclui_ia}
-              onChange={(e) => setCampos({ ...campos, inclui_ia: e.target.checked })}
+              onChange={(e) => setCampos({ ...campos, inclui_ia: e.target.checked, ia_propria: e.target.checked ? false : campos.ia_propria })}
             />
             <Label htmlFor="plano-inclui-ia">{t("Inclui IA")}</Label>
           </div>
