@@ -4732,6 +4732,9 @@ export const DICIONARIO: Traducoes = {
   "não há chave OpenAI nem modelo de conversa com capacidade audio nesta organização": {
     es: "no hay clave de OpenAI ni modelo de conversación con capacidad audio en esta organización",
   },
+  "Esta empresa usa IA própria: cadastre a chave de IA da empresa para ativar.": {
+    es: "Esta empresa usa IA propia: registra la clave de IA de la empresa para activar.",
+  },
   "a escada de transcrição não foi resolvida nesta chamada — não há o que anunciar": {
     es: "la escalera de transcripción no se resolvió en esta llamada — no hay nada que anunciar",
   },

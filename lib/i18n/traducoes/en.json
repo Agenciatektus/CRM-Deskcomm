@@ -2644,6 +2644,7 @@
   "o modelo de conversa da organização declara a capacidade audio e transcreve com a própria chave": "the organization's conversation model declares the audio capability and transcribes with its own key",
   "não consegui resolver o modelo de conversa desta organização e não há chave OpenAI para transcrever": "I could not resolve this organization's conversation model, and there is no OpenAI key to transcribe",
   "o modelo de conversa da organização não declara a capacidade audio, e não há chave OpenAI para o serviço de transcrição": "the organization's conversation model does not declare the audio capability, and there is no OpenAI key for the transcription service",
+  "Esta empresa usa IA própria: cadastre a chave de IA da empresa para ativar.": "This company uses its own AI: register the company AI key to activate it.",
   "não há chave OpenAI nem modelo de conversa com capacidade audio nesta organização": "there is no OpenAI key nor a conversation model with the audio capability in this organization",
   "a escada de transcrição não foi resolvida nesta chamada — não há o que anunciar": "the transcription ladder was not resolved in this call — there is nothing to announce",
   "O cliente manda áudio e o agente responde como se não tivesse recebido nada.": "The client sends audio and the agent responds as if it had received nothing.",
