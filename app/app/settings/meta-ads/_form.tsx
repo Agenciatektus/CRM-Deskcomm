@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -71,6 +71,8 @@ export function FormularioDeMetaAds({
     setTotalDeContas(total);
   }, []);
   const [colarOutro, setColarOutro] = useState(false);
+  const campoDoToken = useRef<HTMLInputElement>(null);
+  const abriuColarOutro = useRef(false);
   const [confirmarDesconexao, setConfirmarDesconexao] = useState(false);
   // O novo token enxerga menos contas que as liberadas hoje: pede confirmação antes de gravar.
   const [reducao, setReducao] = useState<{ atuais: number; visiveis: number } | null>(null);
@@ -140,6 +142,10 @@ export function FormularioDeMetaAds({
 
   const manualComValidade = conectada && via !== "oauth" && Boolean(expiraEm);
   const venceEmBreve = diasParaVencer !== null && diasParaVencer < DIAS_DE_AVISO_DE_VENCIMENTO;
+  // Ao abrir "Colar outro token" o botão some: o foco vai para o campo que ele abriu.
+  useEffect(() => {
+    if (colarOutro && abriuColarOutro.current) campoDoToken.current?.focus();
+  }, [colarOutro]);
   const trocaToken = !conectada || via !== "oauth" || colarOutro;
 
   return (
@@ -212,9 +218,12 @@ export function FormularioDeMetaAds({
                 <Button
                   type="button"
                   variant="ghost"
-                  aria-expanded={false}
+                  aria-expanded={colarOutro}
                   aria-controls="access_token"
-                  onClick={() => setColarOutro(true)}
+                  onClick={() => {
+                    abriuColarOutro.current = true;
+                    setColarOutro(true);
+                  }}
                 >
                   {t("Colar outro token")}
                 </Button>
@@ -225,6 +234,7 @@ export function FormularioDeMetaAds({
                 <Label htmlFor="access_token">{t("Token de acesso")}</Label>
                 <Input
                   id="access_token"
+                  ref={campoDoToken}
                   name="meta_access_token"
                   type="password"
                   // O Chrome ignora autocomplete="off" em campo de senha; "new-password" é o que impede o

@@ -59,3 +59,11 @@ describe("salvar com nenhuma conta marcada", () => {
     expect(salvarMock.mock.calls[0]![0]).toMatchObject({ allowed_ad_account_ids: null });
   });
 });
+
+describe("Colar outro token", () => {
+  it("leva o foco ao campo do token", async () => {
+    montar("oauth");
+    fireEvent.click(await screen.findByRole("button", { name: "Colar outro token" }));
+    await waitFor(() => expect(document.activeElement?.id).toBe("access_token"));
+  });
+});
