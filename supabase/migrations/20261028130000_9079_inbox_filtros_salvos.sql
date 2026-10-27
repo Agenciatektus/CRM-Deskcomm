@@ -32,7 +32,7 @@ begin
   perform pg_advisory_xact_lock(hashtextextended('inbox_filtros_salvos:' || new.user_id::text, 0));
   if (select count(*) from public.inbox_filtros_salvos
        where organization_id = new.organization_id and user_id = new.user_id) >= 20 then
-    raise exception 'limite de 20 filtros salvos por usuario' using errcode = 'P0001';
+    raise exception 'limite de 20 filtros salvos por usuario' using errcode = 'FS020';
   end if;
   return new;
 end

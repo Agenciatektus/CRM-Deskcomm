@@ -63,8 +63,8 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (error?.code === "23505") {
     return fail("conflict", t("Já existe um filtro salvo com esse nome."), 409, { requestId });
   }
-  // P0001: o teto de 20 do trigger (a corrida entre dois pedidos só o banco enxerga).
-  if (error?.code === "P0001") {
+  // FS020: o teto de 20 do trigger (a corrida entre dois pedidos só o banco enxerga).
+  if (error?.code === "FS020") {
     return fail(
       "limit_reached",
       `${t("Limite de filtros salvos atingido.")} (${MAXIMO_DE_FILTROS_SALVOS})`,
