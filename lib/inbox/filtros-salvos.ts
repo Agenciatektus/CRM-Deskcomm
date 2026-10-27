@@ -90,8 +90,9 @@ export const haFiltroAtivo = (f: Parameters<typeof normalizarFiltros>[0]): boole
 
 const limparId = (id: string) => id.replace(/[^a-zA-Z0-9-]/g, "");
 
-/** Uma chave por atendente no navegador: o filtro de um não vaza para outro. */
-export const chaveDoFiltroLembrado = (usuarioId: string) => `inbox_filtro:${limparId(usuarioId)}`;
+/** Uma chave por atendente e organização: o filtro de um (ou de outra empresa) não vaza. */
+export const chaveDoFiltroLembrado = (usuarioId: string, orgId: string) =>
+  `inbox_filtro:${limparId(usuarioId)}:${limparId(orgId)}`;
 
 /** Lê o que o navegador guardou. Ausente, JSON quebrado ou forma fora do schema = `null`. */
 export function lerFiltroLembrado(valor: string | null): FiltrosSalvos | null {

@@ -61,7 +61,7 @@ describe("filtro lembrado", () => {
   );
 
   it("a chave é por usuário e não aceita caractere estranho", () => {
-    expect(chaveDoFiltroLembrado(UUID)).toBe(`inbox_filtro:${UUID}`);
-    expect(chaveDoFiltroLembrado("a/../b")).toBe("inbox_filtro:ab");
+    expect(chaveDoFiltroLembrado(UUID, "org-1")).toBe(`inbox_filtro:${UUID}:org-1`);
+    expect(chaveDoFiltroLembrado("a/../b", "o/1")).toBe("inbox_filtro:ab:o1");
   });
 });

@@ -184,7 +184,7 @@ export function InboxLayout({
   });
   const filterValue: InboxFiltersValue = { tab, ...aux };
   // O filtro de ontem volta ao reabrir o Inbox sem filtro na URL (por atendente).
-  useFiltroLembrado(user?.id, aux, (f) =>
+  useFiltroLembrado(user?.id, orgId, aux, (f) =>
     setAux((a) => {
       const { tab: _t, ...rest } = aplicarFiltroSalvo({ tab, ...a }, f);
       return rest;
