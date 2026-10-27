@@ -28,6 +28,7 @@ import { logger } from "@/lib/logger";
 import {
   ErroDoProvedor,
   type AdaptadorDeCobranca,
+  type CompraLida,
   type Modo,
   type PlanoParaProvedor,
   type SinalDoWebhook,
@@ -301,6 +302,33 @@ function lerEvento(corpoCru: string): SinalDoWebhook | null {
     clienteRef: typeof cliente === "string" ? cliente : (cliente?.id ?? null),
   };
 }
+
+const eventoDaCompra = z.object({ data: z.object({ object: z.object({ id: z.string().min(1) }) }) });
+const sessaoDaCompra = z.object({
+  id: z.string().min(1),
+  livemode: z.boolean(),
+  mode: z.string(),
+  payment_status: z.string(),
+  status: z.string().nullish(),
+  client_reference_id: z.string().nullish(),
+  customer: z.union([z.string(), z.object({ id: z.string().min(1) })]).nullish(),
+  subscription: z
+    .union([
+      z.string(),
+      z.object({
+        id: z.string().min(1),
+        items: z.object({
+          data: z.array(z.object({ price: z.object({ recurring: z.object({ interval: z.string() }).nullish() }).nullish() })),
+        }),
+      }),
+    ])
+    .nullish(),
+  customer_details: z.object({ email: z.string().nullish(), name: z.string().nullish() }).nullish(),
+  metadata: z.record(z.string(), z.string().nullable()).nullish(),
+  custom_fields: z
+    .array(z.object({ key: z.string(), text: z.object({ value: z.string().nullish() }).nullish() }))
+    .nullish(),
+});
 
 export function criarAdaptadorStripe(dep: DependenciasDaStripe): AdaptadorDeCobranca {
   const base = dep.baseUrl ?? STRIPE_API_BASE;
@@ -693,8 +721,36 @@ export function criarAdaptadorStripe(dep: DependenciasDaStripe): AdaptadorDeCobr
     return url;
   }
 
+  /** Venda direta: evento -> sessão (`expand[]=subscription`). Só leitura; o corpo do webhook nunca entra. */
+  async function lerCompra(eventoId: string): Promise<CompraLida> {
+    const evento = ler(eventoDaCompra, await chamar("GET", `/events/${encodeURIComponent(eventoId)}`));
+    const sessaoId = evento.data.object.id;
+    const s = ler(
+      sessaoDaCompra,
+      await chamar("GET", `/checkout/sessions/${encodeURIComponent(sessaoId)}?expand[]=subscription`),
+    );
+    const assinatura = typeof s.subscription === "object" && s.subscription !== null ? s.subscription : null;
+    const intervalo = assinatura?.items.data[0]?.price?.recurring?.interval;
+    return {
+      sessaoId: s.id,
+      modo: s.livemode ? "producao" : "teste",
+      modoDaSessao: s.mode,
+      pagamento: s.payment_status,
+      status: s.status ?? null,
+      clienteRef: typeof s.customer === "string" ? s.customer : (s.customer?.id ?? null),
+      assinaturaRef: typeof s.subscription === "string" ? s.subscription : (assinatura?.id ?? null),
+      intervaloDaAssinatura: intervalo === "month" || intervalo === "year" ? intervalo : null,
+      email: s.customer_details?.email ?? null,
+      nome: s.customer_details?.name ?? null,
+      planoChave: s.metadata?.plano ?? null,
+      nomeDaEmpresa: s.custom_fields?.find((c) => c.key === "nome_da_empresa")?.text?.value ?? null,
+      clientReferenceId: s.client_reference_id ?? null,
+    };
+  }
+
   return {
     id: "stripe",
+    lerCompra,
     testarChave,
     verificarWebhook: verificarWebhookStripe,
     garantirCliente,

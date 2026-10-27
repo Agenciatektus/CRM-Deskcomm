@@ -10,6 +10,7 @@ const h = vi.hoisted(() => ({
   permitido: true,
   baldes: [] as string[],
   aviso: vi.fn(),
+  processar: vi.fn(),
   banco: undefined as unknown as BancoFalso,
 }));
 vi.mock("@/lib/instalacao/modulos", () => ({ moduloLigado: async () => h.ligada }));
@@ -21,6 +22,7 @@ vi.mock("@/lib/ai/dispatcher/rate-limit", () => ({
     return { allowed: h.permitido };
   },
 }));
+vi.mock("@/lib/cobranca/compra", () => ({ processarCompra: h.processar }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => h.banco.cliente }));
 vi.mock("@/lib/logger", () => ({ logger: { warn: h.aviso, error: vi.fn(), info: vi.fn() } }));
 
@@ -71,12 +73,13 @@ const doAsaas = (headers: Record<string, string>) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  h.processar.mockResolvedValue({ tipo: "criada", org: "org-x" });
   h.ligada = true;
   h.segredo = "whsec_teste";
   h.sinal = { eventoId: "evt_1", tipo: "invoice.paid", clienteRef: "cus_1" };
   h.permitido = true;
   h.baldes = [];
-  m = { duplicado: false, statusExistente: "received", dona: { organization_id: ORG }, emit: { data: "ev-1" }, flag: null, compra: {} };
+  m = { duplicado: false, statusExistente: "received", dona: { organization_id: ORG }, emit: { data: "ev-1" }, flag: null, compra: { data: [{ id: "compra-1" }] } };
   h.banco = bancoFalso(responder, () => m.emit);
 });
 
@@ -249,6 +252,46 @@ describe("venda direta: compra da LP de cliente desconhecido (fatia 2)", () => {
     await pedido();
     expect(flagLida()).toEqual([]);
     expect(compras()).toEqual([]);
+  });
+
+  it("(d) flag ligada: chama processarCompra com o id da linha gravada e responde 200", async () => {
+    checkout("evt_d_liga");
+    m.dona = null;
+    m.flag = "ligado";
+    m.compra = { data: [{ id: "compra-d-111" }] };
+    const res = await pedido();
+    expect(res.status).toBe(200);
+    expect(h.processar).toHaveBeenCalledTimes(1);
+    expect(h.processar.mock.calls[0]?.[1]).toBe("compra-d-111");
+  });
+
+  it("(d) reentrega (conflito ignorado, sem linha devolvida): relê o id pelo evento e processa", async () => {
+    checkout("evt_d_reentrega");
+    m.dona = null;
+    m.flag = "ligado";
+    m.compra = { data: [] };
+    h.banco = bancoFalso((c) => (c.tabela === "cobranca_compras" && operacao(c) === "select" ? { data: { id: "compra-d-222" } } : c.tabela === "cobranca_compras" ? { data: [] } : responder(c)), () => m.emit);
+    const res = await pedido();
+    expect(res.status).toBe(200);
+    expect(h.processar.mock.calls[0]?.[1]).toBe("compra-d-222");
+  });
+
+  it("(d) processarCompra lançando: 200 {compra:registrada} do mesmo jeito", async () => {
+    checkout("evt_d_lanca");
+    m.dona = null;
+    m.flag = "ligado";
+    h.processar.mockRejectedValue(new Error("stripe fora"));
+    const res = await pedido();
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ data: { compra: "registrada" } });
+  });
+
+  it("(d) flag desligada: processarCompra nunca é chamado", async () => {
+    checkout("evt_d_desligada");
+    m.dona = null;
+    m.flag = "desligado";
+    await pedido();
+    expect(h.processar).not.toHaveBeenCalled();
   });
 
   it("(b) flag ligada + checkout.session.completed desconhecido: 1 linha recebida com o id do ponteiro, 200, ponteiro fechado", async () => {

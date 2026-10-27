@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { bancoFalso, valorDoFiltro, type BancoFalso, type Cadeia, type Resposta } from "@/tests/helpers/banco-falso-da-cobranca";
 
-const h = vi.hoisted(() => ({ sincronizar: vi.fn(), aplicarRegua: vi.fn() }));
+const h = vi.hoisted(() => ({ sincronizar: vi.fn(), aplicarRegua: vi.fn(), compras: vi.fn() }));
+vi.mock("./compra", () => ({ processarComprasPendentes: h.compras }));
 vi.mock("./sincronizar", () => ({ sincronizar: h.sincronizar, aplicarRegua: h.aplicarRegua }));
 vi.mock("@/lib/logger", () => ({ logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 
@@ -15,11 +16,13 @@ interface Mundo {
   assinaturasDePlano: Array<{ organization_id: string; plano_id: string }>;
   orgs: Array<{ id: string; status: string; locale: string | null }>;
   gasto: Record<string, number>;
+  flag: string | null;
 }
 let m: Mundo;
 let banco: BancoFalso;
 
 function responder(c: Cadeia): Resposta {
+  if (c.tabela === "platform_config") return { data: m.flag === null ? null : { valor: m.flag } };
   if (c.tabela === "cobranca_planos") return { data: m.planos };
   if (c.tabela === "organizations") return { data: m.orgs };
   if (valorDoFiltro(c, "in", "plano_id") !== undefined) return { data: m.assinaturasDePlano };
@@ -33,7 +36,8 @@ function rpc(nome: string, args: Record<string, unknown>): Resposta {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  m = { reconciliaveis: [], todas: [], planos: [], assinaturasDePlano: [], orgs: [], gasto: {} };
+  m = { reconciliaveis: [], todas: [], planos: [], assinaturasDePlano: [], orgs: [], gasto: {}, flag: null };
+  h.compras.mockResolvedValue({ lidas: 0, criadas: 0, falhas: 0 });
   banco = bancoFalso(responder, rpc);
   h.sincronizar.mockResolvedValue({ tipo: "aplicada", estado: "ativa", mudou: false, acao: "nada" });
   h.aplicarRegua.mockResolvedValue("nada");
@@ -107,5 +111,29 @@ describe("rodadaDaCobranca", () => {
     expect(avisos.map((a) => a.args.p_org)).toEqual(["A"]);
     expect(String(avisos[0]?.args.p_corpo)).toContain("US$ 8.50 de US$ 10.00");
     expect(r.avisosDeIa).toBe(1);
+  });
+
+  it("venda direta desligada: não repassa as compras e o resumo não ganha o campo", async () => {
+    const r = await rodar();
+    expect(h.compras).not.toHaveBeenCalled();
+    expect(r).not.toHaveProperty("compras");
+  });
+
+  it("venda direta ligada: repassa as compras pendentes e soma o resumo", async () => {
+    m.flag = "ligado";
+    h.compras.mockResolvedValue({ lidas: 3, criadas: 2, falhas: 1 });
+    const r = await rodar();
+    expect(h.compras).toHaveBeenCalledTimes(1);
+    expect(h.compras.mock.calls[0]?.[0]).toBe(banco.cliente);
+    expect(r.compras).toEqual({ lidas: 3, criadas: 2, falhas: 1 });
+  });
+
+  it("venda direta ligada com erro nas compras: a rodada não cai e o resto do resumo sai", async () => {
+    m.flag = "ligado";
+    m.reconciliaveis = [{ organization_id: "A", relida_em: null, precisa_reler: true }];
+    h.compras.mockRejectedValue(new Error("fila fora"));
+    const r = await rodar();
+    expect(r.relidas).toBe(1);
+    expect(r).not.toHaveProperty("compras");
   });
 });

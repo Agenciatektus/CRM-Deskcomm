@@ -26,6 +26,7 @@ import { segredoDoWebhook } from "@/lib/cobranca/configuracao";
 import { ipDoCliente } from "@/lib/http/ip-do-cliente";
 import { adaptador } from "@/lib/cobranca/provedores";
 import type { SinalDoWebhook } from "@/lib/cobranca/provedores/contrato";
+import { processarCompra } from "@/lib/cobranca/compra";
 import { vendaDiretaLigada } from "@/lib/cobranca/venda-direta";
 import { PROVEDORES_DE_COBRANCA, type ProvedorDeCobranca } from "@/lib/cobranca/vocabulario";
 import { moduloLigado } from "@/lib/instalacao/modulos";
@@ -128,13 +129,21 @@ export async function POST(req: NextRequest, { params }: Rota) {
     // Venda direta: a compra por link de pagamento ainda não tem empresa. Só o ponteiro
     // vira linha (evento_id único: a reentrega cai no conflito e não duplica); quem
     // decide e relê na API é o processador. Nada além de {id,type} é lido do corpo.
-    const { error: erroDaCompra } = await admin
+    const { data: nova, error: erroDaCompra } = await admin
       .from("cobranca_compras")
-      .upsert({ provedor, evento_id: sinal.eventoId, status: "recebida" }, { onConflict: "evento_id", ignoreDuplicates: true });
+      .upsert({ provedor, evento_id: sinal.eventoId, status: "recebida" }, { onConflict: "evento_id", ignoreDuplicates: true })
+      .select("id");
     if (erroDaCompra) {
       logger.error("cobranca.compra_nao_registrada", { provedor, codigo: erroDaCompra.code ?? null });
       return fail("unavailable", "Tente de novo em instantes.", 503, { requestId });
     }
+    // Reentrega: o conflito ignorado não devolve linha; relê pelo evento para repassar o que ficou pelo caminho.
+    let compraId = idDaCompra(nova);
+    if (compraId === null) {
+      const { data: existente } = await admin.from("cobranca_compras").select("id").eq("evento_id", sinal.eventoId).maybeSingle();
+      compraId = idDaCompra(existente);
+    }
+    if (compraId !== null) await processarComOrcamento(admin, compraId);
     await admin
       .from("webhook_events_log")
       .update({ status: "processed", processed_at: agora })
@@ -207,4 +216,28 @@ async function gravarPonteiro(
     .maybeSingle();
   if (erroDaLeitura || !existente) return "erro";
   return existente as { id: string; status: string };
+}
+
+const ORCAMENTO_DA_COMPRA_MS = 4000;
+
+function idDaCompra(dados: unknown): string | null {
+  const linha = Array.isArray(dados) ? dados[0] : dados;
+  const id = (linha as { id?: unknown } | null | undefined)?.id;
+  return typeof id === "string" ? id : null;
+}
+
+/** Tenta criar a empresa dentro de um orçamento curto. Erro ou estouro só loga: a rodada horária termina. */
+async function processarComOrcamento(admin: SupabaseClient, compraId: string): Promise<void> {
+  let relogio: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const estouro = new Promise<"estourou">((resolver) => {
+      relogio = setTimeout(() => resolver("estourou"), ORCAMENTO_DA_COMPRA_MS);
+    });
+    const r = await Promise.race([processarCompra(admin, compraId), estouro]);
+    if (r === "estourou") logger.warn("cobranca.compra_orcamento_estourado", { compra: compraId });
+  } catch (e) {
+    logger.warn("cobranca.compra_nao_processada_na_hora", { compra: compraId, erro: e instanceof Error ? e.message : "desconhecido" });
+  } finally {
+    if (relogio) clearTimeout(relogio);
+  }
 }
