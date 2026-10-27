@@ -35,6 +35,7 @@ import { comandaDoGanhoHandler } from "@/lib/financeiro/comanda-do-ganho.handler
 import { avisoDeCasoAoSuporteHandler } from "@/lib/escalacao/aviso-ao-suporte.handler";
 import { avisoDePropostaNoWhatsAppHandler } from "@/lib/propostas/aviso-no-whatsapp.handler";
 import { cobrancaSinalHandler } from "@/lib/cobranca/sinal.handler";
+import { pedidosNuvemshopHandler } from "@/lib/nuvemshop/pedidos.handler";
 import { registerHandler } from "@/lib/event-log/dispatcher";
 
 let _registered = false;
@@ -56,6 +57,8 @@ export function ensureHandlersRegistered(): void {
   registerHandler(aiSentimentHandler);
   registerHandler(aiHandoffFromSentimentHandler);
   registerHandler(ragIndexerHandler);
+  // Pedido da loja -> `orders`: relê a API, mas só escreve; sem contato nem card.
+  registerHandler(pedidosNuvemshopHandler);
   registerHandler(lgpdExportHandler);
   registerHandler(lgpdRedactHandler);
   registerHandler(automationRulesHandler);
