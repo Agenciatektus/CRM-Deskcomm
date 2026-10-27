@@ -40,3 +40,25 @@ export function credencialEmUsoPeloJev<T extends LinhaDeCredencial>(
   );
   return aptas.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0] ?? null;
 }
+
+/**
+ * DE QUEM É A CHAVE DO JEV — a regra completa, sobre linhas já lidas.
+ *
+ * Própria da empresa (`credencialEmUsoPeloJev`) > a da plataforma > nenhuma. A
+ * plataforma só entra na origem `typesafe`: pela OpenRouter a chave é a da
+ * conversa da empresa, e a conta da instalação nunca a paga. `plataformaServe`
+ * é o fato JÁ resolvido no servidor (chave da instalação definida E empresa
+ * elegível, `./elegibilidade.ts`): este módulo vai ao navegador e não importa
+ * `env`, então recebe o booleano.
+ */
+export type FonteDaChaveDoJev<T> = { tipo: "propria"; credencial: T } | { tipo: "plataforma" } | null;
+
+export function fonteDaChaveDoJev<T extends LinhaDeCredencial>(
+  linhas: readonly T[],
+  origem: OrigemDoJev = ORIGEM_PADRAO,
+  plataformaServe = false,
+): FonteDaChaveDoJev<T> {
+  const propria = credencialEmUsoPeloJev(linhas, origem);
+  if (propria !== null) return { tipo: "propria", credencial: propria };
+  return origem === "typesafe" && plataformaServe ? { tipo: "plataforma" } : null;
+}

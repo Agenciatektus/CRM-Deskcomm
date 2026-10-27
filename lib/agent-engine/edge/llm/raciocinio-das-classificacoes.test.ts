@@ -20,6 +20,13 @@ import { classifyJailbreak } from "@/lib/agent-engine/guardrails/jailbreak/class
 import { createDefaultRegistry } from "@/lib/agent-engine/edge/llm/providers";
 import { runModelCall } from "@/lib/agent-engine/edge/llm/run-model-call";
 
+// Plano com IA própria (migration 9075) fica fora deste teste: a instalação serve a org.
+vi.mock("@/lib/cobranca/ia-propria", async (orig) => ({
+  ...(await orig<typeof import("@/lib/cobranca/ia-propria")>()),
+  instalacaoPodeServirIa: async () => true,
+}));
+
+
 const ORG = "44444444-4444-4444-8444-444444444444";
 const CFG = {
   anthropicApiKey: "chave-ant-de-teste",

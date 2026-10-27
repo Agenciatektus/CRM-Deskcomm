@@ -65,6 +65,10 @@ vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => clienteFalso()
 import { createDefaultAgent, type CreateAgentResult } from "@/app/actions/onboarding/createDefaultAgent";
 import { audit } from "@/lib/audit";
 
+// Fora do assunto deste teste: a instalação serve a org (sem plano com IA própria).
+vi.mock("@/lib/cobranca/ia-propria", async (orig) =>
+  (await import("@/tests/helpers/ia-propria-instalacao-serve")).instalacaoServeAOrg(await orig()));
+
 /**
  * Construtor de consulta no formato do PostgREST: encadeável, thenable, e com
  * `single`/`maybeSingle`. Cada `from()` abre uma consulta nova — reaproveitar um

@@ -4,6 +4,8 @@ import { WelcomeForm } from "./_form";
 import { marcaDaSaida } from "@/lib/branding/saida";
 import { createClient } from "@/lib/supabase/server";
 import { lerRetratoDaInstalacao } from "@/lib/instalacao/retrato";
+import { instalacaoPodeServirIaViaRpc } from "@/lib/cobranca/ia-propria";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { JaEstaPronto } from "../_components/JaEstaPronto";
 import { traduzir } from "@/lib/i18n/dicionario";
 
@@ -20,7 +22,11 @@ export default async function WelcomePage() {
   const marca = await marcaDaSaida(null);
 
   const supabase = await createClient();
-  const retrato = await lerRetratoDaInstalacao({ supabase, orgId: activeOrg.orgId });
+  const retrato = await lerRetratoDaInstalacao({
+    supabase,
+    orgId: activeOrg.orgId,
+    instalacaoPodeServirIa: () => instalacaoPodeServirIaViaRpc(createAdminClient(), activeOrg.orgId),
+  });
 
   return (
     <div className="space-y-6">

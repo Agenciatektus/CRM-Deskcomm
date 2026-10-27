@@ -4732,6 +4732,9 @@ export const DICIONARIO: Traducoes = {
   "não há chave OpenAI nem modelo de conversa com capacidade audio nesta organização": {
     es: "no hay clave de OpenAI ni modelo de conversación con capacidad audio en esta organización",
   },
+  "Esta empresa usa IA própria: cadastre a chave de IA da empresa para ativar.": {
+    es: "Esta empresa usa IA propia: registra la clave de IA de la empresa para activar.",
+  },
   "a escada de transcrição não foi resolvida nesta chamada — não há o que anunciar": {
     es: "la escalera de transcripción no se resolvió en esta llamada — no hay nada que anunciar",
   },
@@ -4911,6 +4914,21 @@ export const DICIONARIO: Traducoes = {
   "O Jev usa esta chave. Sem ela, ele passa a usar a outra chave dele que já passou no teste.": {
     es: "Jev usa esta clave. Sin ella, pasa a usar su otra clave que ya pasó la prueba.",
   },
+  "O Jev usa esta chave. Sem ela, ele passa a usar o Jev da plataforma e continua ligado.": {
+    es: "Jev usa esta clave. Sin ella, pasa a usar el Jev de la plataforma y sigue activado.",
+  },
+  "Usando o Jev da plataforma. As mensagens processadas pelo Jev são enviadas à TypeSafe AI, nos Estados Unidos, pela conta da Tektus. Cadastre a sua chave para usar a sua conta.": {
+    es: "Usando el Jev de la plataforma. Los mensajes procesados por Jev se envían a TypeSafe AI, en Estados Unidos, por la cuenta de Tektus. Registra tu clave para usar tu cuenta.",
+  },
+  "Marque o aceite do envio das mensagens à TypeSafe AI antes de mudar o Jev.": {
+    es: "Marca la aceptación del envío de mensajes a TypeSafe AI antes de cambiar Jev.",
+  },
+  "Cada mensagem que o cliente manda vai para a TypeSafe AI, nos Estados Unidos, uma de cada vez e sem o resto da conversa, para o Jev avaliar. Antes de sair, o sistema apaga CPF, telefone e e-mail do texto. Para mudar qualquer ajuste do Jev, confirme o aceite abaixo. Desligar não pede aceite.": {
+    es: "Cada mensaje que el cliente envía va a TypeSafe AI, en Estados Unidos, uno a la vez y sin el resto de la conversación, para que Jev lo evalúe. Antes de salir, el sistema borra CPF, teléfono y correo del texto. Para cambiar cualquier ajuste de Jev, confirma la aceptación abajo. Apagar no pide aceptación.",
+  },
+  "Sua chave foi recusada pela TypeSafe:": { es: "Tu clave fue rechazada por TypeSafe:" },
+  "não consegui testar a chave.": { es: "no pude probar la clave." },
+  "Enquanto isso, a plataforma atende.": { es: "Mientras tanto, la plataforma atiende." },
   "O Jev parou de funcionar": { es: "Jev dejó de funcionar" },
   // Título antigo do mesmo aviso: segue aqui para a busca achar o aviso aberto
   // em espanhol numa instalação que atualizou (`lib/ai/decisao/aviso.ts`).
@@ -16620,6 +16638,19 @@ export const DICIONARIO: Traducoes = {
   "Entrada no Instagram": { es: "Entrada en Instagram" },
   "Filtros ativos": { es: "Filtros activos" },
   "Remover filtro": { es: "Quitar filtro" },
+  "Filtros salvos": { es: "Filtros guardados" },
+  "Este filtro salvo não pôde ser aplicado.": { es: "Este filtro guardado no se pudo aplicar." },
+  "Carregando filtros salvos": { es: "Cargando filtros guardados" },
+  "Não foi possível carregar os filtros salvos.": { es: "No se pudieron cargar los filtros guardados." },
+  "Nenhum filtro salvo ainda.": { es: "Aún no hay filtros guardados." },
+  "Apagar este filtro?": { es: "¿Eliminar este filtro?" },
+  "Apagar o filtro": { es: "Eliminar el filtro" },
+  "Salvar este filtro": { es: "Guardar este filtro" },
+  "Nome do filtro": { es: "Nombre del filtro" },
+  "Não foi possível salvar o filtro.": { es: "No se pudo guardar el filtro." },
+  "Já existe um filtro salvo com esse nome.": { es: "Ya existe un filtro guardado con ese nombre." },
+  "Limite de filtros salvos atingido.": { es: "Se alcanzó el límite de filtros guardados." },
+  "Filtro salvo não encontrado.": { es: "Filtro guardado no encontrado." },
   "Nome, telefone ou última mensagem": { es: "Nombre, teléfono o último mensaje" },
   "mensagens não lidas": { es: "mensajes no leídos" },
   ativos: { es: "activos" },
@@ -17149,6 +17180,10 @@ export const DICIONARIO: Traducoes = {
   "Só você atribui": { es: "Solo usted lo asigna" },
   "Esconder das empresas": { es: "Ocultar a las empresas" },
   "Mostrar às empresas": { es: "Mostrar a las empresas" },
+  "IA própria": { es: "IA propia" },
+  "Empresas neste plano usam somente a chave de IA cadastrada por elas. A chave de IA da instalação nunca é usada.": { es: "Las empresas de este plan usan solo la clave de IA registrada por ellas. La clave de IA de la instalación nunca se usa." },
+  "Inclui IA": { es: "Incluye IA" },
+  "Empresas neste plano recebem o Jev da plataforma sem cadastrar chave. Não vale junto com IA própria.": { es: "Las empresas de este plan reciben el Jev de la plataforma sin registrar clave. No vale junto con IA propia." },
   // ─── Cobrança do revendedor — configuração (PR 3a) ───
   "Provedor de cobrança dos seus clientes": { es: "Proveedor de cobro de tus clientes" },
   "Por onde as empresas desta instalação pagam a assinatura. É escolhido quando você conecta a chave em Cobrança › Conexão.": { es: "Por dónde las empresas de esta instalación pagan la suscripción. Se elige cuando conectas la clave en Cobro › Conexión." },

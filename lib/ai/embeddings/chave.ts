@@ -89,6 +89,7 @@
  */
 import { byteaToBuffer, decryptKey } from "@/lib/crypto/aes_gcm";
 import { OPENROUTER_BASE_URL } from "@/lib/ai/gateway";
+import { instalacaoPodeServirIaViaRpc } from "@/lib/cobranca/ia-propria";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -220,6 +221,12 @@ export async function resolverChaveDeEmbedding(
   opcoes: { familia?: ProvedorDaBase | null } = {},
 ): Promise<ChaveDeEmbedding | null> {
   const avisos: string[] = [];
+  // Plano com IA própria (migration 9075): os degraus da INSTALAÇÃO (gateway e
+  // chaves do env) só valem se o banco disser que servem esta empresa. Memoizado
+  // e consultado só quando a escada chega num degrau de env; falha fechada.
+  let servePromessa: Promise<boolean> | null = null;
+  const instalacaoServe = (): Promise<boolean> =>
+    (servePromessa ??= instalacaoPodeServirIaViaRpc(createAdminClient(), organizationId));
   const familia =
     opcoes.familia !== undefined
       ? opcoes.familia
@@ -290,7 +297,7 @@ export async function resolverChaveDeEmbedding(
     if (openAiDaOrg) return daOrganizacao(openAiDaOrg);
 
     // 3 · O gateway da instalação. A chave não sai daqui: o SDK a lê do process.env.
-    if (env.AI_GATEWAY_API_KEY) {
+    if (env.AI_GATEWAY_API_KEY && (await instalacaoServe())) {
       return {
         apiKey: null,
         baseUrl: env.AI_GATEWAY_BASE_URL || null,
@@ -303,7 +310,7 @@ export async function resolverChaveDeEmbedding(
     }
 
     // 4 · Chave OpenAI da instalação.
-    if (env.OPENAI_API_KEY) {
+    if (env.OPENAI_API_KEY && (await instalacaoServe())) {
       return {
         apiKey: env.OPENAI_API_KEY,
         baseUrl: null,
@@ -321,7 +328,7 @@ export async function resolverChaveDeEmbedding(
     if (openRouterDaOrg) return daOrganizacao(openRouterDaOrg);
 
     // 6 · Chave OpenRouter da instalação.
-    if (env.OPENROUTER_API_KEY) {
+    if (env.OPENROUTER_API_KEY && (await instalacaoServe())) {
       return {
         apiKey: env.OPENROUTER_API_KEY,
         baseUrl: OPENROUTER_BASE_URL,
@@ -491,4 +498,12 @@ async function credencialDaOrganizacao(
   } catch {
     return null;
   }
+}
+
+/**
+ * A instalação está VEDADA para esta empresa (plano com IA própria)? Só para a
+ * tela explicar por que não há chave; a decisão de usar chave é do resolvedor.
+ */
+export async function iaPropriaVedaAInstalacao(organizationId: string): Promise<boolean> {
+  return !(await instalacaoPodeServirIaViaRpc(createAdminClient(), organizationId));
 }

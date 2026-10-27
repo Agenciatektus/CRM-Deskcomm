@@ -5,10 +5,18 @@ vi.mock("@/lib/crypto/aes_gcm", () => ({
   decryptKey: () => "chave-byok-da-org",
 }));
 
+const podeServir = vi.hoisted(() => vi.fn(async (..._a: unknown[]) => true));
+vi.mock("@/lib/cobranca/ia-propria", async (orig) => ({
+  ...(await orig<typeof import("@/lib/cobranca/ia-propria")>()),
+  instalacaoPodeServirIa: podeServir,
+}));
+
+import { IaPropriaSemCredencialError } from "@/lib/cobranca/ia-propria";
 import {
   llmEdgeConfigFromEnv,
   resolveOrgLlmConfig,
   LlmNotConfiguredError,
+  temIaDeSempre,
   type LlmEdgeConfig,
 } from "./credentials";
 
@@ -156,5 +164,48 @@ describe("llmEdgeConfigFromEnv — o que sai do .env chega ao turno", () => {
       "org1",
     );
     expect(out.apiKey).toBe("sk-proj-do-env");
+  });
+});
+
+describe("resolveOrgLlmConfig - plano com IA propria nunca usa a chave da instalacao", () => {
+  const cfg: LlmEdgeConfig = { anthropicApiKey: "sk-ant-plataforma", openaiApiKey: "sk-proj-plataforma" };
+  const llm = { provider: "openai", default_model: "gpt-4o" };
+
+  it("ia_propria sem BYOK e com env presente: recusa com o erro tipado", async () => {
+    podeServir.mockResolvedValueOnce(false);
+    const p = resolveOrgLlmConfig(poolFake(llm, SEM_BYOK), cfg, "org-1");
+    await expect(p).rejects.toBeInstanceOf(IaPropriaSemCredencialError);
+    await expect(
+      (async () => {
+        podeServir.mockResolvedValueOnce(false);
+        return resolveOrgLlmConfig(poolFake(llm, SEM_BYOK), cfg, "org-1");
+      })(),
+    ).rejects.toMatchObject({ code: "ia_propria_sem_credencial" });
+  });
+
+  it("ia_propria com BYOK: usa a chave da empresa sem consultar a instalacao", async () => {
+    podeServir.mockClear();
+    podeServir.mockResolvedValue(false);
+    const out = await resolveOrgLlmConfig(
+      poolFake(llm, [{ api_key_encrypted: "x", api_key_iv: "y", api_key_tag: "z" }]),
+      cfg,
+      "org-1",
+    );
+    expect(out.apiKey).toBe("chave-byok-da-org");
+    expect(out.origemDaChave).toBe("credencial_da_organizacao");
+    expect(podeServir).not.toHaveBeenCalled();
+    podeServir.mockResolvedValue(true);
+  });
+
+  it("sem plano (instalacao serve): usa o env como sempre", async () => {
+    podeServir.mockResolvedValue(true);
+    const out = await resolveOrgLlmConfig(poolFake(llm, SEM_BYOK), cfg, "org-1");
+    expect(out.apiKey).toBe("sk-proj-plataforma");
+    expect(out.origemDaChave).toBe("chave_da_instalacao");
+  });
+
+  it("temIaDeSempre responde false para ia_propria sem BYOK", async () => {
+    podeServir.mockResolvedValueOnce(false);
+    expect(await temIaDeSempre(poolFake(llm, SEM_BYOK), cfg, "org-1")).toBe(false);
   });
 });

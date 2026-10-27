@@ -34,12 +34,21 @@
  * default.
  */
 import { allowlistedFetch, buildAllowlist } from "@/lib/agent-engine/edge/egress";
+import { costCents } from "@/lib/agent-engine/edge/llm/pricing";
 import { byteaToBuffer, decryptKey } from "@/lib/crypto/aes_gcm";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 import { baseDaApiDoJev, decidir, TETO_PADRAO_MS, type Pergunta, type ResultadoDaDecisao } from "./cliente";
-import { lerConfigDoJev, type IdDaTarefa } from "./config";
+import { type IdDaTarefa } from "./config";
+import { chaveDaPlataforma, configEfetivaDoJev, organizacaoElegivelAoJev } from "./elegibilidade";
+import {
+  abrirDisjuntorGlobal,
+  estadoDoDisjuntorGlobal,
+  fecharDisjuntorGlobal,
+  registrarUsoDaPlataforma,
+  tetoAtingido,
+} from "./plataforma";
 import { ORIGEM_PADRAO, provedorDaCredencial, type OrigemDoJev } from "./origem";
 import { estadoEfetivoDaTarefa, TAREFAS_DO_JEV, type TarefaDoJev } from "./tarefas";
 
@@ -86,15 +95,30 @@ export interface DependenciasDoPonto {
 export interface DestinoDaChave {
   chave: string;
   origem: OrigemDoJev;
+  /**
+   * `true` = a chave é a da PLATAFORMA (`JEV_PLATFORM_API_KEY`), e não uma que a
+   * empresa cadastrou. Ausente = a da empresa. Quem registra uso ou gasto
+   * (fatia 3) separa por aqui.
+   */
+  daPlataforma?: true;
+  /** A chamada é a tentativa da meia-abertura do disjuntor global: o resultado fecha ou reabre. */
+  sondaDoDisjuntor?: true;
 }
 
 /**
  * A chave do Jev DAQUELA organização, e a ORIGEM que a acompanha: a credencial
  * do provedor da origem (`provedorDaCredencial`) ativa e validada mais recente.
  * No caminho de sempre é a credencial `typesafe`; ligado via OpenRouter é a
- * credencial OpenRouter que a empresa já cadastrou. Nunca uma chave de ambiente
- * global — seria o contrário do BYOK, e uma instalação pagaria a conta de outra.
- * A mesma regra, sobre linhas já lidas, é `credencialEmUsoPeloJev`
+ * credencial OpenRouter que a empresa já cadastrou.
+ *
+ * Sem credencial própria, e SÓ na origem `typesafe`, vale a chave da PLATAFORMA
+ * (`JEV_PLATFORM_API_KEY`) para a empresa elegível (`./elegibilidade.ts`:
+ * assinatura viva num plano com IA). A chave da plataforma só existe numa
+ * instalação hospedada que a definiu; vazia, o recurso está desligado e o
+ * contrário do BYOK nunca acontece por acidente. Uma chave de ambiente jamais
+ * serve outra origem (a OpenRouter é a conta da empresa) nem empresa inelegível:
+ * uma instalação não paga a conta de quem não contratou IA.
+ * A mesma regra, sobre linhas já lidas, é `fonteDaChaveDoJev`
  * (`./credencial.ts`): mudar uma é mudar a outra.
  *
  * "Validada" é a convenção de todo leitor de chave do repo
@@ -133,7 +157,11 @@ export async function destinoDasTarefas(
       .eq("id", organizationId)
       .maybeSingle();
     if (orgErr) throw orgErr;
-    const config = lerConfigDoJev(org?.settings);
+    // Elegibilidade lida no máximo uma vez por chamada (o padrão e a chave da
+    // plataforma perguntam a mesma coisa).
+    let elegibilidade: Promise<boolean> | undefined;
+    const ehElegivel = () => (elegibilidade ??= organizacaoElegivelAoJev(admin, organizationId));
+    const config = await configEfetivaDoJev(org?.settings, ehElegivel);
     if (tarefas.some((t) => estadoEfetivoDaTarefa(config, t) === "desligada")) return null;
     const origem = config.origem;
 
@@ -148,7 +176,24 @@ export async function destinoDasTarefas(
       .limit(1)
       .maybeSingle();
     if (error) throw error;
-    if (!data) return null;
+    if (!data) {
+      // Sem chave própria. Só a origem TypeSafe, só empresa elegível, e só se a
+      // conta compartilhada está protegida (`./plataforma.ts`): teto do mês da
+      // empresa e disjuntor global. Qualquer trava fechada = null, a IA de
+      // sempre, sem erro e sem rede.
+      if (origem !== "typesafe") return null;
+      const daPlataforma = chaveDaPlataforma();
+      if (daPlataforma === null || !(await ehElegivel())) return null;
+      if (await tetoAtingido(admin, organizationId)) return null;
+      const disjuntor = await estadoDoDisjuntorGlobal(admin);
+      if (disjuntor === "aberto") return null;
+      return {
+        chave: daPlataforma,
+        origem,
+        daPlataforma: true,
+        ...(disjuntor === "tentativa" ? { sondaDoDisjuntor: true as const } : {}),
+      };
+    }
     return {
       chave: decryptKey({
         ciphertext: byteaToBuffer(data.api_key_encrypted),
@@ -174,7 +219,11 @@ export async function chaveDasTarefas(
   organizationId: string,
   tarefas: readonly TarefaDoJev[],
 ): Promise<string | null> {
-  return (await destinoDasTarefas(organizationId, tarefas))?.chave ?? null;
+  const destino = await destinoDasTarefas(organizationId, tarefas);
+  // A chave da PLATAFORMA nunca sai por aqui: quem pega só a string não passa por
+  // `decidirNoPonto`, que é onde o gasto entra no teto e o 401/402 abre o disjuntor
+  // global. Um chamador novo que precise dela usa `destinoDasTarefas` + `decidirNoPonto`.
+  return destino === null || destino.daPlataforma === true ? null : destino.chave;
 }
 
 /** A chave para a tarefa daquele ponto — `chaveDasTarefas` com ela só. */
@@ -272,7 +321,7 @@ export async function decidirNoPonto(
       { allowlist, fetchImpl: deps.fetchImpl, log: logger },
     );
 
-  return decidir(
+  const resultado = await decidir(
     {
       chave: destino.chave,
       estado: entrada.estado,
@@ -283,4 +332,57 @@ export async function decidirNoPonto(
     },
     { fetchImpl: fetchContido, baseUrl: base },
   );
+  return destino.daPlataforma === true
+    ? aposChamadaDaPlataforma(entrada.organizationId, destino, resultado)
+    : resultado;
+}
+
+/**
+ * O que acontece depois de uma chamada feita com a chave da PLATAFORMA: o gasto
+ * entra no teto da empresa, e a falha da CONTA da instalação (402 ou 401) abre o
+ * disjuntor global. Essa falha não é da empresa, que não tem conta na TypeSafe:
+ * ela volta como `disjuntor_aberto` (nada de "confira o saldo na sua conta", nem
+ * pedido de ação), e a IA de sempre assume calada. Nunca lança.
+ */
+async function aposChamadaDaPlataforma(
+  organizationId: string,
+  destino: DestinoDaChave,
+  resultado: ResultadoDaDecisao,
+): Promise<ResultadoDaDecisao> {
+  try {
+    const admin = createAdminClient();
+    if (resultado.ok) {
+      await registrarUsoDaPlataforma(
+        admin,
+        organizationId,
+        costCents(resultado.modelo, {
+          inputTokens: resultado.uso.tokensDeEntrada,
+          outputTokens: resultado.uso.tokensDeSaida,
+          cacheReadTokens: 0,
+          cacheWriteTokens: 0,
+        }),
+      );
+      if (destino.sondaDoDisjuntor) await fecharDisjuntorGlobal(admin);
+      return resultado;
+    }
+    // SÓ 401 e 402 são a conta da instalação. `cliente.ts` traduz também 403 para
+    // `credencial_invalida` e todo 4xx não documentado (404, 409, 413...) para
+    // `sem_credito`: se esses abrissem o global, uma mensagem de um contato
+    // derrubaria o Jev de todas as empresas por 15 minutos.
+    if (resultado.status === 401 || resultado.status === 402) {
+      await abrirDisjuntorGlobal(admin, resultado.status === 402 ? "sem_credito" : "credencial_invalida");
+      return { ok: false, motivo: "disjuntor_aberto", exigeAcao: false, defeitoNosso: false, status: null };
+    }
+    if (resultado.motivo === "sem_credito" || resultado.motivo === "credencial_invalida") {
+      // Outro 4xx com a chave da plataforma: a empresa não tem conta para conferir, e nada disso
+      // pede ação dela. Cai calada na IA de sempre, sem abrir o global.
+      return { ok: false, motivo: "provedor_indisponivel", exigeAcao: false, defeitoNosso: false, status: resultado.status };
+    }
+  } catch (erro) {
+    logger.warn("o pós-chamada do Jev da plataforma falhou", {
+      organizationId,
+      erro: erro instanceof Error ? erro.name : typeof erro,
+    });
+  }
+  return resultado;
 }

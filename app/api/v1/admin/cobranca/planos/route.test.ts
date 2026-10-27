@@ -58,6 +58,27 @@ describe("POST /api/v1/admin/cobranca/planos", () => {
     );
   });
 
+  it("ia_propria enviado chega ao insert; omitido, o insert não carrega o campo (default false do banco)", async () => {
+    expect((await POST(pedido({ ...CORPO, ia_propria: true }))).status).toBe(201);
+    expect(argumentos(h.banco.cadeias[0]!, "insert")?.[0]).toEqual({ ...CORPO, ia_propria: true, updated_by: h.ator });
+    expect(h.audit).toHaveBeenCalledWith(
+      expect.objectContaining({ metadata: expect.objectContaining({ ia_propria: true }) }),
+    );
+    expect((await POST(pedido(CORPO))).status).toBe(201);
+    const omitido = argumentos(h.banco.cadeias[1]!, "insert")?.[0] as Record<string, unknown>;
+    expect("ia_propria" in omitido).toBe(false);
+  });
+
+  it("ia_propria que não é booleano → 400, nada gravado", async () => {
+    expect((await POST(pedido({ ...CORPO, ia_propria: "sim" }))).status).toBe(400);
+    expect(h.banco.cadeias).toEqual([]);
+  });
+
+  it("devolve ia_propria na resposta", async () => {
+    resposta = { data: { ...PLANO, ia_propria: true } };
+    expect((await (await POST(pedido({ ...CORPO, ia_propria: true }))).json()).data.ia_propria).toBe(true);
+  });
+
   it("chave desligada → 404, e o banco nem é tocado", async () => {
     h.ligada = false;
     expect((await POST(pedido(CORPO))).status).toBe(404);

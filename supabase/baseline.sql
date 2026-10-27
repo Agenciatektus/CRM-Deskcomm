@@ -63136,6 +63136,193 @@ grant execute on function public.fn_marcar_limpeza_nativa(uuid, uuid, boolean)
 
 notify pgrst, 'reload schema';
 
+-- ---- Plano com IA propria (migration 9075) ----
+alter table public.cobranca_planos
+  add column if not exists ia_propria boolean not null default false;
+
+comment on column public.cobranca_planos.ia_propria is
+  'true = a empresa neste plano usa somente a credencial de IA cadastrada por ela; a chave de IA da instalacao nunca a serve. Migration 9075.';
+
+-- A instalacao pode servir IA a esta organizacao? Mesma leitura de fn_limite_do_plano:
+-- cobranca desligada ou organizacao sem assinatura = true (comportamento de sempre).
+-- Vale o plano_id vigente, nunca o agendado.
+create or replace function public.fn_org_pode_usar_ia_da_instalacao(p_org uuid)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.fn_cobranca_ligada() then
+    return true;
+  end if;
+  return not coalesce(
+    (select p.ia_propria
+       from public.cobranca_assinaturas a
+       join public.cobranca_planos p on p.id = a.plano_id
+      where a.organization_id = p_org),
+    false
+  );
+end;
+$$;
+
+revoke execute on function public.fn_org_pode_usar_ia_da_instalacao(uuid) from public, anon, authenticated;
+grant execute on function public.fn_org_pode_usar_ia_da_instalacao(uuid) to service_role;
+
+notify pgrst, 'reload schema';
+
+-- ---- Plano com IA incluida (migration 9076) ----
+alter table public.cobranca_planos
+  add column if not exists inclui_ia boolean not null default false;
+
+comment on column public.cobranca_planos.inclui_ia is
+  'true = a empresa neste plano recebe o Jev da plataforma (JEV_PLATFORM_API_KEY) sem cadastrar chave propria. Plano com ia_propria nunca recebe. Migration 9076.';
+
+-- O plano de R$ 397 com IA. Nao ha plano semeado em migration (os planos nascem pelo admin da cobranca):
+-- a marcacao e por preco, so em plano mensal vivo e que nao seja de IA propria. Idempotente: rodar de novo nao muda nada.
+update public.cobranca_planos
+   set inclui_ia = true
+ where preco_cents = 39700
+   and intervalo = 'mes'
+   and arquivado_em is null
+   and ia_propria = false
+   and inclui_ia = false;
+
+notify pgrst, 'reload schema';
+
+-- ---- Plano com IA incluida: corretiva (migration 9077) ----
+update public.cobranca_planos
+   set inclui_ia = false
+ where preco_cents = 39700
+   and moeda <> 'BRL'
+   and inclui_ia = true;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conname = 'cobranca_planos_ia_exclusivos'
+       and conrelid = 'public.cobranca_planos'::regclass
+  ) then
+    alter table public.cobranca_planos
+      add constraint cobranca_planos_ia_exclusivos check (not (inclui_ia and ia_propria)) not valid;
+  end if;
+end
+$$;
+
+notify pgrst, 'reload schema';
+
+-- ---- Gasto do Jev da plataforma (migration 9078) ----
+create table if not exists public.jev_plataforma_uso (
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  mes date not null,
+  custo_usd_cents numeric not null default 0 check (custo_usd_cents >= 0),
+  chamadas integer not null default 0 check (chamadas >= 0),
+  updated_at timestamptz not null default now(),
+  primary key (organization_id, mes)
+);
+
+comment on table public.jev_plataforma_uso is
+  'Gasto do Jev com a chave da PLATAFORMA (JEV_PLATFORM_API_KEY), por empresa e mes (UTC). Da INSTALACAO: RLS ligada sem policy, so service_role. Migration 9078.';
+
+alter table public.jev_plataforma_uso enable row level security;
+revoke all on public.jev_plataforma_uso from public, anon, authenticated;
+grant select, insert, update, delete on public.jev_plataforma_uso to service_role;
+
+create or replace function public.fn_jev_plataforma_registrar(p_org uuid, p_custo_cents numeric)
+returns numeric
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_total numeric;
+begin
+  insert into public.jev_plataforma_uso as u (organization_id, mes, custo_usd_cents, chamadas)
+  values (p_org, (date_trunc('month', now() at time zone 'utc'))::date, greatest(coalesce(p_custo_cents, 0), 0), 1)
+  on conflict (organization_id, mes) do update
+    set custo_usd_cents = u.custo_usd_cents + excluded.custo_usd_cents,
+        chamadas = u.chamadas + 1,
+        updated_at = now()
+  returning u.custo_usd_cents into v_total;
+  return v_total;
+end;
+$$;
+
+revoke execute on function public.fn_jev_plataforma_registrar(uuid, numeric) from public, anon, authenticated;
+grant execute on function public.fn_jev_plataforma_registrar(uuid, numeric) to service_role;
+
+notify pgrst, 'reload schema';
+
+-- ---- Filtros salvos do Inbox (migration 9079) ----
+create table if not exists public.inbox_filtros_salvos (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  nome text not null,
+  filtros jsonb not null,
+  created_at timestamptz not null default now(),
+  constraint inbox_filtros_salvos_nome_tam check (char_length(nome) between 1 and 40),
+  constraint inbox_filtros_salvos_filtros_obj check (jsonb_typeof(filtros) = 'object' and pg_column_size(filtros) <= 4096)
+);
+
+create unique index if not exists inbox_filtros_salvos_nome_uq
+  on public.inbox_filtros_salvos (organization_id, user_id, lower(nome));
+
+comment on table public.inbox_filtros_salvos is
+  'Filtros nomeados do Inbox, por usuario e organizacao (vale em qualquer aparelho). Maximo 20 por usuario (trigger). A forma de filtros e validada por zod na rota. Sem update: renomear = apagar e criar. Migration 9079.';
+
+create or replace function public.fn_inbox_filtros_salvos_limite()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  -- Serializa os inserts do mesmo usuario: sem o lock, dois pedidos juntos passam do teto.
+  perform pg_advisory_xact_lock(hashtextextended('inbox_filtros_salvos:' || new.user_id::text, 0));
+  if (select count(*) from public.inbox_filtros_salvos
+       where organization_id = new.organization_id and user_id = new.user_id) >= 20 then
+    raise exception 'limite de 20 filtros salvos por usuario' using errcode = 'FS020';
+  end if;
+  return new;
+end
+$$;
+
+revoke execute on function public.fn_inbox_filtros_salvos_limite() from public, anon;
+
+drop trigger if exists trg_inbox_filtros_salvos_limite on public.inbox_filtros_salvos;
+create trigger trg_inbox_filtros_salvos_limite
+  before insert on public.inbox_filtros_salvos
+  for each row execute function public.fn_inbox_filtros_salvos_limite();
+
+alter table public.inbox_filtros_salvos enable row level security;
+
+revoke all on public.inbox_filtros_salvos from anon, authenticated;
+grant select, insert, delete on public.inbox_filtros_salvos to authenticated;
+grant select, insert, update, delete on public.inbox_filtros_salvos to service_role;
+
+drop policy if exists "inbox_filtros_salvos_select" on public.inbox_filtros_salvos;
+create policy "inbox_filtros_salvos_select" on public.inbox_filtros_salvos
+  for select to authenticated
+  using (user_id = (select auth.uid()) and organization_id in (select public.fn_user_org_ids()));
+
+drop policy if exists "inbox_filtros_salvos_insert" on public.inbox_filtros_salvos;
+create policy "inbox_filtros_salvos_insert" on public.inbox_filtros_salvos
+  for insert to authenticated
+  with check (user_id = (select auth.uid()) and organization_id in (select public.fn_user_org_ids()));
+
+drop policy if exists "inbox_filtros_salvos_delete" on public.inbox_filtros_salvos;
+create policy "inbox_filtros_salvos_delete" on public.inbox_filtros_salvos
+  for delete to authenticated
+  using (user_id = (select auth.uid()) and organization_id in (select public.fn_user_org_ids()));
+
+create or replace trigger trg_organizacao_nao_muda before update of organization_id on public.inbox_filtros_salvos
+  for each row execute function public.fn_organizacao_da_linha_nao_muda();
+
+notify pgrst, 'reload schema';
+
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria

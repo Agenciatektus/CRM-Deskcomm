@@ -218,6 +218,10 @@ import { esquecerDestinosInternos } from "@/lib/automation/destinos-internos-aut
 import { deriveMediaText, type DeriveDeps } from "@/lib/messaging/media/derive";
 import type { Env } from "@/lib/env";
 
+// Fora do assunto deste teste: a instalação serve a org (sem plano com IA própria).
+vi.mock("@/lib/cobranca/ia-propria", async (orig) =>
+  (await import("@/tests/helpers/ia-propria-instalacao-serve")).instalacaoServeAOrg(await orig()));
+
 function eventRow(attempts = 0) {
   return {
     id: "ev1",

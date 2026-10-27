@@ -4465,6 +4465,8 @@ export type Database = {
         Row: {
           arquivado_em: string | null
           created_at: string
+          ia_propria: boolean
+          inclui_ia: boolean
           id: string
           intervalo: string
           max_assentos: number | null
@@ -4482,6 +4484,8 @@ export type Database = {
         Insert: {
           arquivado_em?: string | null
           created_at?: string
+          ia_propria?: boolean
+          inclui_ia?: boolean
           id?: string
           intervalo: string
           max_assentos?: number | null
@@ -4499,6 +4503,8 @@ export type Database = {
         Update: {
           arquivado_em?: string | null
           created_at?: string
+          ia_propria?: boolean
+          inclui_ia?: boolean
           id?: string
           intervalo?: string
           max_assentos?: number | null

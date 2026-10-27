@@ -142,3 +142,26 @@ describe("P2-1: vídeo propaga o erro da transcrição quando o worker pede", ()
     await expect(deriveVideoText(Buffer.from("v"), { transcriber, describeImage, runFfmpeg })).resolves.not.toThrow();
   });
 });
+
+describe("plano com IA própria: o serviço da instalação não ouve (migration 9075)", () => {
+  it("CONTROLE NEGATIVO: ia_propria sem chave própria e com serviço no env -> nada, com a mensagem de IA própria", async () => {
+    const d = await decidirTranscricao({
+      conversa: { provider: "openai", apiKey: "k", modelId: "gpt-5", credencialPropria: false },
+      chaveOpenai: async () => null,
+      instalacaoServe: async () => false,
+    });
+    expect(d.origem).toBe("nada");
+    expect(d.transcriber).toBeNull();
+    expect(d.motivo).toContain("IA própria");
+  });
+
+  it("ia_propria COM chave OpenAI própria continua transcrevendo", async () => {
+    const d = await decidirTranscricao({ chaveOpenai: openai, instalacaoServe: async () => false });
+    expect(d.origem).toBe("padrao_openai_compativel");
+  });
+
+  it("NÃO-REGRESSÃO: sem plano (instalação serve) -> serviço da instalação como hoje", async () => {
+    const d = await decidirTranscricao({ chaveOpenai: async () => null, instalacaoServe: async () => true });
+    expect(d.origem).toBe("servico_da_instalacao");
+  });
+});

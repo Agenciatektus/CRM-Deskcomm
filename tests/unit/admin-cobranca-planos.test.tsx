@@ -16,7 +16,7 @@ import { PlanosDaInstalacao, type PlanoDaTela } from "@/app/admin/(protected)/co
 
 const PLANO: PlanoDaTela = {
   id: "cccccccc-0000-4000-8000-000000000001", nome: "Básico", preco_cents: 4990, intervalo: "mes", trial_dias: 14,
-  max_assentos: 3, max_canais: null, teto_ia_usd_cents: null, padrao_no_cadastro: false, oferecido_ao_cliente: true, arquivado_em: null,
+  max_assentos: 3, max_canais: null, teto_ia_usd_cents: null, padrao_no_cadastro: false, oferecido_ao_cliente: true, ia_propria: false, inclui_ia: false, arquivado_em: null,
 };
 
 beforeEach(() => {
@@ -43,7 +43,7 @@ describe("Planos da instalação", () => {
     await waitFor(() => expect(h.post).toHaveBeenCalledTimes(1));
     expect(h.post).toHaveBeenCalledWith("/api/v1/admin/cobranca/planos", {
       nome: "Pro", preco_cents: 9990, intervalo: "mes", trial_dias: 7,
-      max_assentos: 5, max_canais: null, teto_ia_usd_cents: null,
+      max_assentos: 5, max_canais: null, teto_ia_usd_cents: null, ia_propria: false, inclui_ia: false,
     });
     expect(h.refresh).toHaveBeenCalled();
   });
@@ -87,5 +87,26 @@ describe("Planos da instalação", () => {
     rerender(<PlanosDaInstalacao planos={[{ ...PLANO, oferecido_ao_cliente: false }]} />);
     expect(screen.getByText("Só você atribui")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Mostrar às empresas" })).toBeTruthy();
+  });
+
+  it("marcar IA própria no formulário chega ao POST", async () => {
+    const u = userEvent.setup();
+    render(<PlanosDaInstalacao planos={[]} />);
+    await preencher(u, "99,90");
+    await u.click(screen.getByLabelText("IA própria"));
+    await u.click(screen.getByRole("button", { name: "Salvar plano" }));
+    await waitFor(() => expect(h.post).toHaveBeenCalledTimes(1));
+    expect(h.post.mock.calls[0]![1]).toMatchObject({ ia_propria: true });
+  });
+
+  it("editar um plano com IA própria carrega o checkbox marcado e o selo na listagem", async () => {
+    const u = userEvent.setup();
+    render(<PlanosDaInstalacao planos={[{ ...PLANO, ia_propria: true }]} />);
+    expect(screen.getAllByText("IA própria").length).toBe(2);
+    await u.click(screen.getByRole("button", { name: "Editar" }));
+    expect((screen.getByLabelText("IA própria") as HTMLInputElement).checked).toBe(true);
+    await u.click(screen.getByRole("button", { name: "Salvar alterações" }));
+    await waitFor(() => expect(h.patch).toHaveBeenCalledTimes(1));
+    expect(h.patch.mock.calls[0]![1]).toMatchObject({ ia_propria: true });
   });
 });

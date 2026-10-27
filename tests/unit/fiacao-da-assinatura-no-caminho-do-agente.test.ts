@@ -58,6 +58,10 @@ import { bufToBytea, encryptKey } from "@/lib/crypto/aes_gcm";
 
 import { FakeSupabase } from "./helpers/fake-ai-credentials";
 
+// Fora do assunto deste teste: a instalação serve a org (sem plano com IA própria).
+vi.mock("@/lib/cobranca/ia-propria", async (orig) =>
+  (await import("@/tests/helpers/ia-propria-instalacao-serve")).instalacaoServeAOrg(await orig()));
+
 const estado = vi.hoisted(() => ({ fake: null as unknown, modulo: true }));
 
 const ORG = "11111111-1111-4111-8111-111111111111";

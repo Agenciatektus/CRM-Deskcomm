@@ -42,16 +42,17 @@ import { getRequestPool } from "@/lib/agent-engine/db/request-pool";
 import { llmEdgeConfigFromEnv, temIaDeSempre } from "@/lib/agent-engine/edge/llm/credentials";
 import { camadasEfetivas } from "@/lib/agent-engine/guardrails/camadas-da-org";
 import { haQuemAtendaAOrganizacao } from "@/lib/ai/agents/quem-atende-a-sessao";
-import { credencialEmUsoPeloJev, PROVEDOR_DO_JEV } from "@/lib/ai/decisao/credencial";
+import { credencialEmUsoPeloJev, fonteDaChaveDoJev, PROVEDOR_DO_JEV } from "@/lib/ai/decisao/credencial";
 import {
+  ehConfigDoPadrao,
   ESTADO_DO_MODO,
   ESTADOS_DA_TAREFA,
   gravarConfigDoJev,
   idDaTarefaSchema,
-  lerConfigDoJev,
   type ConfigDoJev,
   type MudancaDaConfig,
 } from "@/lib/ai/decisao/config";
+import { configEfetivaDoJev, organizacaoElegivelAoJev, plataformaServeOJev, plataformaTemJev } from "@/lib/ai/decisao/elegibilidade";
 import { CHAVES_DO_CLIMA, type MotorDoClima } from "@/lib/ai/decisao/metadados-do-clima";
 import {
   ORIGENS_DO_JEV,
@@ -317,7 +318,16 @@ function irritadosPercebidos(
 }
 
 function configPublica(c: ConfigDoJev) {
-  return { ligado: c.ligado, modo: c.modo, modo_roteador: c.modo_roteador, aceite: c.aceite };
+  // O aceite sintético do padrão da plataforma (`ehConfigDoPadrao`) NUNCA sai:
+  // a resposta diria que alguém aceitou, e ninguém aceitou. A tela lê `no_padrao`.
+  const noPadrao = ehConfigDoPadrao(c);
+  return {
+    ligado: c.ligado,
+    modo: c.modo,
+    modo_roteador: c.modo_roteador,
+    aceite: noPadrao ? null : c.aceite,
+    no_padrao: noPadrao,
+  };
 }
 
 /**
@@ -558,7 +568,11 @@ export async function GET(): Promise<Response> {
     versoesEmCursoRes.error?.message;
   if (erro) return fail("query_failed", erro, 500, { requestId });
 
-  const config = lerConfigDoJev(orgRes.data?.settings);
+  // A config que VALE (empresa no padrão da plataforma aparece LIGADA ao cliente).
+  const adminDoGet = createAdminClient();
+  const config = await configEfetivaDoJev(orgRes.data?.settings, () =>
+    organizacaoElegivelAoJev(adminDoGet, org.orgId),
+  );
   const { numeros, ultima_falha } = numerosDaSemana(semana.linhas);
   // A ORIGEM é a primeira coisa que se resolve: ela escolhe qual credencial é
   // "a chave do Jev" e qual bloco de provedor o cartão mostra.
@@ -576,6 +590,13 @@ export async function GET(): Promise<Response> {
   // oferece REAPROVEITAR em vez de exigir uma chave TypeSafe separada (issue
   // #2947). Vale mesmo com a origem de hoje sendo a TypeSafe — é justamente o
   // convite para trocar sem cadastrar nada.
+  // De quem é a chave: própria > plataforma > nenhuma. A tela só recebe o rótulo e
+  // o booleano `plataforma_tem_jev`, nunca a chave.
+  const fonteDaChave = fonteDaChaveDoJev(
+    doProvedorDaOrigem,
+    origem,
+    emUso === null && origem === "typesafe" ? await plataformaServeOJev(adminDoGet, org.orgId) : false,
+  );
   const credencialOpenRouter = credencialEmUsoPeloJev(
     credenciais.filter((c) => c.provider === provedorDaCredencial("openrouter")),
     "openrouter",
@@ -608,12 +629,17 @@ export async function GET(): Promise<Response> {
         rotulo: credencialOpenRouter?.label ?? null,
       },
       chave: {
-        existe: mostrada !== null,
-        validada: emUso !== null,
+        existe: mostrada !== null || fonteDaChave?.tipo === "plataforma",
+        // A plataforma servindo conta como chave pronta: o cartão deixa ligar.
+        validada: fonteDaChave !== null,
+        fonte_da_chave: fonteDaChave?.tipo ?? "nenhuma",
         credencial_id: mostrada?.id ?? null,
         rotulo: mostrada?.label ?? null,
+        // O erro da chave PRÓPRIA aparece mesmo com a plataforma servindo:
+        // `validada` fica true por causa dela, e o erro não pode sumir junto.
         erro_de_validacao: mostrada?.validation_error ?? null,
       },
+      plataforma_tem_jev: plataformaTemJev(),
       config: configPublica(config),
       tarefas: TAREFAS,
       por_tarefa: porTarefa(
@@ -707,7 +733,14 @@ export async function PATCH(req: NextRequest): Promise<Response> {
     .eq("id", org.orgId)
     .maybeSingle();
   if (orgErr) return fail("query_failed", orgErr.message, 500, { requestId });
-  const atual = lerConfigDoJev(orgAtual?.settings);
+  // A config que VALE (não só a gravada): empresa elegível, sem nada gravado e
+  // `JEV_LIGADO_POR_PADRAO` virada já está ligada e decidindo.
+  const atual = await configEfetivaDoJev(orgAtual?.settings, () => organizacaoElegivelAoJev(admin, org.orgId));
+  const noPadrao = ehConfigDoPadrao(atual);
+  // A plataforma serve a chave do Jev a esta empresa? Lido uma vez, só se um
+  // portão abaixo precisar.
+  let plataformaServe: Promise<boolean> | undefined;
+  const serveAPlataforma = () => (plataformaServe ??= plataformaServeOJev(admin, org.orgId));
 
   const mudanca: MudancaDaConfig = {};
   if (corpo.origem !== undefined && corpo.origem !== atual.origem) {
@@ -725,7 +758,7 @@ export async function PATCH(req: NextRequest): Promise<Response> {
       .eq("provider", provedorDaCredencial(corpo.origem))
       .eq("is_active", true);
     if (credsErr) return fail("query_failed", credsErr.message, 500, { requestId });
-    if (credencialEmUsoPeloJev(creds ?? [], corpo.origem) === null) {
+    if (fonteDaChaveDoJev(creds ?? [], corpo.origem, await serveAPlataforma()) === null) {
       return fail(
         "jev_exige_chave_validada",
         corpo.origem === "openrouter"
@@ -792,7 +825,7 @@ export async function PATCH(req: NextRequest): Promise<Response> {
       .eq("provider", provedorDaCredencial(atual.origem))
       .eq("is_active", true);
     if (credsErr) return fail("query_failed", credsErr.message, 500, { requestId });
-    if (credencialEmUsoPeloJev(creds ?? [], atual.origem) === null) {
+    if (fonteDaChaveDoJev(creds ?? [], atual.origem, await serveAPlataforma()) === null) {
       return fail(
         "jev_exige_chave_validada",
         t("Para ligar o Jev, cole a chave dele em Credenciais e espere o teste da chave passar."),
@@ -818,12 +851,46 @@ export async function PATCH(req: NextRequest): Promise<Response> {
     mudanca.ligado = true;
   }
 
+  // A empresa está no padrão da plataforma (aceite sintético, nunca gravado).
+  // Desligar grava o desligado, sem aceite nenhum. Qualquer outra mudança é a
+  // empresa assumindo o Jev: ela dá o aceite de verdade, como ao ligar.
+  if (noPadrao && Object.keys(mudanca).length > 0) {
+    if (mudanca.ligado === false) {
+      // Estado SEGURO ao desligar: sem aceite, tarefas observando e roteador em
+      // comparação. Sem isto, o `base` (decidindo/sob_demanda) seria gravado, e
+      // religar com aceite real já entraria decidindo, sem a empresa ter escolhido.
+      mudanca.aceite = null;
+      mudanca.modo = "observacao";
+      mudanca.modo_roteador = "comparacao";
+      mudanca.tarefas = Object.fromEntries(
+        idDaTarefaSchema.options.map((id) => [id, "observando" as const]),
+      );
+    } else if (corpo.aceite_lgpd !== true) {
+      return fail(
+        "jev_exige_aceite",
+        t(
+          "Ligar o Jev manda cada mensagem dos clientes, uma de cada vez e sem o resto da conversa, para a TypeSafe AI, nos Estados Unidos. Para ligar, confirme que você está de acordo.",
+        ),
+        422,
+        { requestId },
+      );
+    } else {
+      mudanca.aceite = { em: new Date().toISOString(), por: user.id, alcance: "mensagem" };
+    }
+  }
+
   // Pedir o estado que já vale não é mutação: sem escrita e sem auditoria.
   if (Object.keys(mudanca).length === 0) {
     return ok({ config: configPublica(atual), alterado: false }, { requestId });
   }
 
-  const gravado = await gravarConfigDoJev({ admin, orgId: org.orgId, actorUserId: user.id, mudanca });
+  const gravado = await gravarConfigDoJev({
+    admin,
+    orgId: org.orgId,
+    actorUserId: user.id,
+    mudanca,
+    ...(noPadrao ? { base: atual } : {}),
+  });
   if (!gravado.ok) {
     return fail("save_failed", t("nada foi gravado — verifique as permissões da organização"), 500, {
       requestId,

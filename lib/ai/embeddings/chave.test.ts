@@ -7,6 +7,8 @@ const state = vi.hoisted(() => ({
   versions: [] as Array<Record<string, unknown>>,
   /** Tabelas cuja leitura devolve `error` — o supabase-js não lança. */
   falhas: new Set<string>(),
+  /** Resposta de fn_org_pode_usar_ia_da_instalacao; `chamadas` conta as consultas. */
+  rpc: { data: true as unknown, error: null as { message: string } | null, chamadas: 0 },
   env: {
     AI_GATEWAY_API_KEY: "",
     AI_GATEWAY_BASE_URL: "",
@@ -31,6 +33,10 @@ vi.mock("@/lib/crypto/aes_gcm", () => ({
 }));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
+    rpc: async () => {
+      state.rpc.chamadas += 1;
+      return { data: state.rpc.data, error: state.rpc.error };
+    },
     from: (table: string) => {
       const rows =
         {
@@ -95,6 +101,9 @@ beforeEach(() => {
   state.organizations = [];
   state.versions = [];
   state.falhas = new Set();
+  state.rpc.data = true;
+  state.rpc.error = null;
+  state.rpc.chamadas = 0;
   state.env.AI_GATEWAY_API_KEY = "";
   state.env.OPENAI_API_KEY = "";
   state.env.OPENROUTER_API_KEY = "";
@@ -427,5 +436,46 @@ describe("a família da base não muda porque uma credencial apareceu ou sumiu",
     state.falhas.add("organizations");
 
     expect(await temChaveDeEmbedding("org-1")).toBe(true);
+  });
+});
+
+describe("resolverChaveDeEmbedding em plano com IA própria", () => {
+  function todasAsChavesDeEnv() {
+    state.env.AI_GATEWAY_API_KEY = "gw-ficticia";
+    state.env.OPENAI_API_KEY = "chave-ficticia-env-openai";
+    state.env.OPENROUTER_API_KEY = "chave-ficticia-env-openrouter";
+  }
+
+  it("controle negativo: rpc false + env presente + sem chave da org -> null", async () => {
+    todasAsChavesDeEnv();
+    state.rpc.data = false;
+
+    expect(await resolverChaveDeEmbedding("org-1")).toBeNull();
+    expect(await resolverChaveDeEmbedding("org-1", "embedding_consultar", { familia: "openai" })).toBeNull();
+    expect(state.rpc.chamadas).toBeGreaterThan(0);
+  });
+
+  it("rpc true usa o env como hoje", async () => {
+    state.env.OPENAI_API_KEY = "chave-ficticia-env-openai";
+
+    expect(await resolverChaveDeEmbedding("org-1")).toMatchObject({ apiKey: "chave-ficticia-env-openai" });
+  });
+
+  it("rpc com erro nega (fail-closed)", async () => {
+    todasAsChavesDeEnv();
+    state.rpc.error = { message: "rpc caiu" };
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(await resolverChaveDeEmbedding("org-1")).toBeNull();
+    log.mockRestore();
+  });
+
+  it("chave da org presente: usa a da org e nao consulta o rpc", async () => {
+    todasAsChavesDeEnv();
+    state.rpc.data = false;
+    state.credentials = [credential({ provider: "openai", api_key_encrypted: "chave-ficticia-da-org" })];
+
+    expect(await resolverChaveDeEmbedding("org-1")).toMatchObject({ apiKey: "chave-ficticia-da-org" });
+    expect(state.rpc.chamadas).toBe(0);
   });
 });

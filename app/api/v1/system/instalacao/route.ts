@@ -22,6 +22,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { listSelectableChannels } from "@/lib/channels/selectable";
 import { lerRetratoDaInstalacao } from "@/lib/instalacao/retrato";
+import { instalacaoPodeServirIaViaRpc, MENSAGEM_IA_PROPRIA_SEM_CREDENCIAL } from "@/lib/cobranca/ia-propria";
 import { provarSaldo } from "@/lib/instalacao/prova-de-credito";
 import { loadCredential, CredentialUnavailableError } from "@/lib/ai/credentials";
 
@@ -55,6 +56,7 @@ export async function GET(req: NextRequest) {
     supabase,
     orgId: org.orgId,
     contarCanais: () => contarCanaisDaOrg(org.orgId),
+    instalacaoPodeServirIa: () => instalacaoPodeServirIaViaRpc(createAdminClient(), org.orgId),
   });
 
   const querProvar = req.nextUrl.searchParams.get("provar") === "1";
@@ -67,7 +69,7 @@ export async function GET(req: NextRequest) {
   const authzProva = await requireRole("admin", { resource: "system_instalacao_provar" });
   if (!authzProva.ok) return authzProva.response;
 
-  const { origemDaChave, modeloCurado, provedor, chaveEmVerificacao } = retrato.inteligencia;
+  const { origemDaChave, modeloCurado, provedor, chaveEmVerificacao, iaPropria } = retrato.inteligencia;
   if (origemDaChave === "nenhuma" || !modeloCurado) {
     // "Ainda conferindo" e "não tem" pedem frases OPOSTAS: a primeira é esperar,
     // a segunda é cadastrar. A validação da chave roda em segundo plano, então
@@ -81,7 +83,9 @@ export async function GET(req: NextRequest) {
         motivo: aindaVerificando
           ? "A chave acabou de ser cadastrada e ainda está sendo conferida."
           : origemDaChave === "nenhuma"
-            ? "Não há chave para testar."
+            ? iaPropria
+              ? MENSAGEM_IA_PROPRIA_SEM_CREDENCIAL
+              : "Não há chave para testar."
             : "Não há modelo desta empresa de IA nesta instalação ainda.",
       },
     });
@@ -116,6 +120,10 @@ export async function GET(req: NextRequest) {
             : { feita: false, motivo: "Não consegui abrir a chave cadastrada para testá-la." },
       });
     }
+  } else if (iaPropria) {
+    // Defesa em profundidade: com `origemDaChave` != "nenhuma" e sem credencial
+    // da org, a chave da instalação nunca é lida em plano com IA própria.
+    apiKey = "";
   } else {
     apiKey = process.env[chaveDoAmbiente(provedor)] ?? "";
   }

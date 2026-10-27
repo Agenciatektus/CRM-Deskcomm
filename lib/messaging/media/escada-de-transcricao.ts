@@ -55,6 +55,7 @@ import { generateText } from "ai";
 
 import { transcreveAudio } from "@/lib/agent-engine/edge/llm/capabilities";
 import { createDefaultRegistry } from "@/lib/agent-engine/edge/llm/providers";
+import { MENSAGEM_IA_PROPRIA_SEM_CREDENCIAL } from "@/lib/cobranca/ia-propria";
 import { env } from "@/lib/env";
 
 import type { TranscriptionProvider } from "@/lib/messaging/media/transcription";
@@ -103,6 +104,8 @@ export const MOTIVOS_DA_TRANSCRICAO = {
   modeloSemAudio:
     "o modelo de conversa da organização não declara a capacidade audio, e não há chave OpenAI para o serviço de transcrição",
   ninguem: "não há chave OpenAI nem modelo de conversa com capacidade audio nesta organização",
+  // Plano com IA própria: a chave da instalação não serve esta empresa.
+  iaPropria: MENSAGEM_IA_PROPRIA_SEM_CREDENCIAL,
 } as const;
 
 /** O modelo de CONVERSA da organização, já resolvido pelo worker. */
@@ -257,6 +260,12 @@ export async function decidirTranscricao(
     conversa?: ConversaDaOrganizacao | null;
     idiomas?: readonly string[];
     chaveOpenai?: () => Promise<string | null>;
+    /**
+     * Thunk: a chave da INSTALAÇÃO pode servir esta organização? `false` (plano
+     * com IA própria, ou leitura que falhou) pula o degrau C. Ausente = serve,
+     * como antes (chamadas sem organização).
+     */
+    instalacaoServe?: () => Promise<boolean>;
   },
   de = 0,
 ): Promise<DecisaoDeTranscricao> {
@@ -286,6 +295,11 @@ export async function decidirTranscricao(
     anuncio: { provider: conversa!.provider, modelId: conversa!.modelId! },
   });
 
+  // Memoizado: a pergunta vai ao banco no máximo uma vez por decisão.
+  let servePromessa: Promise<boolean> | null = null;
+  const instalacaoServe = (): Promise<boolean> =>
+    (servePromessa ??= entrada.instalacaoServe ? entrada.instalacaoServe() : Promise.resolve(true));
+
   const degraus: Array<() => Promise<DecisaoDeTranscricao | null>> = [
     // A · assinatura/chave PRÓPRIA da organização, no modelo de conversa.
     async () =>
@@ -313,6 +327,8 @@ export async function decidirTranscricao(
     async () => {
       const servico = env.TRANSCRIPTION_API_KEY;
       if (!servico) return null;
+      // Plano com IA própria: o serviço da instalação NUNCA ouve esta empresa.
+      if (entrada.instalacaoServe && !(await instalacaoServe())) return null;
       // Com a chave do serviço na mão, `modeloDeTranscricaoEmVigor` devolve
       // exatamente o modelo que o transcriber abaixo vai mandar.
       const modelo = modeloDeTranscricaoEmVigor({
@@ -348,7 +364,10 @@ export async function decidirTranscricao(
   }
 
   // D · Nada — e o motivo é do caso, não um "deu erro" genérico.
-  const motivo = !conversa
+  const iaPropriaBloqueou = !!env.TRANSCRIPTION_API_KEY && !!entrada.instalacaoServe && !(await instalacaoServe());
+  const motivo = iaPropriaBloqueou
+    ? MOTIVOS_DA_TRANSCRICAO.iaPropria
+    : !conversa
     ? MOTIVOS_DA_TRANSCRICAO.semModeloDeConversa
     : conversa.modelId && !transcreveAudio(conversa.provider, conversa.modelId)
       ? MOTIVOS_DA_TRANSCRICAO.modeloSemAudio

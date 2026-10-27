@@ -201,6 +201,10 @@ import { generateText } from "ai";
 import { MAX_TOKENS_DA_DESCRICAO_DE_IMAGEM } from "@/lib/messaging/media/imagem-para-ia";
 import { MAX_TOKENS_DA_TRANSCRICAO_PELO_MODELO } from "@/lib/messaging/media/escada-de-transcricao";
 
+// Fora do assunto deste teste: a instalação serve a org (sem plano com IA própria).
+vi.mock("@/lib/cobranca/ia-propria", async (orig) =>
+  (await import("@/tests/helpers/ia-propria-instalacao-serve")).instalacaoServeAOrg(await orig()));
+
 function eventRow(org = "org1") {
   return {
     id: "ev1",
