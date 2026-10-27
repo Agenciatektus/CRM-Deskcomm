@@ -6,6 +6,11 @@ import { seedGov, GOV_ADMIN } from "./gov-helpers";
 vi.mock("@/lib/audit", () => ({ audit: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/lib/ai/runtime/agent", () => ({
   chaveDePlataforma: (provider: string) => (provider === "openai" ? "test-key-never-sent" : null),
+  // Org sem plano com IA própria (9075): a chave da instalação segue valendo.
+  chaveDaInstalacaoParaOrg: async (_org: string, provider: string) => ({
+    apiKey: provider === "openai" ? "test-key-never-sent" : null,
+    bloqueada: false,
+  }),
 }));
 import { setupProspectingAgent } from "@/lib/prospecting/agent-setup";
 import { prospectingAgentSetupSchema } from "@/lib/prospecting/agent-setup-schema";
