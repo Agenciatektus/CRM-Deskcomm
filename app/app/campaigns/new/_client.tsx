@@ -34,6 +34,14 @@ import { useConfiguracaoDeCampanhas } from "@/hooks/campanhas/useConfiguracao";
 import { channelLabel, useChannelSessions } from "@/hooks/channels/useChannelSessions";
 import { useT } from "@/hooks/i18n/useT";
 import type { SaidasDaCadencia } from "@/lib/cadencia/saidas";
+import {
+  COMPRA_VAZIA,
+  CamposDeCompraDoFiltro,
+  compraDoFiltro,
+  criteriosDeCompra,
+  excluirDoFiltro,
+  temCriterioDeCompra,
+} from "../_campos-de-compra";
 import { ritmoDaCampanhaNova } from "@/lib/campanhas/ritmo-recomendado";
 import { minutosParaSegundos, segundosParaMinutos } from "@/lib/campanhas/unidades";
 import type { PassoDaRegua } from "@/lib/regua/timeline";
@@ -57,6 +65,8 @@ export function NovaCampanha() {
   const [comAlgumaTag, setComAlgumaTag] = useState("");
   const [semTags, setSemTags] = useState("");
   const [semInteracao, setSemInteracao] = useState("");
+  const [compra, setCompra] = useState(COMPRA_VAZIA);
+  const [excluirCompra, setExcluirCompra] = useState(COMPRA_VAZIA);
   const [limite, setLimite] = useState("100");
   // `variantes[0]` é o `message_body`; as demais são as EXTRAS (migration 9034).
   const [variantes, setVariantes] = useState<string[]>([""]);
@@ -162,9 +172,11 @@ export function NovaCampanha() {
       sem_interacao_ha_dias: semInteracao ? Number(semInteracao) : null,
       funis: funilDoPublico ? [funilDoPublico] : [],
       etapas: etapaDoPublico ? [etapaDoPublico] : [],
+      ...criteriosDeCompra(compra),
+      excluir: excluirDoFiltro(excluirCompra),
       limite: Number(limite) || 100,
     }),
-    [comAlgumaTag, semTags, semInteracao, funilDoPublico, etapaDoPublico, limite],
+    [comAlgumaTag, semTags, semInteracao, funilDoPublico, etapaDoPublico, compra, excluirCompra, limite],
   );
 
   const temCriterio =
@@ -172,7 +184,8 @@ export function NovaCampanha() {
     filtro.sem_tags.length > 0 ||
     filtro.funis.length > 0 ||
     filtro.etapas.length > 0 ||
-    filtro.sem_interacao_ha_dias !== null;
+    filtro.sem_interacao_ha_dias !== null ||
+    temCriterioDeCompra(criteriosDeCompra(compra));
 
   const podeSalvar =
     nome.trim() !== "" &&
@@ -376,6 +389,13 @@ export function NovaCampanha() {
               onChange={(e) => setSemInteracao(e.target.value)}
             />
           </div>
+          <CamposDeCompraDoFiltro
+            prefixo="silencio-compra"
+            compra={compra}
+            onCompra={setCompra}
+            excluir={excluirCompra}
+            onExcluir={setExcluirCompra}
+          />
           <div className="space-y-2">
             <Label htmlFor="pub-funil">{t("Com negócio no funil")}</Label>
             <Escolha
