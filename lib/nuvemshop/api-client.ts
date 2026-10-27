@@ -155,6 +155,20 @@ export class NuvemshopApiClient {
     return this.delete(`/webhooks/${id}`);
   }
 
+  /** Pedido por id (`aggregates=fulfillment_orders` traz o rastreio). 404 vira null. */
+  async getOrder(
+    id: string,
+    opts?: { aggregates?: string },
+  ): Promise<Record<string, unknown> | null> {
+    const qs = opts?.aggregates ? `?aggregates=${encodeURIComponent(opts.aggregates)}` : "";
+    try {
+      return await this.get<Record<string, unknown>>(`/orders/${encodeURIComponent(id)}${qs}`, 2);
+    } catch (err) {
+      if (err instanceof NuvemshopApiError && err.status === 404) return null;
+      throw err;
+    }
+  }
+
   /** Busca ao vivo (nome, tags e SKU). Sem resultado a API responde 404, não lista vazia. */
   async buscarProdutos(termo: string, limite: number): Promise<unknown[]> {
     try {
