@@ -25,7 +25,7 @@ const previa = vi.hoisted(() => ({
   },
 }));
 
-const CAMPANHA = {
+const CAMPANHA: Record<string, unknown> = {
   id: "c1",
   name: "Reativação de clientes parados",
   status: "draft",
@@ -74,5 +74,30 @@ describe("prévia da edição de campanha: o aviso do teto de 20.000", () => {
     render(<EditarCampanha id="c1" />);
     expect(await screen.findByDisplayValue("Reativação de clientes parados")).toBeInTheDocument();
     expect(screen.queryByText(AVISO)).not.toBeInTheDocument();
+  });
+});
+
+describe("edição: hidratação dos critérios de compra", () => {
+  it("filtro antigo, sem os campos novos, abre vazio sem quebrar", async () => {
+    render(<EditarCampanha id="c1" />);
+    const campos = await screen.findAllByLabelText("Gasto total mínimo (R$)");
+    expect(campos[0]).toHaveValue("");
+    expect(campos[1]).toHaveValue("");
+  });
+
+  it("filtro com excluir preenchido hidrata os campos", async () => {
+    CAMPANHA.audience_filter = {
+      com_alguma_tag: ["vip"],
+      ultima_compra_ha_dias_min: 60,
+      gasto_min_centavos: 15000,
+      excluir: { ultima_compra_ha_dias_max: 30, compras_min: 2 },
+      limite: 100,
+    };
+    render(<EditarCampanha id="c1" />);
+    const min = await screen.findAllByLabelText("Última compra há pelo menos (dias)");
+    expect(min[0]).toHaveValue(60);
+    expect(screen.getAllByLabelText("Gasto total mínimo (R$)")[0]).toHaveValue("150,00");
+    expect(screen.getAllByLabelText("Última compra há no máximo (dias)")[1]).toHaveValue(30);
+    expect(screen.getAllByLabelText("Pelo menos N compras")[1]).toHaveValue(2);
   });
 });

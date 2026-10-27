@@ -15725,6 +15725,12 @@ export const DICIONARIO: Traducoes = {
   },
   "Sem falar com a gente há (dias)": { es: "Sin hablar con nosotros hace (días)" },
   "Sem nenhuma destas etiquetas": { es: "Sin ninguna de estas etiquetas" },
+  "Última compra há pelo menos (dias)": { es: "Última compra hace al menos (días)" },
+  "Última compra há no máximo (dias)": { es: "Última compra hace como máximo (días)" },
+  "Pelo menos N compras": { es: "Al menos N compras" },
+  "Gasto total mínimo (R$)": { es: "Gasto total mínimo (R$)" },
+  "Excluir quem...": { es: "Excluir a quienes..." },
+  "Conta só pedido pago ou entregue, sem cancelado, estornado ou pendente.": { es: "Cuenta solo pedidos pagados o entregados, sin cancelados, reembolsados ni pendientes." },
   "separe por vírgula": { es: "separe por coma" },
   "Último problema": { es: "Último problema" },
   "Uma campanha fala com uma lista de contatos que você escolhe, no ritmo do número — nunca em rajada.": {
