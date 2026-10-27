@@ -12,4 +12,16 @@ describe("SeletorDeDataHora", () => {
     expect(document.body.textContent).toContain(String(new Date().getFullYear()));
     expect(document.body.textContent).not.toContain("1900");
   });
+
+  it("max no passado sem valor abre no mês do max", () => {
+    const max = new Date(new Date().getFullYear() - 2, 2, 15);
+    render(<SeletorDeDataHora valor={null} modo="data" passado max={max} onEscolher={() => {}} />);
+    expect(document.body.textContent).toContain(String(max.getFullYear()));
+  });
+
+  it("min um ano à frente abre nele", () => {
+    const min = new Date(new Date().getFullYear() + 1, 5, 10);
+    render(<SeletorDeDataHora valor={null} modo="data" min={min} onEscolher={() => {}} />);
+    expect(document.body.textContent).toContain(String(min.getFullYear()));
+  });
 });
