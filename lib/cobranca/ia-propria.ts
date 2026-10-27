@@ -22,6 +22,20 @@ export class IaPropriaSemCredencialError extends Error {
   }
 }
 
+export const MENSAGEM_SEM_CHAVE_OPENAI_NA_INSTALACAO =
+  'A chave da OpenAI não está configurada na instalação (OPENAI_API_KEY) e a empresa não cadastrou a sua.';
+
+/** Por que a voz ficou sem chave: plano com IA própria sem credencial, ou instalação sem OPENAI_API_KEY. */
+export type MotivoSemChaveDaVoz = 'ia_propria' | 'instalacao';
+
+export function mensagemSemChaveDaVoz(motivo: MotivoSemChaveDaVoz | undefined): string {
+  return motivo === 'instalacao' ? MENSAGEM_SEM_CHAVE_OPENAI_NA_INSTALACAO : MENSAGEM_IA_PROPRIA_SEM_CREDENCIAL;
+}
+
+export function erroDeVozSemChave(motivo: MotivoSemChaveDaVoz | undefined): Error {
+  return motivo === 'instalacao' ? new Error(MENSAGEM_SEM_CHAVE_OPENAI_NA_INSTALACAO) : new IaPropriaSemCredencialError();
+}
+
 /**
  * Falha FECHADA continua valendo, mas o log separa "leitura quebrou" (com o
  * código do erro do banco/PostgREST) de "o plano veda", que não loga nada.

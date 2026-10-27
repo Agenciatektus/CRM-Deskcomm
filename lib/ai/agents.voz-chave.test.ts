@@ -21,8 +21,13 @@ vi.mock("@/lib/supabase/admin", () => {
   };
 });
 
-import { resolverChaveOpenAiDaVoz } from "@/lib/ai/agents";
-import { invalidarMemoIaPropria } from "@/lib/cobranca/ia-propria";
+import { resolverChaveDaVozComMotivo, resolverChaveOpenAiDaVoz } from "@/lib/ai/agents";
+import {
+  erroDeVozSemChave,
+  IaPropriaSemCredencialError,
+  invalidarMemoIaPropria,
+  MENSAGEM_SEM_CHAVE_OPENAI_NA_INSTALACAO,
+} from "@/lib/cobranca/ia-propria";
 
 beforeEach(() => {
   invalidarMemoIaPropria();
@@ -49,5 +54,25 @@ describe("resolverChaveOpenAiDaVoz", () => {
     state.rpc.data = false;
     state.credencial = { api_key_encrypted: "chave-da-org", api_key_iv: "iv", api_key_tag: "tag" };
     expect(await resolverChaveOpenAiDaVoz("org-1")).toBe("chave-da-org");
+  });
+});
+
+describe("motivo de a voz ficar sem chave", () => {
+  it("plano com IA propria sem credencial -> motivo ia_propria e erro de IA propria", async () => {
+    state.rpc.data = false;
+    const r = await resolverChaveDaVozComMotivo("org-1");
+    expect(r).toEqual({ chave: "", motivoSemChave: "ia_propria" });
+    expect(erroDeVozSemChave(r.motivoSemChave)).toBeInstanceOf(IaPropriaSemCredencialError);
+  });
+  it("sem plano e sem OPENAI_API_KEY -> motivo instalacao e mensagem da chave da instalacao", async () => {
+    delete process.env.OPENAI_API_KEY;
+    const r = await resolverChaveDaVozComMotivo("org-1");
+    expect(r).toEqual({ chave: "", motivoSemChave: "instalacao" });
+    const erro = erroDeVozSemChave(r.motivoSemChave);
+    expect(erro).not.toBeInstanceOf(IaPropriaSemCredencialError);
+    expect(erro.message).toBe(MENSAGEM_SEM_CHAVE_OPENAI_NA_INSTALACAO);
+  });
+  it("com chave no env nao ha motivo", async () => {
+    expect(await resolverChaveDaVozComMotivo("org-1")).toEqual({ chave: "chave-ficticia-env" });
   });
 });

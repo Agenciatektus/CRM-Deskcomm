@@ -6,7 +6,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { AGENT_CONFIG_DEFAULTS, agentConfigSchema } from "@/lib/ai/guardrails-schema";
 import { byteaToBuffer, decryptKey } from "@/lib/crypto/aes_gcm";
-import { instalacaoPodeServirIaComMemo } from "@/lib/cobranca/ia-propria";
+import { instalacaoPodeServirIaComMemo, type MotivoSemChaveDaVoz } from "@/lib/cobranca/ia-propria";
 
 export interface VoiceAgentConfig {
   id: string;
@@ -25,6 +25,8 @@ export interface VoiceAgentConfig {
    * Credenciais pra esta org, ou env OPENAI_API_KEY do servidor.
    */
   apiKey: string;
+  /** Quando `apiKey` é vazia: IA própria sem credencial, ou instalação sem OPENAI_API_KEY. */
+  motivoSemChave?: MotivoSemChaveDaVoz;
 }
 
 /**
@@ -39,6 +41,13 @@ export interface VoiceAgentConfig {
  * alguém cadastra uma segunda é pior que sempre usar a mesma.
  */
 export async function resolverChaveOpenAiDaVoz(organizationId: string): Promise<string> {
+  return (await resolverChaveDaVozComMotivo(organizationId)).chave;
+}
+
+/** Mesma resolução, devolvendo também POR QUE ficou sem chave (para a mensagem certa). */
+export async function resolverChaveDaVozComMotivo(
+  organizationId: string,
+): Promise<{ chave: string; motivoSemChave?: MotivoSemChaveDaVoz }> {
   try {
     const admin = createAdminClient();
     const { data } = await admin
@@ -53,19 +62,22 @@ export async function resolverChaveOpenAiDaVoz(organizationId: string): Promise<
       .maybeSingle();
 
     if (data) {
-      return decryptKey({
+      return { chave: decryptKey({
         ciphertext: byteaToBuffer(data.api_key_encrypted),
         iv: byteaToBuffer(data.api_key_iv),
         tag: byteaToBuffer(data.api_key_tag),
-      });
+      }) };
     }
   } catch {
     // Decrypt falhou ou a query deu erro -- cai pro .env abaixo, log já
     // aconteceu no INFO deste arquivo se aplicável; não vale a pena arriscar
     // ecoar detalhe de credencial no log do worker.
   }
-  if (!(await instalacaoPodeServirIaComMemo(createAdminClient(), organizationId))) return "";
-  return process.env.OPENAI_API_KEY ?? "";
+  if (!(await instalacaoPodeServirIaComMemo(createAdminClient(), organizationId))) {
+    return { chave: "", motivoSemChave: "ia_propria" };
+  }
+  const doEnv = process.env.OPENAI_API_KEY ?? "";
+  return doEnv ? { chave: doEnv } : { chave: "", motivoSemChave: "instalacao" };
 }
 
 export async function getActiveVoiceAgent(organizationId: string): Promise<VoiceAgentConfig | null> {
@@ -87,6 +99,7 @@ export async function getActiveVoiceAgent(organizationId: string): Promise<Voice
   });
   const cfg = cfgParsed.success ? cfgParsed.data : AGENT_CONFIG_DEFAULTS;
 
+  const chaveDaVoz = await resolverChaveDaVozComMotivo(organizationId);
   return {
     id: data.id,
     systemPrompt: data.system_prompt,
@@ -95,6 +108,7 @@ export async function getActiveVoiceAgent(organizationId: string): Promise<Voice
     voiceModel: cfg.voice_model,
     ragTopK: cfg.rag_top_k,
     ragSimilarityThreshold: cfg.rag_similarity_threshold,
-    apiKey: await resolverChaveOpenAiDaVoz(organizationId),
+    apiKey: chaveDaVoz.chave,
+    motivoSemChave: chaveDaVoz.motivoSemChave,
   };
 }
