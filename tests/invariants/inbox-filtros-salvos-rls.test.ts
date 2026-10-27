@@ -64,7 +64,8 @@ beforeAll(() => {
     insert into public.inbox_filtros_salvos (organization_id, user_id, nome, filtros) values
       ('${ORG_A}', '${A1}', 'Do A1', ${FILTRO}),
       ('${ORG_A}', '${A2}', 'Do A2', ${FILTRO}),
-      ('${ORG_B}', '${B1}', 'Do B1', ${FILTRO});
+      ('${ORG_B}', '${B1}', 'Do B1', ${FILTRO}),
+      ('${ORG_B}', '${A1}', 'A1 fora da org', ${FILTRO});
   `);
 });
 
@@ -90,7 +91,23 @@ describe("inbox_filtros_salvos: cada usuário só enxerga as próprias linhas", 
       const n = como(quem, `with d as (delete from public.inbox_filtros_salvos where nome = '${alvo}' returning 1) select count(*) from d;`);
       expect(Number(n), `${quem} apagou "${alvo}"`).toBe(0);
     }
-    expect(sql(`select count(*) from public.inbox_filtros_salvos where organization_id in ('${ORG_A}', '${ORG_B}');`)).toBe("3");
+    expect(sql(`select count(*) from public.inbox_filtros_salvos where organization_id in ('${ORG_A}', '${ORG_B}');`)).toBe("4");
+  });
+
+  it("A1 é dono da linha da ORG_B mas não é membro dela: conta 0 e o DELETE devolve 0", () => {
+    expect(contarComo(A1, `nome = 'A1 fora da org'`)).toBe(0);
+    const n = como(A1, `with d as (delete from public.inbox_filtros_salvos where nome = 'A1 fora da org' returning 1) select count(*) from d;`);
+    expect(Number(n)).toBe(0);
+  });
+
+  it("controle: membership revogada = a linha própria deixa de aparecer", () => {
+    sql(`update public.user_organizations set revoked_at = now() where user_id = '${A2}' and organization_id = '${ORG_A}';`);
+    try {
+      expect(contarComo(A2, `nome = 'Do A2'`)).toBe(0);
+    } finally {
+      sql(`update public.user_organizations set revoked_at = null where user_id = '${A2}' and organization_id = '${ORG_A}';`);
+    }
+    expect(contarComo(A2, `nome = 'Do A2'`)).toBe(1);
   });
 
   it("o dono apaga a própria", () => {

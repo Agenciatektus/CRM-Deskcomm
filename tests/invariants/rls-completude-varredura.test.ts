@@ -111,7 +111,7 @@ const PROVA_PROPRIA: readonly Excecao[] = [
   {
     tabela: "inbox_filtros_salvos",
     razao:
-      "tests/invariants/inbox-filtros-salvos-rls.test.ts — JWT real: o usuário só lê, insere e apaga a PRÓPRIA linha da PRÓPRIA org (colega da mesma org e outra org: 0 linhas, insert forjado barrado pelo with check), sem update (permission denied), anon barrado, nome único por usuário e teto de 20 no banco, migration 9079. Fica fora de TABLES: rls-isolation é congelado e a policy é por usuário, não por org.",
+      "tests/invariants/inbox-filtros-salvos-rls.test.ts — JWT real: o usuário só lê e apaga a PRÓPRIA linha, e só em organização de que é membro ativo (colega da mesma org, outra org, linha própria em org de que não é membro e membership revogada: 0 linhas), insert forjado barrado pelo with check, sem update (permission denied), anon barrado, nome único por usuário e teto de 20 no banco, migration 9079. Fica fora de TABLES: rls-isolation é congelado e a policy é por usuário, não por org.",
   },
   {
     tabela: "verdash_fzap_pastas",
