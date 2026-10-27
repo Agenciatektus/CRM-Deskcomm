@@ -20,7 +20,7 @@ import { useCampanhas } from "@/hooks/campanhas/useCampanhas";
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
 import { useT } from "@/hooks/i18n/useT";
 import { Megaphone, Plus } from "@/lib/ui/icons";
-import { ROLE_RANK, escreveComoPlatformAdmin } from "@/lib/auth/types";
+import { escreveComoPlatformAdmin, roleAtLeast, type Role } from "@/lib/auth/types";
 import { STATUS_DA_CAMPANHA } from "@/lib/campanhas/tipos";
 
 /** A API deixa `agent`+ LER a lista (somente leitura); criar, editar e disparar é `manager`. Abaixo de agent (403), a tela diz isso em vez de "Erro ao carregar". */
@@ -30,8 +30,9 @@ export function ListaDeCampanhas() {
   const role = activeOrg?.role;
   // Mesma exceção do servidor (require-role) e do Meta Ads: platform admin com escopo full, fora do suporte.
   const platformAdmin = escreveComoPlatformAdmin(user) && !user.support;
-  const rank = role ? ROLE_RANK[role] : ROLE_RANK.manager;
-  if (rank < ROLE_RANK.agent && !platformAdmin) {
+  // Sem papel conhecido, o servidor decide (trata como manager).
+  const atLeast = (min: Role) => !role || roleAtLeast(role, min);
+  if (!atLeast("agent") && !platformAdmin) {
     return (
       <Pagina>
         <CabecalhoDaPagina titulo={t("Campanhas")} />
@@ -44,7 +45,7 @@ export function ListaDeCampanhas() {
     );
   }
   // O agent só lê a lista (a API de detalhe e as ações seguem de manager+).
-  return <CampanhasDoGestor somenteLeitura={rank < ROLE_RANK.manager && !platformAdmin} />;
+  return <CampanhasDoGestor somenteLeitura={!atLeast("manager") && !platformAdmin} />;
 }
 
 function CampanhasDoGestor({ somenteLeitura }: { somenteLeitura: boolean }) {
