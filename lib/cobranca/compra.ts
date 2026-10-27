@@ -16,9 +16,11 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { audit } from "@/lib/audit";
 import { slugDoProvisionamento } from "@/lib/auth/provision";
 import { logger } from "@/lib/logger";
 
+import { avisarDonosDaInstalacao } from "./emails";
 import { adaptador as adaptadorDe, modoDoProvedor } from "./provedores";
 import type { AdaptadorDeCobranca, CompraLida } from "./provedores/contrato";
 import { sincronizar, type DependenciasDaCobranca } from "./sincronizar";
@@ -28,6 +30,8 @@ export const CHAVE_DO_MAPA_DE_PLANOS = "VENDA_DIRETA_PLANOS";
 export const LIMITE_DE_COMPRAS_POR_RODADA = 20;
 export const TETO_DE_TENTATIVAS = 10;
 const JANELA_DO_MESMO_EMAIL_MS = 24 * 3600 * 1000;
+/** Compra que não foi paga depois disso deixa a fila (`pagamento_nao_confirmado`). */
+export const IDADE_MAXIMA_SEM_PAGAMENTO_MS = 72 * 3600 * 1000;
 export const MOTIVO_DOS_EFEITOS_PENDENTES = "efeitos_pendentes";
 export const MOTIVO_DO_CONVITE_EM_CURSO = "convite_em_curso";
 /** Depois disso, um `convite_em_curso` é de um processo que morreu: a rodada retoma. */
@@ -44,6 +48,7 @@ export interface CompraGravada {
   email: string | null;
   nome_empresa: string | null;
   plano_chave: string | null;
+  created_at?: string | null;
 }
 
 export type MotivoDeDuplicada = "mesma_sessao" | "mesmo_email" | "cliente_ja_vinculado";
@@ -59,6 +64,9 @@ export interface DependenciasDaCompra {
   aoCriar?: (org: string, compra: CompraGravada) => Promise<void> | void;
   /** Gancho da 3c: compra marcada como duplicada (alerta ao dono). */
   aoDuplicar?: (compra: CompraGravada, motivo: MotivoDeDuplicada) => Promise<void> | void;
+  /** Aviso aos donos da instalação (nunca lança). */
+  avisarDono?: typeof avisarDonosDaInstalacao;
+  audit?: typeof audit;
 }
 
 export type ResultadoDaCompra =
@@ -71,7 +79,7 @@ export type ResultadoDaCompra =
   | { tipo: "falhou" };
 
 const TERMINAIS = new Set(["criada", "recusada", "duplicada"]);
-const COLUNAS = "id, evento_id, status, empresa_criada_id, tentativas, email, nome_empresa, plano_chave";
+const COLUNAS = "id, evento_id, status, empresa_criada_id, tentativas, email, nome_empresa, plano_chave, created_at";
 
 /** `a***@dominio`: o e-mail nunca vai cru para o log. */
 export function mascararEmail(email: string | null): string {
@@ -117,9 +125,20 @@ export async function processarCompra(
   if (!compra) return { tipo: "inexistente" };
   if (TERMINAIS.has(compra.status)) return { tipo: "ja_resolvida", status: compra.status };
 
+  let atual: CompraGravada = compra;
+  const avisarDono = deps.avisarDono ?? avisarDonosDaInstalacao;
+  let sessaoPaga = false;
+  const avisar = async (titulo: string, motivo: string, email: string | null): Promise<void> => {
+    await avisarDono(admin, {
+      titulo,
+      corpo: `Motivo: ${motivo}. Compra: ${compra.id}. Comprador: ${mascararEmail(email)}.`,
+      botao: null,
+    });
+  };
   const recusar = async (motivo: string): Promise<ResultadoDaCompra> => {
     await gravar(admin, compra.id, { status: "recusada", motivo });
     logger.warn("cobranca.compra_recusada", { compra: compra.id, motivo });
+    if (sessaoPaga) await avisar("Compra paga não virou empresa", motivo, atual.email);
     return { tipo: "recusada", motivo };
   };
   const falhar = async (erro: unknown): Promise<ResultadoDaCompra> => {
@@ -134,9 +153,9 @@ export async function processarCompra(
     } catch (e) {
       logger.error("cobranca.compra_falha_nao_gravada", { compra: compra.id, erro: e instanceof Error ? e.message : "desconhecido" });
     }
+    if (compra.tentativas + 1 >= TETO_DE_TENTATIVAS) await avisar("Compra parada depois de várias tentativas", "erro_do_provedor", atual.email);
     return { tipo: "falhou" };
   };
-  let atual: CompraGravada = compra;
   const duplicar = async (motivo: MotivoDeDuplicada): Promise<ResultadoDaCompra> => {
     await gravar(admin, compra.id, { status: "duplicada", motivo });
     logger.warn("cobranca.compra_duplicada", { compra: compra.id, motivo, email: mascararEmail(atual.email) });
@@ -164,6 +183,7 @@ export async function processarCompra(
     const nomeDaEmpresa = relida.nomeDaEmpresa?.trim() || null;
     const referencia = relida.clientReferenceId && FORMATO_DO_CLIENT_REFERENCE.test(relida.clientReferenceId) ? relida.clientReferenceId : null;
     atual = { ...compra, email, nome_empresa: nomeDaEmpresa, plano_chave: relida.planoChave };
+    sessaoPaga = relida.pagamento === "paid";
 
     const codigo = await gravar(admin, compra.id, {
       sessao_id: relida.sessaoId,
@@ -193,12 +213,18 @@ export async function processarCompra(
     if (!nomeDaEmpresa) return await recusar("sem_nome_da_empresa");
     if (!email) return await recusar("sem_email");
 
+    if (relida.pagamento === "no_payment_required") return await recusar("sem_pagamento");
     if (relida.pagamento !== "paid") {
       if (relida.status === "expired") return await recusar("sessao_expirada");
-      await gravar(admin, compra.id, { status: "aguardando_pagamento", motivo: null });
+      const criadaEm = compra.created_at ? new Date(compra.created_at).getTime() : null;
+      if (criadaEm !== null && agora().getTime() - criadaEm > IDADE_MAXIMA_SEM_PAGAMENTO_MS) return await recusar("pagamento_nao_confirmado");
+      await gravar(admin, compra.id, { status: "aguardando_pagamento", motivo: null, tentativas: compra.tentativas + 1 });
       return { tipo: "aguardando_pagamento" };
     }
 
+    // Limitação conhecida: sem trava por e-mail, duas compras simultâneas do mesmo e-mail podem passar
+    // ambas por esta checagem. O índice único do cliente da Stripe e o alerta de duplicada cobrem o caso
+    // comum; o resto é estorno manual.
     const desde = new Date(agora().getTime() - JANELA_DO_MESMO_EMAIL_MS).toISOString();
     const { data: irmas, error: erroDasIrmas } = await admin
       .from("cobranca_compras")
@@ -231,6 +257,15 @@ export async function processarCompra(
     const r = await sincronizarOrg(admin, orgId, deps.cobranca);
     if (r.tipo === "falhou") throw new Error(`compra: sincronização falhou (${r.erro})`);
     await gravar(admin, compra.id, { status: "criada", motivo: null, empresa_criada_id: orgId });
+    void (deps.audit ?? audit)({
+      action: "cobranca.compra_criou_empresa",
+      actorUserId: null,
+      organizationId: orgId,
+      bypassedRls: true,
+      resourceType: "cobranca_compra",
+      resourceId: orgId,
+      metadata: { compra: compra.id, plano: atual.plano_chave, origem: "venda_direta" },
+    });
     logger.info("cobranca.compra_criada", { compra: compra.id, empresa_criada_id: orgId });
     try {
       await deps.aoCriar?.(orgId, { ...atual, status: "criada", empresa_criada_id: orgId });

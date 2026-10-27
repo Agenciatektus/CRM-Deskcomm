@@ -9,7 +9,7 @@ vi.mock("@/lib/logger", () => ({ logger: { warn: vi.fn(), error: vi.fn(), info: 
 vi.mock("./provedores", () => ({ adaptador: () => ({}), modoDoProvedor: async () => "teste" }));
 vi.mock("./sincronizar", () => ({ sincronizar: vi.fn() }));
 
-import { LIMITE_DE_COMPRAS_POR_RODADA, TETO_DE_TENTATIVAS, mascararEmail, processarCompra, processarComprasPendentes } from "./compra";
+import { IDADE_MAXIMA_SEM_PAGAMENTO_MS, LIMITE_DE_COMPRAS_POR_RODADA, TETO_DE_TENTATIVAS, mascararEmail, processarCompra, processarComprasPendentes } from "./compra";
 
 const AGORA = new Date("2026-10-27T12:00:00Z");
 
@@ -31,6 +31,8 @@ const lerCompra = vi.fn();
 const sincronizar = vi.fn();
 const aoCriar = vi.fn();
 const aoDuplicar = vi.fn();
+const avisarDono = vi.fn();
+const auditar = vi.fn();
 
 function responder(c: Cadeia): Resposta {
   if (c.tabela === "platform_config") return { data: m.mapa === null ? null : { valor: m.mapa } };
@@ -52,14 +54,14 @@ const rpc = (): Resposta => (m.erroDaRpc ? { error: m.erroDaRpc } : { data: `org
 const gravacoes = () => banco.cadeias.filter((c) => c.tabela === "cobranca_compras" && operacao(c) === "update").map((c) => argumentos(c, "update")![0] as Record<string, unknown>);
 const ultima = () => gravacoes().at(-1)!;
 const rodar = (id = `compra-${n}`) =>
-  processarCompra(banco.cliente as never, id, { adaptador: () => ({ lerCompra }) as never, modoDaChave: async () => "teste", sincronizar, agora: () => AGORA, aoCriar, aoDuplicar });
+  processarCompra(banco.cliente as never, id, { adaptador: () => ({ lerCompra }) as never, modoDaChave: async () => "teste", sincronizar, agora: () => AGORA, aoCriar, aoDuplicar, avisarDono, audit: auditar });
 
 beforeEach(() => {
   vi.clearAllMocks();
   aoCriar.mockReset();
   n += 1;
   m = {
-    compra: { id: `compra-${n}`, evento_id: `evt_${n}`, status: "recebida", empresa_criada_id: null, tentativas: 0, email: null, nome_empresa: null, plano_chave: null },
+    compra: { id: `compra-${n}`, evento_id: `evt_${n}`, status: "recebida", empresa_criada_id: null, tentativas: 0, email: null, nome_empresa: null, plano_chave: null, created_at: "2026-10-27T11:00:00Z" },
     mapa: JSON.stringify({ [`chave_${n}`]: `plano-${n}` }),
     intervaloDoPlano: "mes",
     irmas: [],
@@ -223,6 +225,78 @@ describe("processarCompra", () => {
     aoCriar.mockRejectedValue(new Error("convite fora"));
     expect(await rodar()).toEqual({ tipo: "criada", org: `org-${n}` });
     expect(ultima()).toEqual({ motivo: "efeitos_pendentes", tentativas: 1 });
+  });
+
+  it("aguardando_pagamento soma uma tentativa a cada releitura", async () => {
+    m.compra = { ...m.compra, tentativas: 4 };
+    lida = { ...lida, pagamento: "unpaid", status: "open" };
+    expect(await rodar()).toEqual({ tipo: "aguardando_pagamento" });
+    expect(ultima()).toEqual({ status: "aguardando_pagamento", motivo: null, tentativas: 5 });
+  });
+
+  it("no_payment_required recusa com sem_pagamento, sem RPC e sem aviso", async () => {
+    lida = { ...lida, pagamento: "no_payment_required" };
+    expect(await rodar()).toEqual({ tipo: "recusada", motivo: "sem_pagamento" });
+    expect(banco.rpcs).toEqual([]);
+    expect(avisarDono).not.toHaveBeenCalled();
+  });
+
+  it("não paga além de 72 h recusa pagamento_nao_confirmado; dentro do prazo segue aguardando", async () => {
+    lida = { ...lida, pagamento: "unpaid", status: "open" };
+    const velha = new Date(AGORA.getTime() - IDADE_MAXIMA_SEM_PAGAMENTO_MS - 1000).toISOString();
+    m.compra = { ...m.compra, created_at: velha };
+    expect(await rodar()).toEqual({ tipo: "recusada", motivo: "pagamento_nao_confirmado" });
+    const dentro = new Date(AGORA.getTime() - IDADE_MAXIMA_SEM_PAGAMENTO_MS + 60_000).toISOString();
+    m.compra = { ...m.compra, created_at: dentro };
+    expect(await rodar()).toEqual({ tipo: "aguardando_pagamento" });
+    expect(avisarDono).not.toHaveBeenCalled();
+  });
+
+  it("recusa de sessão PAGA avisa o dono com o motivo e o e-mail mascarado, nunca cru", async () => {
+    lida = { ...lida, planoChave: "outra_chave" };
+    expect(await rodar()).toEqual({ tipo: "recusada", motivo: "plano_fora_do_mapa" });
+    expect(avisarDono).toHaveBeenCalledTimes(1);
+    const o = avisarDono.mock.calls[0]![1] as { titulo: string; corpo: string; botao: unknown };
+    expect(o.titulo).toBe("Compra paga não virou empresa");
+    expect(o.corpo).toContain("plano_fora_do_mapa");
+    expect(o.corpo).toContain(`compra-${n}`);
+    expect(o.corpo).toContain(`c***@exemplo.com`);
+    expect(o.corpo).not.toContain(`omprador${n}@`);
+    expect(o.botao).toBeNull();
+  });
+
+  it("recusa de sessão NÃO paga não avisa o dono", async () => {
+    lida = { ...lida, pagamento: "unpaid", status: "expired" };
+    expect(await rodar()).toEqual({ tipo: "recusada", motivo: "sessao_expirada" });
+    expect(avisarDono).not.toHaveBeenCalled();
+  });
+
+  it("falhou avisa só quando a tentativa chega ao teto", async () => {
+    lerCompra.mockRejectedValue(new Error("sem_resposta"));
+    m.compra = { ...m.compra, tentativas: TETO_DE_TENTATIVAS - 2 };
+    await rodar();
+    expect(avisarDono).not.toHaveBeenCalled();
+    m.compra = { ...m.compra, tentativas: TETO_DE_TENTATIVAS - 1 };
+    await rodar();
+    expect(avisarDono).toHaveBeenCalledTimes(1);
+    expect((avisarDono.mock.calls[0]![1] as { titulo: string }).titulo).toBe("Compra parada depois de várias tentativas");
+  });
+
+  it("audita uma vez a empresa criada (resourceId = org da RPC, sem usuário) e reprocessar não audita de novo", async () => {
+    await rodar();
+    expect(auditar).toHaveBeenCalledTimes(1);
+    expect(auditar).toHaveBeenCalledWith({
+      action: "cobranca.compra_criou_empresa",
+      actorUserId: null,
+      organizationId: `org-${n}`,
+      bypassedRls: true,
+      resourceType: "cobranca_compra",
+      resourceId: `org-${n}`,
+      metadata: { compra: `compra-${n}`, plano: `chave_${n}`, origem: "venda_direta" },
+    });
+    m.compra = { ...m.compra, status: "criada", empresa_criada_id: `org-${n}` };
+    await rodar();
+    expect(auditar).toHaveBeenCalledTimes(1);
   });
 
   it("o e-mail sai mascarado para log", () => {
