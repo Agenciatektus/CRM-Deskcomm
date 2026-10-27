@@ -18046,6 +18046,7 @@ export const DICIONARIO: Traducoes = {
   "Selecionar as {n} visíveis": { es: "Seleccionar las {n} visibles" },
   "{x} de {n} marcadas": { es: "{x} de {n} marcadas" },
   "Nenhuma conta encontrada.": { es: "No se encontró ninguna cuenta." },
+  "O pedido de acesso usa as mesmas permissões da Verdash (incluindo gerenciar anúncios), para um único login servir leitura e envio de conversões.": { es: "La solicitud de acceso usa los mismos permisos de Verdash (incluida la gestión de anuncios), para que un solo inicio de sesión sirva para lectura y envío de conversiones." },
   "Nenhuma conta liberada. Marque ao menos uma para salvar.": { es: "Ninguna cuenta habilitada. Marca al menos una para guardar." },
   "As {n} contas marcadas continuam guardadas. Reconecte para ver a lista e mudar a seleção.": { es: "Las {n} cuentas marcadas siguen guardadas. Reconecta para ver la lista y cambiar la selección." },
   "Os gestores desta organização só veem as contas marcadas. O login alcança contas de outros clientes também: marque só as deste.": { es: "Los gestores de esta organización solo ven las cuentas marcadas. El inicio de sesión también alcanza cuentas de otros clientes: marca solo las de este." },

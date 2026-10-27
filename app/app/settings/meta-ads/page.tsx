@@ -99,6 +99,11 @@ export default async function MetaAdsSettingsPage({
         )}
       />
       <SecaoDaPagina>
+        <p className="text-xs text-text-muted" data-testid="meta-escopo-pedido">
+          {t(
+            "O pedido de acesso usa as mesmas permissões da Verdash (incluindo gerenciar anúncios), para um único login servir leitura e envio de conversões.",
+          )}
+        </p>
         {parametros.conectado === "1" && verificacao?.tipo === "aviso" && (
           <div
             role="alert"
