@@ -15,7 +15,18 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { DIAS_SEM_REPETIR_A_CADENCIA } from "@/lib/cadencia/inscrever";
 
-import { limiteDeSilencio, temRecorte, usaNegocio, type FiltroDeAudiencia } from "./audiencia";
+import {
+  casaCompra,
+  limiteDeSilencio,
+  resumirPedidos,
+  STATUS_DE_COMPRA_EFETIVA,
+  temPredicadoDeContato,
+  temRecorte,
+  usaCompra,
+  usaNegocio,
+  type CriteriosDeAudiencia,
+  type FiltroDeAudiencia,
+} from "./audiencia";
 import { STATUS_TERMINAIS } from "./maquina-de-estados";
 import { NA_FILA_DE_DESPACHO } from "./tipos";
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
@@ -33,6 +44,15 @@ const PAGINA_DO_POSTGREST = 1000;
 
 /** Teto de ids que um filtro de negócio devolve antes de virar `in (...)`. */
 const TETO_DE_IDS_DE_NEGOCIO = 20_000;
+
+/**
+ * Teto de pedidos lidos para os critérios de compra. Acima dele a consulta
+ * FALHA em vez de cortar: resumo de compras truncado erra a última data e a
+ * contagem, e escolheria (ou excluiria) a pessoa errada calado.
+ * shortcut: agrega em memória; se alguma org chegar perto, trocar por RPC com
+ * `max(ordered_at)`/`count`/`sum` agrupado no banco.
+ */
+const TETO_DE_PEDIDOS = 200_000;
 
 /** Cursor de keyset: a última linha LIDA — não a última guardada (a exclusão é depois). */
 interface CursorDeLeitura {
@@ -79,11 +99,258 @@ interface LinhaDeContato {
 const COLUNAS_DO_CONTATO = "id, name, display_name, phone_number, is_blocked, is_personal, is_anonymized, consent";
 
 /**
+ * A consulta de contatos com os predicados dos CRITÉRIOS. É a mesma para o
+ * público positivo e para o bloco `excluir`: um predicado escrito uma vez só.
+ */
+function consultaDeContatos(
+  admin: SupabaseClient,
+  organizationId: string,
+  criterios: CriteriosDeAudiencia,
+  agora: Date,
+  colunas: string,
+) {
+  let consulta = admin
+    .from("contacts")
+    .select(colunas)
+    .eq("organization_id", organizationId)
+    // Placeholder de GRUPO não recebe campanha: campanha é 1:1 por doutrina, e
+    // o grupo não tem opt-in individual nenhum por trás desse registro técnico.
+    .eq("kind", "person")
+    // Cadastro mesclado é fantasma: quem responde é o sobrevivente.
+    .is("is_merged_into", null)
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true });
+  if (criterios.com_todas_tags.length > 0) consulta = consulta.contains("tags", criterios.com_todas_tags);
+  if (criterios.com_alguma_tag.length > 0) consulta = consulta.overlaps("tags", criterios.com_alguma_tag);
+  if (criterios.sem_tags.length > 0) {
+    consulta = consulta.not("tags", "ov", `{${criterios.sem_tags.map(citar).join(",")}}`);
+  }
+  if (criterios.origens.length > 0) consulta = consulta.in("source", criterios.origens);
+  if (criterios.sem_interacao_ha_dias !== null) {
+    const limite = limiteDeSilencio(criterios.sem_interacao_ha_dias, agora).toISOString();
+    // Quem nunca interagiu ENTRA no recorte de silêncio: `last_activity_at` nulo
+    // é o silêncio mais longo que existe, e deixá-lo de fora tiraria justamente
+    // a lista fria — que é o caso de uso principal da campanha.
+    consulta = consulta.or(`last_activity_at.is.null,last_activity_at.lt.${limite}`);
+  }
+  if (criterios.com_interacao_ha_dias !== null) {
+    consulta = consulta.gte(
+      "last_activity_at",
+      limiteDeSilencio(criterios.com_interacao_ha_dias, agora).toISOString(),
+    );
+  }
+  if (criterios.cadastrado_de) consulta = consulta.gte("created_at", criterios.cadastrado_de);
+  if (criterios.cadastrado_ate) consulta = consulta.lte("created_at", criterios.cadastrado_ate);
+  return consulta;
+}
+
+/**
+ * Os contatos que têm negócio no recorte.
+ *
+ * Consulta separada, e não `join` embutido do PostgREST: o mesmo contato tem N
+ * negócios, e o embed devolveria o contato N vezes — contagem de prévia
+ * inflada, que é exatamente o número que o operador confere antes de apertar.
+ */
+async function contatosPorNegocio(
+  admin: SupabaseClient,
+  organizationId: string,
+  criterios: CriteriosDeAudiencia,
+): Promise<{ ids: string[]; truncado: boolean }> {
+  // A consulta pede até `TETO_DE_IDS_DE_NEGOCIO` LINHAS e o PostgREST corta
+  // TODA resposta em `max_rows` (cuja config da instalação pode ser MENOR que
+  // `PAGINA_DO_POSTGREST`). Paginar por `range` tinha dois defeitos: parar
+  // cedo quando o `max_rows` era menor (a primeira página já volta "curta") e
+  // repetir/perder linha quando um negócio muda de etapa no meio da leitura
+  // (#2404). Por isso o laço é KEYSEET em (`created_at`, `id`), e só a página
+  // VAZIA prova o fim.
+  const consultaDeNegocios = () => {
+    let consulta = admin
+      .from("crm_leads")
+      .select("contact_id, created_at, id")
+      .eq("organization_id", organizationId)
+      .not("contact_id", "is", null)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true });
+    if (criterios.funis.length > 0) consulta = consulta.in("pipeline_id", criterios.funis);
+    if (criterios.etapas.length > 0) consulta = consulta.in("stage_id", criterios.etapas);
+    if (criterios.responsaveis.length > 0) consulta = consulta.in("owner_user_id", criterios.responsaveis);
+    if (criterios.situacoes_do_negocio.length > 0) {
+      consulta = consulta.in("status", criterios.situacoes_do_negocio);
+    }
+    return consulta;
+  };
+  let truncado = false;
+  const linhasDeNegocio: Array<{ contact_id: string; created_at: string; id: string }> = [];
+  let cursor: CursorDeLeitura | null = null;
+  for (;;) {
+    let pagina = consultaDeNegocios().limit(PAGINA_DO_POSTGREST);
+    if (cursor) pagina = pagina.or(filtroDepoisDoCursor(cursor, "asc"));
+    const { data, error } = await pagina;
+    if (error) throw new Error(`audiência: negócios — ${error.message}`);
+    const lidas = (data ?? []) as unknown as typeof linhasDeNegocio;
+    if (lidas.length === 0) break;
+    const ultima = lidas[lidas.length - 1]!;
+    const novo = { created_at: ultima.created_at, id: ultima.id };
+    if (cursor && !avancou(cursor, novo, "asc")) {
+      throw new Error("audiência: audiencia_page_did_not_advance");
+    }
+    cursor = novo;
+    linhasDeNegocio.push(...lidas);
+    if (linhasDeNegocio.length >= TETO_DE_IDS_DE_NEGOCIO) {
+      // O teto é por LINHA: corta o excesso da última página e sonda UMA
+      // linha além do teto — o aviso da prévia não pode mentir num recorte
+      // de exatamente 20.000.
+      linhasDeNegocio.length = TETO_DE_IDS_DE_NEGOCIO;
+      const ultimaDoTeto = linhasDeNegocio[linhasDeNegocio.length - 1]!;
+      const { data: sobra, error: erroSobra } = await consultaDeNegocios()
+        .or(filtroDepoisDoCursor({ created_at: ultimaDoTeto.created_at, id: ultimaDoTeto.id }, "asc"))
+        .limit(1);
+      if (erroSobra) throw new Error(`audiência: negócios — ${erroSobra.message}`);
+      truncado = (sobra ?? []).length > 0;
+      break;
+    }
+  }
+  return { ids: [...new Set(linhasDeNegocio.map((l) => l.contact_id))], truncado };
+}
+
+/**
+ * Os contatos cujas COMPRAS casam com os critérios. Lê os pedidos efetivos da
+ * organização inteira (keyset, como os negócios) e resume por contato em
+ * memória: o PostgREST não agrupa. Quem não tem pedido efetivo não aparece no
+ * resumo e por isso nunca casa (`casaCompra`).
+ */
+async function contatosPorCompra(
+  admin: SupabaseClient,
+  organizationId: string,
+  criterios: CriteriosDeAudiencia,
+  agora: Date,
+): Promise<string[]> {
+  type Pedido = {
+    contact_id: string;
+    status: string;
+    ordered_at: string;
+    total_cents: number | string;
+    created_at: string;
+    id: string;
+  };
+  const pedidos: Pedido[] = [];
+  let cursor: CursorDeLeitura | null = null;
+  for (;;) {
+    let pagina = admin
+      .from("orders")
+      .select("contact_id, status, ordered_at, total_cents, created_at, id")
+      .eq("organization_id", organizationId)
+      .in("status", STATUS_DE_COMPRA_EFETIVA as unknown as string[])
+      .not("contact_id", "is", null)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .limit(PAGINA_DO_POSTGREST);
+    if (cursor) pagina = pagina.or(filtroDepoisDoCursor(cursor, "asc"));
+    const { data, error } = await pagina;
+    if (error) throw new Error(`audiência: pedidos — ${error.message}`);
+    const lidas = (data ?? []) as unknown as Pedido[];
+    if (lidas.length === 0) break;
+    const ultima = lidas[lidas.length - 1]!;
+    const novo = { created_at: ultima.created_at, id: ultima.id };
+    if (cursor && !avancou(cursor, novo, "asc")) {
+      throw new Error("audiência: audiencia_page_did_not_advance");
+    }
+    cursor = novo;
+    pedidos.push(...lidas);
+    if (pedidos.length > TETO_DE_PEDIDOS) throw new Error("audiência: pedidos acima do teto");
+  }
+  const resumo = resumirPedidos(pedidos);
+  return [...resumo.keys()].filter((id) => casaCompra(resumo.get(id), criterios, agora));
+}
+
+/**
+ * Os ids que os critérios de NEGÓCIO e de COMPRA restringem (interseção), ou
+ * `null` quando nenhum dos dois é usado. Lista vazia é recorte vazio, não
+ * recorte ausente: seguir sem o `in` devolveria a organização inteira.
+ */
+async function idsRestritos(
+  admin: SupabaseClient,
+  organizationId: string,
+  criterios: CriteriosDeAudiencia,
+  agora: Date,
+): Promise<{ ids: string[] | null; truncado: boolean }> {
+  let ids: string[] | null = null;
+  let truncado = false;
+  if (usaNegocio(criterios)) {
+    const porNegocio = await contatosPorNegocio(admin, organizationId, criterios);
+    ids = porNegocio.ids;
+    truncado = porNegocio.truncado;
+    if (ids.length === 0) return { ids, truncado };
+  }
+  if (usaCompra(criterios)) {
+    const porCompra = await contatosPorCompra(admin, organizationId, criterios, agora);
+    if (ids === null) ids = porCompra;
+    else {
+      const compraram = new Set(porCompra);
+      ids = ids.filter((id) => compraram.has(id));
+    }
+  }
+  return { ids, truncado };
+}
+
+/**
+ * O bloco `excluir` vira uma pergunta sobre um lote de candidatos: "quais
+ * destes casam com a exclusão?". Usa os MESMOS predicados do público positivo
+ * (`idsRestritos` + `consultaDeContatos`). `null` quando não há o que excluir.
+ *
+ * A pergunta é feita sobre os candidatos (em lotes de 100 ids), e não sobre a
+ * organização inteira: os predicados de contato não precisam varrer a base.
+ */
+async function prepararExclusao(
+  admin: SupabaseClient,
+  organizationId: string,
+  excluir: CriteriosDeAudiencia | null,
+  agora: Date,
+): Promise<((ids: string[]) => Promise<Set<string>>) | null> {
+  if (!excluir || !temRecorte(excluir)) return null;
+  const restritos = await idsRestritos(admin, organizationId, excluir, agora);
+  // Exclusão truncada deixaria passar quem devia sair: falha fechada.
+  if (restritos.truncado) throw new Error("audiência: exclusão por negócio acima do teto");
+  const conjunto = restritos.ids ? new Set(restritos.ids) : null;
+  return async (ids) => {
+    const alvo = conjunto ? ids.filter((id) => conjunto.has(id)) : ids;
+    if (alvo.length === 0 || !temPredicadoDeContato(excluir)) return new Set(alvo);
+    const { data, error } = await buscaEmLotes<{ id: string }>(alvo, async (lote) => {
+      const { data: pagina, error: erro } = await consultaDeContatos(
+        admin,
+        organizationId,
+        excluir,
+        agora,
+        "id",
+      ).in("id", lote);
+      return { data: (pagina ?? null) as unknown as { id: string }[] | null, error: erro };
+    });
+    if (error) throw new Error(`audiência: exclusão — ${error.message}`);
+    return new Set(data.map((l) => l.id));
+  };
+}
+
+/** Tira das linhas quem a exclusão manual ou por critério pega. */
+async function semExcluidos(
+  linhas: LinhaDeContato[],
+  excluidos: Set<string>,
+  casaExclusao: ((ids: string[]) => Promise<Set<string>>) | null,
+): Promise<LinhaDeContato[]> {
+  const restantes = linhas.filter((l) => !excluidos.has(l.id));
+  if (!casaExclusao || restantes.length === 0) return restantes;
+  const fora = await casaExclusao(restantes.map((l) => l.id));
+  return restantes.filter((l) => !fora.has(l.id));
+}
+
+/**
  * Os candidatos do recorte, e o recibo de truncamento.
  *
  * `truncado` só é verdadeiro quando o recorte bate o teto de
  * `TETO_DE_IDS_DE_NEGOCIO` E há pelo menos uma linha além dele — a prévia
  * avisa o operador em vez de cortar calada (#2404).
+ *
+ * O bloco `excluir` é subtração do RECORTE: como `excluir_contatos`, não tira
+ * quem foi incluído à mão (`incluir_contatos` é a vontade explícita do operador).
  */
 export async function buscarCandidatos(
   admin: SupabaseClient,
@@ -95,117 +362,22 @@ export async function buscarCandidatos(
   const camposDoTexto = camposUsadosNoTexto(entrada.corpo ?? "");
   const colunasDeContato = camposDoTexto.contato ? ", custom_fields" : "";
 
-  // ─── Os contatos que têm negócio no recorte ───
-  // Consulta separada, e não `join` embutido do PostgREST: o mesmo contato tem N
-  // negócios, e o embed devolveria o contato N vezes — contagem de prévia
-  // inflada, que é exatamente o número que o operador confere antes de apertar.
-  let idsPorNegocio: string[] | null = null;
-  let truncado = false;
-  if (usaNegocio(filtro)) {
-    // A consulta pede até `TETO_DE_IDS_DE_NEGOCIO` LINHAS e o PostgREST corta
-    // TODA resposta em `max_rows` (cuja config da instalação pode ser MENOR que
-    // `PAGINA_DO_POSTGREST`). Paginar por `range` tinha dois defeitos: parar
-    // cedo quando o `max_rows` era menor (a primeira página já volta "curta") e
-    // repetir/perder linha quando um negócio muda de etapa no meio da leitura
-    // (#2404). Por isso o laço é KEYSEET em (`created_at`, `id`), e só a página
-    // VAZIA prova o fim.
-    const consultaDeNegocios = () => {
-      let consulta = admin
-        .from("crm_leads")
-        .select("contact_id, created_at, id")
-        .eq("organization_id", organizationId)
-        .not("contact_id", "is", null)
-        .order("created_at", { ascending: true })
-        .order("id", { ascending: true });
-      if (filtro.funis.length > 0) consulta = consulta.in("pipeline_id", filtro.funis);
-      if (filtro.etapas.length > 0) consulta = consulta.in("stage_id", filtro.etapas);
-      if (filtro.responsaveis.length > 0) consulta = consulta.in("owner_user_id", filtro.responsaveis);
-      if (filtro.situacoes_do_negocio.length > 0) {
-        consulta = consulta.in("status", filtro.situacoes_do_negocio);
-      }
-      return consulta;
-    };
-    const linhasDeNegocio: Array<{ contact_id: string; created_at: string; id: string }> = [];
-    let cursor: CursorDeLeitura | null = null;
-    for (;;) {
-      let pagina = consultaDeNegocios().limit(PAGINA_DO_POSTGREST);
-      if (cursor) pagina = pagina.or(filtroDepoisDoCursor(cursor, "asc"));
-      const { data, error } = await pagina;
-      if (error) throw new Error(`audiência: negócios — ${error.message}`);
-      const lidas = (data ?? []) as unknown as typeof linhasDeNegocio;
-      if (lidas.length === 0) break;
-      const ultima = lidas[lidas.length - 1]!;
-      const novo = { created_at: ultima.created_at, id: ultima.id };
-      if (cursor && !avancou(cursor, novo, "asc")) {
-        throw new Error("audiência: audiencia_page_did_not_advance");
-      }
-      cursor = novo;
-      linhasDeNegocio.push(...lidas);
-      if (linhasDeNegocio.length >= TETO_DE_IDS_DE_NEGOCIO) {
-        // O teto é por LINHA: corta o excesso da última página e sonda UMA
-        // linha além do teto — o aviso da prévia não pode mentir num recorte
-        // de exatamente 20.000.
-        linhasDeNegocio.length = TETO_DE_IDS_DE_NEGOCIO;
-        const ultimaDoTeto = linhasDeNegocio[linhasDeNegocio.length - 1]!;
-        const { data: sobra, error: erroSobra } = await consultaDeNegocios()
-          .or(filtroDepoisDoCursor({ created_at: ultimaDoTeto.created_at, id: ultimaDoTeto.id }, "asc"))
-          .limit(1);
-        if (erroSobra) throw new Error(`audiência: negócios — ${erroSobra.message}`);
-        truncado = (sobra ?? []).length > 0;
-        break;
-      }
-    }
-    idsPorNegocio = [...new Set(linhasDeNegocio.map((l) => l.contact_id))];
-    // Recorte de negócio que não achou ninguém é recorte vazio, não recorte
-    // ausente: seguir sem o `in` devolveria a organização inteira.
-    if (idsPorNegocio.length === 0) return { candidatos: [], truncado };
-  }
+  // ─── Os contatos que o negócio e a compra restringem ───
+  const { ids: idsDoRecorte, truncado } = await idsRestritos(admin, organizationId, filtro, agora);
+  if (idsDoRecorte && idsDoRecorte.length === 0) return { candidatos: [], truncado };
+  const casaExclusao = await prepararExclusao(admin, organizationId, filtro.excluir, agora);
 
   // ─── A consulta de contatos ───
   // Dois filtros deste módulo crescem com a organização e não cabem na URL: os
-  // ids de negócio do recorte (até 20.000) e a lista de excluídos (até 5.000).
-  // O gateway na frente do PostgREST devolve `414` acima de ~8.192 B (#2358, a
-  // mesma família do #2357 em `leadsMaisRecentes`). Por isso:
+  // ids do recorte (até 20.000 de negócio, ou os compradores) e a lista de
+  // excluídos (até 5.000). O gateway na frente do PostgREST devolve `414` acima
+  // de ~8.192 B (#2358, a mesma família do #2357 em `leadsMaisRecentes`). Por isso:
   //   * a exclusão sai da URL e vira filtro em MEMÓRIA, ANTES do corte — é o
   //     que o `.not("id","in",…)` fazia no servidor;
-  //   * com recorte de negócio, a consulta é fatiada por `buscaEmLotes`;
+  //   * com recorte de negócio ou compra, a consulta é fatiada por `buscaEmLotes`;
   //   * sem ele, a consulta é única e paginada por `max_rows`, parando cedo.
   const excluidos = new Set(filtro.excluir_contatos);
-  const consultaDeContatos = () => {
-    let consulta = admin
-      .from("contacts")
-      .select(COLUNAS_DO_CONTATO + colunasDeContato + ", created_at")
-      .eq("organization_id", organizationId)
-      // Placeholder de GRUPO não recebe campanha: campanha é 1:1 por doutrina, e
-      // o grupo não tem opt-in individual nenhum por trás desse registro técnico.
-      .eq("kind", "person")
-      // Cadastro mesclado é fantasma: quem responde é o sobrevivente.
-      .is("is_merged_into", null)
-      .order("created_at", { ascending: true })
-      .order("id", { ascending: true });
-    if (filtro.com_todas_tags.length > 0) consulta = consulta.contains("tags", filtro.com_todas_tags);
-    if (filtro.com_alguma_tag.length > 0) consulta = consulta.overlaps("tags", filtro.com_alguma_tag);
-    if (filtro.sem_tags.length > 0) {
-      consulta = consulta.not("tags", "ov", `{${filtro.sem_tags.map(citar).join(",")}}`);
-    }
-    if (filtro.origens.length > 0) consulta = consulta.in("source", filtro.origens);
-    if (filtro.sem_interacao_ha_dias !== null) {
-      const limite = limiteDeSilencio(filtro.sem_interacao_ha_dias, agora).toISOString();
-      // Quem nunca interagiu ENTRA no recorte de silêncio: `last_activity_at` nulo
-      // é o silêncio mais longo que existe, e deixá-lo de fora tiraria justamente
-      // a lista fria — que é o caso de uso principal da campanha.
-      consulta = consulta.or(`last_activity_at.is.null,last_activity_at.lt.${limite}`);
-    }
-    if (filtro.com_interacao_ha_dias !== null) {
-      consulta = consulta.gte(
-        "last_activity_at",
-        limiteDeSilencio(filtro.com_interacao_ha_dias, agora).toISOString(),
-      );
-    }
-    if (filtro.cadastrado_de) consulta = consulta.gte("created_at", filtro.cadastrado_de);
-    if (filtro.cadastrado_ate) consulta = consulta.lte("created_at", filtro.cadastrado_ate);
-    return consulta;
-  };
+  const colunas = COLUNAS_DO_CONTATO + colunasDeContato + ", created_at";
 
   // O select é DINÂMICO (a coluna `custom_fields` só entra quando o texto pede),
   // então o PostgREST não infere as colunas e devolve o tipo genérico: o `unknown`
@@ -215,18 +387,24 @@ export async function buscarCandidatos(
     // Só incluídos à mão: a consulta sem predicado traria a organização
     // inteira. A audiência é exatamente quem foi incluído (bloco abaixo).
     linhas = [];
-  } else if (idsPorNegocio) {
+  } else if (idsDoRecorte) {
     // Cada lote traz no MÁXIMO 100 linhas (um id por contato, e os lotes do
     // `buscaEmLotes` têm 100 ids), então a união é o recorte inteiro — a
     // exclusão e o corte global acontecem UMA vez, no fim. Um `.limit` por lote
     // cortaria a união antes da exclusão em memória: um lote com muitas linhas
     // excluídas empurraria para fora quem deveria entrar.
-    const { data, error } = await buscaEmLotes<LinhaDeContato>(idsPorNegocio, async (lote) => {
-      const { data: pagina, error: erro } = await consultaDeContatos().in("id", lote);
+    const { data, error } = await buscaEmLotes<LinhaDeContato>(idsDoRecorte, async (lote) => {
+      const { data: pagina, error: erro } = await consultaDeContatos(
+        admin,
+        organizationId,
+        filtro,
+        agora,
+        colunas,
+      ).in("id", lote);
       return { data: (pagina ?? null) as unknown as LinhaDeContato[] | null, error: erro };
     });
     if (error) throw new Error(`audiência: contatos — ${error.message}`);
-    linhas = data.filter((l) => !excluidos.has(l.id));
+    linhas = await semExcluidos(data, excluidos, casaExclusao);
     // Comparação ORDINAL, não `localeCompare`: a colação ICU põe `.` antes de
     // `+`, e um `…56+00:00` (segundo exato) cairia DEPOIS de um `…56.5+00:00`,
     // o contrário do `ORDER BY` do Postgres. Com timestamp em UTC no formato do
@@ -241,7 +419,9 @@ export async function buscarCandidatos(
     linhas = [];
     let cursorContatos: CursorDeLeitura | null = null;
     for (;;) {
-      let consulta = consultaDeContatos().limit(PAGINA_DO_POSTGREST);
+      let consulta = consultaDeContatos(admin, organizationId, filtro, agora, colunas).limit(
+        PAGINA_DO_POSTGREST,
+      );
       if (cursorContatos) consulta = consulta.or(filtroDepoisDoCursor(cursorContatos, "asc"));
       const { data, error } = await consulta;
       if (error) throw new Error(`audiência: contatos — ${error.message}`);
@@ -253,7 +433,7 @@ export async function buscarCandidatos(
         throw new Error("audiência: audiencia_page_did_not_advance");
       }
       cursorContatos = novo;
-      for (const l of pagina) if (!excluidos.has(l.id)) linhas.push(l);
+      linhas.push(...(await semExcluidos(pagina, excluidos, casaExclusao)));
       if (linhas.length >= filtro.limite) break;
     }
   }
@@ -273,7 +453,7 @@ export async function buscarCandidatos(
       async (lote) => {
         const { data: pagina, error: erro } = await admin
           .from("contacts")
-          .select(COLUNAS_DO_CONTATO + colunasDeContato + ", created_at")
+          .select(colunas)
           .eq("organization_id", organizationId)
           .eq("kind", "person")
           .in("id", lote);
