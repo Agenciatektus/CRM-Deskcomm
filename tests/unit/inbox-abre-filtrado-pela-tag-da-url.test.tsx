@@ -92,6 +92,7 @@ function pedidosDaLista(): URLSearchParams[] {
 
 describe("inbox aberto pelo link do relatório Por etiqueta", () => {
   beforeEach(() => {
+    window.localStorage.clear(); // o filtro lembrado de um caso não pode valer no seguinte
     get.mockClear();
   });
 
