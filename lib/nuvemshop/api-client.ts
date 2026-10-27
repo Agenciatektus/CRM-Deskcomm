@@ -72,7 +72,12 @@ export class NuvemshopApiClient {
     };
   }
 
-  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  private async request<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    retries429 = 0,
+  ): Promise<T> {
     let res: Response;
     try {
       res = await fetch(this.url(path), {
@@ -91,6 +96,13 @@ export class NuvemshopApiClient {
     }
 
     if (!res.ok) {
+      // A API não manda Retry-After no 429: a espera vem de `x-rate-limit-reset`
+      // (ms até o balde repor), com teto curto para não segurar o turno do agente.
+      if (res.status === 429 && retries429 > 0) {
+        const espera = Number(res.headers.get("x-rate-limit-reset"));
+        await new Promise((r) => setTimeout(r, Math.min(espera > 0 ? espera : 1000, 2000)));
+        return this.request<T>(method, path, body, retries429 - 1);
+      }
       const code =
         res.status === 401
           ? "unauthorized"
@@ -113,8 +125,8 @@ export class NuvemshopApiClient {
     }
   }
 
-  get<T>(path: string): Promise<T> {
-    return this.request<T>("GET", path);
+  get<T>(path: string, retries429 = 0): Promise<T> {
+    return this.request<T>("GET", path, undefined, retries429);
   }
 
   post<T>(path: string, body: unknown): Promise<T> {
@@ -141,5 +153,19 @@ export class NuvemshopApiClient {
 
   deleteWebhook(id: number): Promise<void> {
     return this.delete(`/webhooks/${id}`);
+  }
+
+  /** Busca ao vivo (nome, tags e SKU). Sem resultado a API responde 404, não lista vazia. */
+  async buscarProdutos(termo: string, limite: number): Promise<unknown[]> {
+    try {
+      const r = await this.get<unknown>(
+        `/products?q=${encodeURIComponent(termo)}&per_page=${limite}`,
+        2,
+      );
+      return Array.isArray(r) ? r : [];
+    } catch (err) {
+      if (err instanceof NuvemshopApiError && err.status === 404) return [];
+      throw err;
+    }
   }
 }
