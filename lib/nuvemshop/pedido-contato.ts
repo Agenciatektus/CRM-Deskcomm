@@ -4,7 +4,7 @@
  * só servem ao casamento: não são gravados nem logados (LGPD).
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { phoneLookupVariants } from "@/lib/channels/phone-variants";
+import { normalizePhoneBR, phoneLookupVariants } from "@/lib/channels/phone-variants";
 
 export type CasamentoDeContato = { contactId: string } | { motivo: "contato_ambiguo" } | null;
 
@@ -24,10 +24,9 @@ export async function casarContato(
       .is("is_merged_into", null)
       .limit(2);
 
-  let digitos = texto(pedido["contact_phone"]).replace(/\D/g, "");
-  // Número nacional sem DDI (10/11 dígitos): `phoneLookupVariants` só entende o 55.
-  if (digitos.length === 10 || digitos.length === 11) digitos = `55${digitos}`;
-  const variantes = digitos ? phoneLookupVariants(digitos) : [];
+  // Respeita o `+` (número estrangeiro não ganha 55) e só põe 55 em número sem DDI.
+  const telefone = normalizePhoneBR(pedido["contact_phone"]);
+  const variantes = telefone ? phoneLookupVariants(telefone) : [];
   const email = texto(pedido["contact_email"]).toLowerCase();
 
   const buscas = [

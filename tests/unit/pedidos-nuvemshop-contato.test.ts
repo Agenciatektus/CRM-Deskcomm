@@ -152,6 +152,42 @@ describe("sem casamento", () => {
     expect(gravado()).not.toHaveProperty("contact_id");
   });
 
+  it("número estrangeiro não ganha 55: +46 8123 4567 não casa com o DDD 46 do Paraná", async () => {
+    contatos = [contato("pr", { phone_number: "+5546981234567" })];
+    getOrder.mockResolvedValue(pedido({ contact_phone: "+4681234567" }));
+    await processPedido(evento);
+    expect(gravado()).not.toHaveProperty("contact_id");
+  });
+
+  it("fixo com 9 grudado não casa com o fixo de outra pessoa", async () => {
+    contatos = [contato("fixo", { phone_number: "+553132345678" })];
+    getOrder.mockResolvedValue(pedido({ contact_phone: "+5531932345678" }));
+    await processPedido(evento);
+    expect(gravado()).not.toHaveProperty("contact_id");
+  });
+
+  it("ambíguo também por e-mail", async () => {
+    contatos = [contato("a", { email_normalized: "m@x.com" }), contato("b", { email_normalized: "m@x.com" })];
+    getOrder.mockResolvedValue(pedido({ contact_email: "m@x.com" }));
+    expect(await processPedido(evento)).toMatchObject({ status: "ok", detail: "contato_ambiguo" });
+    expect(gravado()).not.toHaveProperty("contact_id");
+  });
+
+  it("erro na busca: detail só leva o código, sem telefone nem e-mail", async () => {
+    getOrder.mockResolvedValue(pedido({ contact_phone: "+5511999998888", contact_email: "m@x.com" }));
+    const admin = fakeAdmin();
+    vi.mocked(createAdminClient).mockReturnValue({
+      from: (t: string) => {
+        const q = admin.from(t) as Record<string, unknown>;
+        if (t === "contacts") q.then = (ok: (r: unknown) => unknown) => ok({ data: null, error: { code: "42P01" } });
+        return q;
+      },
+    } as never);
+    const r = await processPedido(evento);
+    expect(r).toMatchObject({ status: "error", detail: "contato:42P01" });
+    expect(JSON.stringify(r)).not.toMatch(/99999|m@x\.com/);
+  });
+
   it("sem telefone e sem e-mail: NULL, e nenhum contato é criado", async () => {
     contatos = [contato("c1", { phone_number: "+5511999998888" })];
     getOrder.mockResolvedValue(pedido());
@@ -172,7 +208,7 @@ describe("ao longo do tempo", () => {
     await processPedido(evento);
     expect(gravado()?.contact_id).toBe("c1");
 
-    // Outro contato assume o número e o pedido volta sem telefone: a linha segue com c1.
+    // Outro contato assume o número e o pedido volta com o mesmo telefone: a linha segue com c1.
     contatos = [contato("c2", { phone_number: "+5511999998888" })];
     getOrder.mockResolvedValue(pedido({ contact_phone: "+5511999998888", updated_at: "2026-10-22T10:00:00+0000" }));
     await processPedido(evento);
