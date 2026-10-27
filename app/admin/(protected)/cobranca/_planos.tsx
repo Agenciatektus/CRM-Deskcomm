@@ -188,7 +188,6 @@ export function PlanosDaInstalacao({ planos }: { planos: readonly PlanoDaTela[] 
             <input
               id="plano-ia-propria"
               type="checkbox"
-              className="size-4"
               aria-describedby="plano-ia-propria-dica"
               checked={campos.ia_propria}
               onChange={(e) => setCampos({ ...campos, ia_propria: e.target.checked, inclui_ia: e.target.checked ? false : campos.inclui_ia })}
