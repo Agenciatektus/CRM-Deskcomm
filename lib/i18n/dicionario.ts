@@ -8490,6 +8490,7 @@ export const DICIONARIO: Traducoes = {
   // ─── Inbox: composer (anexos, áudio, contato, templates) ───
   Anexar: { es: "Adjuntar" },
   "Fotos e vídeos": { es: "Fotos y videos" },
+  "Câmera": { es: "Cámara" },
   Documento: { es: "Documento" },
   "Enviar anexo": { es: "Enviar adjunto" },
   "Legenda (opcional)": { es: "Descripción (opcional)" },
@@ -15620,6 +15621,8 @@ export const DICIONARIO: Traducoes = {
     es: "Ningún número conectado. Conecta uno en Conexiones antes de crear la campaña.",
   },
   "Nome da campanha": { es: "Nombre de la campaña" },
+  "Você não tem permissão para ver nem criar campanhas.": { es: "No tienes permiso para ver ni crear campañas." },
+  "Peça a um gerente ou administrador da organização.": { es: "Pídelo a un gerente o administrador de la organización." },
   "Nova campanha": { es: "Nueva campaña" },
   "Sem telefone no cadastro": { es: "Sin teléfono en el registro" },
   "Telefone fora do formato de envio": { es: "Teléfono con formato no válido para envío" },
