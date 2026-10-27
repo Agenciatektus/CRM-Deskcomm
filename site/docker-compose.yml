@@ -11,9 +11,9 @@
 # ao público por engano):
 #
 #   TESTE (só quem manda o cabeçalho X-LP-Teste: 1 chega à LP; o público continua no CRM):
-#     Host(`crm.verdash.com.br`) && Header(`X-LP-Teste`, `1`) && (Path(`/`) || PathPrefix(`/_lp`) || Path(`/robots.txt`) || Path(`/sitemap.xml`) || Path(`/llms.txt`) || Path(`/llms-full.txt`))
+#     Host(`crm.verdash.com.br`) && Header(`X-LP-Teste`, `1`) && (Path(`/`) || PathPrefix(`/_lp`) || Path(`/robots.txt`) || Path(`/sitemap.xml`) || Path(`/llms.txt`) || Path(`/llms-full.txt`) || Path(`/obrigado`))
 #   PÚBLICO:
-#     Host(`crm.verdash.com.br`) && (Path(`/`) || PathPrefix(`/_lp`) || Path(`/robots.txt`) || Path(`/sitemap.xml`) || Path(`/llms.txt`) || Path(`/llms-full.txt`))
+#     Host(`crm.verdash.com.br`) && (Path(`/`) || PathPrefix(`/_lp`) || Path(`/robots.txt`) || Path(`/sitemap.xml`) || Path(`/llms.txt`) || Path(`/llms-full.txt`) || Path(`/obrigado`))
 #
 # Voltar atrás = subir de novo com a regra de TESTE (ou `docker compose down`): o CRM volta a servir
 # a raiz na hora, porque o roteador do CRM nunca foi alterado.
