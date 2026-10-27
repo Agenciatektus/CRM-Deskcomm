@@ -12,7 +12,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { eventLogTypeFor, SUBSCRIBED_EVENTS } from "./config";
 import { NuvemshopApiClient } from "./api-client";
 import { credenciaisDaLoja } from "./credenciais";
-import { casarContato } from "./pedido-contato";
+import { contatoDoPedido } from "./pedido-contato";
 import { sincronizarCardDoPedido } from "./pedido-card";
 import { mapearPedido, PedidoInvalidoError, semRegredir, type PedidoRow } from "./pedido-mapper";
 
@@ -74,7 +74,7 @@ export async function processPedido(row: EventRow): Promise<HandlerResult> {
 
     // Só casa quando a linha ainda não tem contato; o que já casou nunca é trocado nem zerado.
     // Sem a chave `contact_id` no upsert a coluna fica como está.
-    const casou = atual?.contact_id ? null : await casarContato(admin, row.organization_id, cru);
+    const casou = atual?.contact_id ? null : await contatoDoPedido(admin, row.organization_id, cru);
     const contato = casou && "contactId" in casou ? { contact_id: casou.contactId } : {};
 
     const { error } = await admin
@@ -98,6 +98,7 @@ export async function processPedido(row: EventRow): Promise<HandlerResult> {
     });
     const detalhes = [
       casou && "motivo" in casou ? casou.motivo : null,
+      casou && "criado" in casou ? "contato_criado" : null,
       card.detail === "funil_ausente" ? null : card.detail,
     ].filter(Boolean);
     return r("ok", detalhes.join(",") || undefined);

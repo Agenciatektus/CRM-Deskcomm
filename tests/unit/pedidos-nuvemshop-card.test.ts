@@ -187,9 +187,10 @@ describe("card do pedido", () => {
     expect(moveLeadHandler).toHaveBeenCalledTimes(1);
   });
 
-  it("sem contato não cria card nem contato", async () => {
+  it("pedido sem telefone nem e-mail não cria card nem contato", async () => {
     contatos = [];
-    const res = await roda("paid", "unpacked");
+    getOrder.mockResolvedValue(pedido("paid", "unpacked", { contact_phone: null }));
+    const res = await processPedido(evento());
     expect(res).toMatchObject({ status: "ok", detail: "sem_contato" });
     expect(leads).toHaveLength(0);
   });
