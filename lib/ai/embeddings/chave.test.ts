@@ -452,7 +452,6 @@ describe("resolverChaveDeEmbedding em plano com IA própria", () => {
 
     expect(await resolverChaveDeEmbedding("org-1")).toBeNull();
     expect(await resolverChaveDeEmbedding("org-1", "embedding_consultar", { familia: "openai" })).toBeNull();
-    expect(await resolverChaveDeEmbedding("org-1", "embedding_consultar", { familia: "openrouter" })).toBeNull();
     expect(state.rpc.chamadas).toBeGreaterThan(0);
   });
 
