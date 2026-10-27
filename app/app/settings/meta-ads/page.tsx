@@ -159,21 +159,6 @@ export default async function MetaAdsSettingsPage({
           </div>
         )}
 
-        {/* Só no fluxo do token colado à mão: no login com a Meta não há token a gerar. */}
-        {conexao.via !== "oauth" && (
-        <div className="rounded-md border border-sky-500/40 bg-sky-500/10 p-4 text-sm">
-          {/*
-            A permissão exata está escrita aqui porque é o erro nº 1 desta
-            integração: um token gerado sem `ads_read` conecta, salva, e só falha
-            na hora de abrir a tabela — longe daqui, com uma mensagem que parece
-            problema de outra coisa.
-          */}
-          {t(
-            "O token precisa da permissão ads_read. Gere-o no Meta for Developers, na sua conta de aplicativo, e cole abaixo — ele fica guardado criptografado e nunca é mostrado de volta.",
-          )}
-        </div>
-        )}
-
         <p className="text-sm text-muted-foreground">
           {t(
             "A conta Meta escolhida define o que os gestores desta organização veem: conecte com o login da própria empresa.",

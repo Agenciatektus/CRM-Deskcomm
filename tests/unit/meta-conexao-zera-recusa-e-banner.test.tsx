@@ -79,3 +79,42 @@ describe("banner de recusa em Ajustes > Meta Ads", () => {
     expect(sem).not.toContain("meta-precisa-reconectar");
   });
 });
+
+describe("formulário de token em Ajustes > Meta Ads", () => {
+  const base = {
+    contaPadrao: null,
+    via: null,
+    expiraEm: null,
+    diasParaVencer: null,
+    oauthFalta: [],
+    contasPermitidas: null,
+    podeAmpliar: true,
+    idioma: "pt-BR" as const,
+  };
+  const html = (conectada: boolean, oauthDisponivel: boolean) =>
+    renderToStaticMarkup(
+      <QueryClientProvider client={new QueryClient()}>
+        <FormularioDeMetaAds {...base} conectada={conectada} oauthDisponivel={oauthDisponivel} />
+      </QueryClientProvider>,
+    );
+
+  it("sem conexão e com login Meta: não mostra token nem Salvar", () => {
+    const m = html(false, true);
+    expect(m).not.toContain("escolher-contas");
+    expect(m).not.toContain("Token de acesso");
+    expect(m).not.toContain("Salvar");
+  });
+
+  it("conectada: mostra o formulário", () => {
+    const m = html(true, true);
+    expect(m).toContain("escolher-contas");
+    expect(m).toContain("Token de acesso");
+  });
+
+  it("sem login Meta na instalação: mostra o formulário para colar o token", () => {
+    const m = html(false, false);
+    expect(m).toContain("escolher-contas");
+    expect(m).toContain("Token de acesso");
+    expect(m).toContain("Salvar");
+  });
+});
