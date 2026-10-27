@@ -100,7 +100,7 @@ function Campos({
     inputMode?: "decimal",
   ) => (
     <div className="space-y-2">
-      <Label htmlFor={`${prefixo}-${chave}`}>{t(rotulo)}</Label>
+      <Label htmlFor={`${prefixo}-${chave}`}>{rotulo}</Label>
       <Input
         id={`${prefixo}-${chave}`}
         type={chave === "gasto" ? "text" : "number"}
@@ -113,10 +113,10 @@ function Campos({
   );
   return (
     <>
-      {campo("ultimaMin", "Última compra há pelo menos (dias)", 0)}
-      {campo("ultimaMax", "Última compra há no máximo (dias)", 0)}
-      {campo("comprasMin", "Pelo menos N compras", 1)}
-      {campo("gasto", "Gasto total mínimo (R$)", 0, "decimal")}
+      {campo("ultimaMin", t("Última compra há pelo menos (dias)"), 0)}
+      {campo("ultimaMax", t("Última compra há no máximo (dias)"), 0)}
+      {campo("comprasMin", t("Pelo menos N compras"), 1)}
+      {campo("gasto", t("Gasto total mínimo (R$)"), 0, "decimal")}
     </>
   );
 }
