@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { CredentialRow } from "@/hooks/ai/useCredentials";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { contarUsoQueBloqueia, type VersaoVinculada } from "@/lib/ai/credenciais/uso";
-import { lerConfigDoJev } from "@/lib/ai/decisao/config";
+import { configEfetivaDoJev, organizacaoElegivelAoJev, plataformaServeOJev } from "@/lib/ai/decisao/elegibilidade";
 import {
   algumFluxoQueClassifica,
   algumRoteadorQuePergunta,
@@ -144,8 +144,15 @@ export default async function CredentialsPage() {
     .select("settings")
     .eq("id", activeOrg.orgId)
     .maybeSingle();
-  const configDoJev = lerConfigDoJev(orgRow?.settings);
+  // A config que VALE: empresa no padrão da plataforma aparece LIGADA (e o
+  // aceite sintético não vai a lugar nenhum desta tela).
+  const adminDaTela = createAdminClient();
+  const configDoJev = await configEfetivaDoJev(orgRow?.settings, () =>
+    organizacaoElegivelAoJev(adminDaTela, activeOrg.orgId),
+  );
   const jevLigado = configDoJev.ligado;
+  // Só o booleano vai ao cliente; a chave da plataforma nunca sai do servidor.
+  const plataformaTemJev = jevLigado ? await plataformaServeOJev(adminDaTela, activeOrg.orgId) : false;
   // A camada que a manipulação acompanha: desligada, a tarefa não roda. Leitura
   // que falha não cai no padrão do ambiente (que liga a camada): a tela deixa a
   // tarefa de fora em vez de afirmar que ela roda — falha fechada na afirmação.
@@ -199,6 +206,7 @@ export default async function CredentialsPage() {
     ? {
         // De onde o Jev responde: decide QUAL credencial a lista marca como dele.
         origem: configDoJev.origem,
+        plataformaTemJev,
         // Só as tarefas que a chave de fato serve agora.
         tarefas: TAREFAS_DO_JEV.filter(
           (t) =>

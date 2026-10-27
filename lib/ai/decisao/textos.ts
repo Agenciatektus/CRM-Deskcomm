@@ -79,6 +79,7 @@ export const JEV_FALHOU_E_A_IA_COBRIU = "O Jev decide esta tarefa e não respond
  */
 export const AO_EXCLUIR_A_CHAVE_DO_JEV = {
   outraChave: "O Jev usa esta chave. Sem ela, ele passa a usar a outra chave dele que já passou no teste.",
+  voltaParaAPlataforma: "O Jev usa esta chave. Sem ela, ele passa a usar o Jev da plataforma e continua ligado.",
   usada: "O Jev usa esta chave. Sem ela, o Jev é desligado e as tarefas em “Usada em” param.",
   nenhumaTarefa: "O Jev está ligado, mas nenhuma tarefa dele usa esta chave agora. Sem ela, o Jev é desligado.",
   climaComIa: "O clima da conversa volta a ser medido só pela sua IA principal.",
@@ -96,9 +97,12 @@ export function avisoAoExcluirAChaveDoJev(c: {
   temOutraChave: boolean;
   tarefas: readonly string[];
   temIaPrincipal: boolean;
+  /** A plataforma serve o Jev a esta empresa: apagar a última chave própria não desliga. */
+  plataformaServe?: boolean;
 }): string[] {
   const t = AO_EXCLUIR_A_CHAVE_DO_JEV;
   if (c.temOutraChave) return [t.outraChave];
+  if (c.plataformaServe) return [t.voltaParaAPlataforma];
   if (c.tarefas.length === 0) return [t.nenhumaTarefa];
   if (!c.tarefas.includes(TAREFA_DO_CLIMA.rotulo)) return [t.usada];
   return [t.usada, c.temIaPrincipal ? t.climaComIa : t.climaSemIa];

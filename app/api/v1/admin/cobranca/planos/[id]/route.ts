@@ -24,7 +24,7 @@ import {
 } from "@/lib/auth/requirePlatformAdmin";
 import { requireSupportWrite } from "@/lib/impersonate/support";
 import { moduloLigado } from "@/lib/instalacao/modulos";
-import { COLUNAS_DO_PLANO, edicaoDoPlanoSchema } from "@/lib/schemas/cobranca-plano";
+import { COLUNAS_DO_PLANO, edicaoDoPlanoSchema, INCLUI_IA_E_IA_PROPRIA } from "@/lib/schemas/cobranca-plano";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 interface PlanoAtual {
@@ -32,6 +32,8 @@ interface PlanoAtual {
   preco_cents: number;
   intervalo: string;
   arquivado_em: string | null;
+  ia_propria?: boolean;
+  inclui_ia?: boolean;
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -60,7 +62,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { data: lido, error: erroDeLeitura } = await admin
     .from("cobranca_planos")
-    .select("id, preco_cents, intervalo, arquivado_em")
+    .select("id, preco_cents, intervalo, arquivado_em, ia_propria, inclui_ia")
     .eq("id", id)
     .maybeSingle();
   if (erroDeLeitura) return fail("internal_error", "Não foi possível ler o plano", 500, { requestId });
@@ -68,6 +70,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!atual) return fail("not_found", "Plano não encontrado", 404, { requestId });
 
   const { arquivado, ...campos } = corpo.data;
+  // O corpo sozinho passa no schema (só um dos dois); o plano resultante não pode ter os dois.
+  if ((campos.inclui_ia ?? atual.inclui_ia) === true && (campos.ia_propria ?? atual.ia_propria) === true) {
+    return fail("validation_failed", INCLUI_IA_E_IA_PROPRIA, 400, { requestId });
+  }
   const mudaACobranca =
     (campos.preco_cents !== undefined && campos.preco_cents !== Number(atual.preco_cents)) ||
     (campos.intervalo !== undefined && campos.intervalo !== atual.intervalo);

@@ -4914,6 +4914,21 @@ export const DICIONARIO: Traducoes = {
   "O Jev usa esta chave. Sem ela, ele passa a usar a outra chave dele que já passou no teste.": {
     es: "Jev usa esta clave. Sin ella, pasa a usar su otra clave que ya pasó la prueba.",
   },
+  "O Jev usa esta chave. Sem ela, ele passa a usar o Jev da plataforma e continua ligado.": {
+    es: "Jev usa esta clave. Sin ella, pasa a usar el Jev de la plataforma y sigue activado.",
+  },
+  "Usando o Jev da plataforma. As mensagens processadas pelo Jev são enviadas à TypeSafe AI, nos Estados Unidos, pela conta da Tektus. Cadastre a sua chave para usar a sua conta.": {
+    es: "Usando el Jev de la plataforma. Los mensajes procesados por Jev se envían a TypeSafe AI, en Estados Unidos, por la cuenta de Tektus. Registra tu clave para usar tu cuenta.",
+  },
+  "Marque o aceite do envio das mensagens à TypeSafe AI antes de mudar o Jev.": {
+    es: "Marca la aceptación del envío de mensajes a TypeSafe AI antes de cambiar Jev.",
+  },
+  "Cada mensagem que o cliente manda vai para a TypeSafe AI, nos Estados Unidos, uma de cada vez e sem o resto da conversa, para o Jev avaliar. Antes de sair, o sistema apaga CPF, telefone e e-mail do texto. Para mudar qualquer ajuste do Jev, confirme o aceite abaixo. Desligar não pede aceite.": {
+    es: "Cada mensaje que el cliente envía va a TypeSafe AI, en Estados Unidos, uno a la vez y sin el resto de la conversación, para que Jev lo evalúe. Antes de salir, el sistema borra CPF, teléfono y correo del texto. Para cambiar cualquier ajuste de Jev, confirma la aceptación abajo. Apagar no pide aceptación.",
+  },
+  "Sua chave foi recusada pela TypeSafe:": { es: "Tu clave fue rechazada por TypeSafe:" },
+  "não consegui testar a chave.": { es: "no pude probar la clave." },
+  "Enquanto isso, a plataforma atende.": { es: "Mientras tanto, la plataforma atiende." },
   "O Jev parou de funcionar": { es: "Jev dejó de funcionar" },
   // Título antigo do mesmo aviso: segue aqui para a busca achar o aviso aberto
   // em espanhol numa instalação que atualizou (`lib/ai/decisao/aviso.ts`).

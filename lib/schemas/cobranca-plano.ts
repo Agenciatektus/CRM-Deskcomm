@@ -23,7 +23,12 @@ const campos = {
   inclui_ia: z.boolean(),
 };
 
-export const novoPlanoSchema = z.strictObject({
+/** IA própria e IA incluída se excluem: a chave da plataforma é a da instalação, que o plano com IA própria proíbe. */
+export const INCLUI_IA_E_IA_PROPRIA = "Um plano não pode incluir IA e ser de IA própria ao mesmo tempo.";
+const naoJuntaIa = (v: { inclui_ia?: boolean; ia_propria?: boolean }) => !(v.inclui_ia === true && v.ia_propria === true);
+
+export const novoPlanoSchema = z
+  .strictObject({
   nome: campos.nome,
   preco_cents: campos.preco_cents,
   intervalo: campos.intervalo,
@@ -35,12 +40,14 @@ export const novoPlanoSchema = z.strictObject({
   oferecido_ao_cliente: campos.oferecido_ao_cliente.optional(),
   ia_propria: campos.ia_propria.optional(),
   inclui_ia: campos.inclui_ia.optional(),
-});
+  })
+  .refine(naoJuntaIa, INCLUI_IA_E_IA_PROPRIA);
 
 export const edicaoDoPlanoSchema = z
   .strictObject({ ...campos, arquivado: z.boolean() })
   .partial()
-  .refine((v) => Object.keys(v).length > 0, "Nada para mudar.");
+  .refine((v) => Object.keys(v).length > 0, "Nada para mudar.")
+  .refine(naoJuntaIa, INCLUI_IA_E_IA_PROPRIA);
 
 export const COLUNAS_DO_PLANO =
   "id, nome, preco_cents, moeda, intervalo, trial_dias, max_assentos, max_canais, teto_ia_usd_cents, padrao_no_cadastro, oferecido_ao_cliente, ia_propria, inclui_ia, arquivado_em, created_at, updated_at";

@@ -103,6 +103,27 @@ describe("PATCH /api/v1/admin/cobranca/planos/[id]", () => {
     expect("ia_propria" in payload).toBe(false);
   });
 
+  it("inclui_ia junto com ia_propria no mesmo corpo → 400, nada gravado", async () => {
+    expect((await PATCH(...pedido({ inclui_ia: true, ia_propria: true }))).status).toBe(400);
+    expect(updates()).toEqual([]);
+  });
+
+  it("inclui_ia num plano que JÁ é de IA própria → 400; o controle (plano sem IA própria) → 200", async () => {
+    m.atual = { ...ATUAL, ia_propria: true } as typeof ATUAL;
+    const res = await PATCH(...pedido({ inclui_ia: true }));
+    expect(res.status).toBe(400);
+    expect(updates()).toEqual([]);
+
+    m.atual = { ...ATUAL, ia_propria: false } as typeof ATUAL;
+    expect((await PATCH(...pedido({ inclui_ia: true }))).status).toBe(200);
+    expect(argumentos(updates()[0]!, "update")?.[0]).toMatchObject({ inclui_ia: true });
+  });
+
+  it("trocar ia_propria para false e inclui_ia para true no mesmo corpo é válido", async () => {
+    m.atual = { ...ATUAL, ia_propria: true } as typeof ATUAL;
+    expect((await PATCH(...pedido({ inclui_ia: true, ia_propria: false }))).status).toBe(200);
+  });
+
   it("ia_propria que não é booleano → 400", async () => {
     expect((await PATCH(...pedido({ ia_propria: "sim" }))).status).toBe(400);
     expect(updates()).toEqual([]);

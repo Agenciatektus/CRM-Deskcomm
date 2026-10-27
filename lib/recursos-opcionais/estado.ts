@@ -18,6 +18,8 @@ import { canalGraphParceiroLigado } from "@/lib/channels/graph-parceiro/credenti
 import { appDaMeta } from "@/lib/channels/meta/app";
 import { emailConfigurado } from "@/lib/email/roteador";
 import { env } from "@/lib/env";
+import { ehConfigDoPadrao } from "@/lib/ai/decisao/config";
+import { configEfetivaDoJev, organizacaoElegivelAoJev } from "@/lib/ai/decisao/elegibilidade";
 import { modulosLigados } from "@/lib/instalacao/modulos";
 import { logger } from "@/lib/logger";
 import { vapidPronto } from "@/lib/notifications/vapid";
@@ -81,7 +83,11 @@ export async function fontesDaEmpresa(db: SupabaseClient, organizationId: string
           .maybeSingle();
         if (error || !data) return null;
         const s = (data as { settings?: unknown }).settings;
-        return s && typeof s === "object" && !Array.isArray(s) ? (s as Record<string, unknown>) : {};
+        const lidas = s && typeof s === "object" && !Array.isArray(s) ? (s as Record<string, unknown>) : {};
+        // O Jev ligado pelo padrão da plataforma aparece LIGADO (o catálogo lê
+        // `settings.jev`); o aceite sintético só vive neste objeto em memória.
+        const efetiva = await configEfetivaDoJev(lidas, () => organizacaoElegivelAoJev(db, organizationId));
+        return ehConfigDoPadrao(efetiva) ? { ...lidas, jev: efetiva } : lidas;
       } catch {
         return null;
       }

@@ -18,7 +18,7 @@
  * deixar decidir a tarefa seguinte.
  */
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { AddCredentialDialog } from "@/app/app/ai/credentials/_components/AddCredentialDialog";
@@ -46,6 +46,25 @@ import { ROTEADOR_SOB_DEMANDA, ROTEADOR_SOB_DEMANDA_SEM_IA, TAREFA_DO_CLIMA, TAR
 import { O_QUE_FAZER_DO_JEV } from "@/lib/ai/decisao/textos";
 import type { ProvedorComChave } from "@/lib/ai/pontos/provedores";
 
+/**
+ * O aceite da empresa que está no padrão da plataforma (`config.no_padrao`):
+ * `exigido` enquanto estiver no padrão, `dado` quando o checkbox está marcado.
+ * Fora do padrão o contexto é `{ exigido: false }` e nada muda.
+ */
+export const AceiteDoPadrao = createContext<{ exigido: boolean; dado: boolean }>({ exigido: false, dado: false });
+
+/**
+ * O corpo do PATCH com o aceite, ou `null` quando ele é exigido e não foi dado.
+ * Desligar nunca pede aceite; fora do padrão o corpo segue como veio.
+ */
+export function corpoComAceiteDoPadrao(
+  corpo: Record<string, unknown>,
+  aceite: { exigido: boolean; dado: boolean },
+): Record<string, unknown> | null {
+  if (!aceite.exigido || corpo.ligado === false) return corpo;
+  return aceite.dado ? { ...corpo, aceite_lgpd: true } : null;
+}
+
 /** O corpo de `GET /api/v1/ai/jev` (`app/api/v1/ai/jev/route.ts`). */
 export interface DadosDoJev {
   provedor: { rotulo: string; quandoUsar: string; ondePegarAChave: string; prefixoDaChave: string };
@@ -55,8 +74,14 @@ export interface DadosDoJev {
     credencial_id: string | null;
     rotulo: string | null;
     erro_de_validacao: string | null;
+    /** De quem é a chave que o Jev usa. Ausente na imagem anterior. */
+    fonte_da_chave?: "propria" | "plataforma" | "nenhuma";
   };
+  /** A plataforma serve o Jev a esta empresa (só o booleano; a chave nunca chega à tela). */
+  plataforma_tem_jev?: boolean;
   config: {
+    /** Ligado pelo padrão da plataforma, sem aceite gravado: o aceite nunca vem na resposta. */
+    no_padrao?: boolean;
     ligado: boolean;
     modo: "observacao" | "decide";
     modo_roteador?: "comparacao" | "sob_demanda";
@@ -441,6 +466,7 @@ export function CartaoDoJev({
   recarregar: () => Promise<void>;
 }) {
   const t = useT();
+  const [aceitoNoPadrao, setAceitoNoPadrao] = useState(false);
 
   if (erro) {
     return (
@@ -458,8 +484,10 @@ export function CartaoDoJev({
 
   const estado = estadoDoJev(dados);
   const ligado = dados.config.ligado;
+  const noPadrao = dados.config.no_padrao === true;
 
   return (
+    <AceiteDoPadrao.Provider value={{ exigido: noPadrao, dado: aceitoNoPadrao }}>
     <Card className="mb-6 p-4" data-testid="cartao-do-jev" data-estado={estado}>
       {/* No celular o selo desce para baixo do título e a descrição ocupa a
           largura toda: lado a lado, o selo espremia o texto numa coluna
@@ -486,13 +514,54 @@ export function CartaoDoJev({
           o resultado do teste, dito em palavras (o ✓ é enfeite). O nome do
           provedor acompanha a origem: via OpenRouter, quem conferiu foi a
           OpenRouter, e a chave é a mesma da conversa. */}
-      {dados.chave.validada && (
+      {dados.chave.fonte_da_chave === "plataforma" && (
+        <p className="mt-3 text-xs text-muted-foreground" data-testid="jev-da-plataforma">
+          {t("Usando o Jev da plataforma. As mensagens processadas pelo Jev são enviadas à TypeSafe AI, nos Estados Unidos, pela conta da Tektus. Cadastre a sua chave para usar a sua conta.")}
+        </p>
+      )}
+      {/* A chave própria foi recusada e a plataforma atende: o erro dela não pode
+          sumir só porque o Jev segue funcionando. */}
+      {dados.chave.fonte_da_chave === "plataforma" && dados.chave.erro_de_validacao && (
+        <p className="mt-2 text-xs text-warning-fg" data-testid="jev-chave-propria-recusada">
+          {t("Sua chave foi recusada pela TypeSafe:")}{" "}
+          {t(descreverErroDeValidacao(dados.chave.erro_de_validacao, PROVEDOR_DO_JEV).frase) ||
+            t("não consegui testar a chave.")}{" "}
+          {t("Enquanto isso, a plataforma atende.")}
+        </p>
+      )}
+      {dados.chave.validada && dados.chave.fonte_da_chave !== "plataforma" && (
         <p className="mt-3 flex items-center gap-1.5 text-xs text-success-fg" data-testid="jev-chave-conferida">
           <span aria-hidden>✓</span>
           {origemDoCartao(dados) === "openrouter"
             ? t("Chave conferida na OpenRouter")
             : t("Chave conferida com a TypeSafe")}
         </p>
+      )}
+
+      {/* Ligado pelo padrão da plataforma, ninguém aceitou ainda: antes de mudar
+          qualquer coisa, o aceite de verdade (o mesmo texto de ligar). Desligar não pede. */}
+      {noPadrao && dados.pode_editar && (
+        <div className="mt-3 max-w-2xl rounded-md border border-border p-3 text-sm" data-testid="jev-aceite-do-padrao">
+          <p>
+            {t(
+              "Cada mensagem que o cliente manda vai para a TypeSafe AI, nos Estados Unidos, uma de cada vez e sem o resto da conversa, para o Jev avaliar. Antes de sair, o sistema apaga CPF, telefone e e-mail do texto. Para mudar qualquer ajuste do Jev, confirme o aceite abaixo. Desligar não pede aceite.",
+            )}
+          </p>
+          <div className="mt-3 flex items-start gap-2">
+            <input
+              id="jev-aceite-do-padrao"
+              type="checkbox"
+              className="mt-0.5"
+              checked={aceitoNoPadrao}
+              onChange={(e) => setAceitoNoPadrao(e.target.checked)}
+            />
+            <label htmlFor="jev-aceite-do-padrao" className="text-sm">
+              {t(
+                "Concordo com o envio de cada mensagem dos clientes, uma de cada vez e sem o resto da conversa, para a TypeSafe AI, nos Estados Unidos.",
+              )}
+            </label>
+          </div>
+        </div>
       )}
 
       <DeOndeResponde dados={dados} recarregar={recarregar} />
@@ -518,6 +587,7 @@ export function CartaoDoJev({
         <p className="mt-3 text-xs text-muted-foreground">{t("Só quem administra a empresa pode mudar o Jev.")}</p>
       )}
     </Card>
+    </AceiteDoPadrao.Provider>
   );
 }
 
@@ -772,7 +842,16 @@ function useMudarOJev(recarregar: () => Promise<void>) {
   const t = useT();
   const [enviando, setEnviando] = useState(false);
 
-  async function mudar(corpo: Record<string, unknown>, sucesso: string) {
+  const aceiteDoPadrao = useContext(AceiteDoPadrao);
+
+  async function mudar(corpoPedido: Record<string, unknown>, sucesso: string) {
+    // Empresa no padrão da plataforma: qualquer mudança (menos desligar) é ela
+    // assumindo o Jev, e a rota exige o aceite real. Sem o checkbox marcado, nada sai.
+    const corpo = corpoComAceiteDoPadrao(corpoPedido, aceiteDoPadrao);
+    if (corpo === null) {
+      toast.error(t("Marque o aceite do envio das mensagens à TypeSafe AI antes de mudar o Jev."));
+      return;
+    }
     setEnviando(true);
     try {
       const res = await fetch("/api/v1/ai/jev", {
