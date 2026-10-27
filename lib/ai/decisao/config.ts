@@ -144,6 +144,44 @@ export function lerConfigDoJev(settings: unknown): ConfigDoJev {
   return lido.success ? lido.data : { ...DESLIGADO };
 }
 
+/**
+ * O JEV LIGADO POR PADRÃO — a config de quem nunca gravou `settings.jev`, numa
+ * instalação com `JEV_LIGADO_POR_PADRAO` e uma empresa elegível
+ * (`./elegibilidade.ts`). Pura: quem decide SE vale é a elegibilidade; aqui só
+ * mora o QUE vale.
+ *
+ * "Decide direto" nesta base é: interruptor ligado, todas as tarefas em
+ * `decidindo` (o Jev decide e a IA de sempre fica de reserva) e o roteador em
+ * `sob_demanda` (o Jev escolhe primeiro, sem a fase de comparação). O aceite
+ * é o de "cada mensagem, sozinha" (`alcance: "mensagem"`), o mesmo que a tela
+ * grava ao ligar: a tarefa que pede a conversa inteira continua desligada até a
+ * empresa aceitar. O aceite é SINTÉTICO (`por` = `ACEITE_DO_PADRAO_POR`) e nunca
+ * é gravado: no dia em que a empresa mexer, o PATCH pede o aceite de verdade.
+ */
+export const ACEITE_DO_PADRAO_POR = "00000000-0000-0000-0000-000000000000";
+
+export function configLigadaPorPadrao(): ConfigDoJev {
+  return {
+    ligado: true,
+    modo: "decide",
+    modo_roteador: "sob_demanda",
+    origem: ORIGEM_PADRAO,
+    aceite: { em: "1970-01-01T00:00:00.000Z", por: ACEITE_DO_PADRAO_POR, alcance: "mensagem" },
+    tarefas: Object.fromEntries(idDaTarefaSchema.options.map((id) => [id, { estado: "decidindo" as const }])),
+  };
+}
+
+/** A config em uso é a do padrão (aceite sintético), e não uma que a empresa gravou? */
+export function ehConfigDoPadrao(config: ConfigDoJev): boolean {
+  return config.aceite?.por === ACEITE_DO_PADRAO_POR;
+}
+
+/** A empresa gravou `settings.jev` alguma vez? Gravado manda, ligado ou desligado. */
+export function jevFoiGravado(settings: unknown): boolean {
+  if (settings === null || typeof settings !== "object") return false;
+  return (settings as Record<string, unknown>).jev !== undefined;
+}
+
 export type ResultadoDeGravarConfig =
   | { ok: true; config: ConfigDoJev }
   | { ok: false; motivo: "leitura_falhou" | "config_invalida" | "escrita_recusada" };
@@ -159,6 +197,11 @@ export interface PedidoDeGravarConfig {
   orgId: string;
   actorUserId: string;
   mudanca: MudancaDaConfig;
+  /**
+   * A config de que a mudança parte, quando não é a gravada (a empresa estava no
+   * padrão da plataforma e o PATCH já a leu como efetiva). Ausente = a gravada.
+   */
+  base?: ConfigDoJev;
   agora?: Date;
 }
 
@@ -234,7 +277,7 @@ export async function gravarConfigDoJev(p: PedidoDeGravarConfig): Promise<Result
 
   const settingsAtuais = (org.settings ?? {}) as Record<string, unknown>;
   const proxima = configDoJevSchema.safeParse(
-    mesclar(lerConfigDoJev(settingsAtuais), p.mudanca, {
+    mesclar(p.base ?? lerConfigDoJev(settingsAtuais), p.mudanca, {
       em: (p.agora ?? new Date()).toISOString(),
       por: p.actorUserId,
     }),

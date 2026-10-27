@@ -43,7 +43,7 @@ describe("Planos da instalação", () => {
     await waitFor(() => expect(h.post).toHaveBeenCalledTimes(1));
     expect(h.post).toHaveBeenCalledWith("/api/v1/admin/cobranca/planos", {
       nome: "Pro", preco_cents: 9990, intervalo: "mes", trial_dias: 7,
-      max_assentos: 5, max_canais: null, teto_ia_usd_cents: null, ia_propria: false,
+      max_assentos: 5, max_canais: null, teto_ia_usd_cents: null, ia_propria: false, inclui_ia: false,
     });
     expect(h.refresh).toHaveBeenCalled();
   });

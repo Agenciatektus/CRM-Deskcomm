@@ -37,7 +37,8 @@ import { scrubMessage } from "@/lib/sentry/scrub";
 import type { createAdminClient } from "@/lib/supabase/admin";
 
 import { MODELO_DO_JEV, type FalhaDaDecisao, type Pergunta, type Resposta } from "./cliente";
-import { lerConfigDoJev, type EstadoDaTarefa } from "./config";
+import type { EstadoDaTarefa } from "./config";
+import { configEfetivaDoJev, organizacaoElegivelAoJev } from "./elegibilidade";
 import { podeTentar, registrarFalha, registrarSucesso } from "./disjuntor";
 import { decidirNoPonto, type DependenciasDoPonto } from "./ponto";
 import { codigoDoErroDoJev } from "./textos";
@@ -102,7 +103,8 @@ export async function estadoDaAfirmacao(admin: Admin, organizationId: string): P
       .eq("id", organizationId)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    return estadoEfetivoDaTarefa(lerConfigDoJev(data?.settings ?? null), TAREFA_DA_AFIRMACAO_DE_FATO);
+    const config = await configEfetivaDoJev(data?.settings ?? null, () => organizacaoElegivelAoJev(admin, organizationId));
+    return estadoEfetivoDaTarefa(config, TAREFA_DA_AFIRMACAO_DE_FATO);
   } catch (erro) {
     logger.warn("a conferência de fato não leu a configuração do Jev; a tarefa fica de fora", {
       organization_id: organizationId,
