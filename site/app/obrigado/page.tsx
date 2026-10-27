@@ -7,7 +7,6 @@ import { Secao } from "../_components/Secao";
 
 export const metadata: Metadata = {
   title: OBRIGADO.titulo,
-  alternates: { canonical: "/obrigado" },
   robots: { index: false, follow: false },
 };
 

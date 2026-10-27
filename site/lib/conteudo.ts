@@ -638,8 +638,8 @@ export const META_DESCRICAO =
 
 /** Página para onde a Stripe leva quem acabou de pagar. Sem prazo prometido: o convite chega quando a conta é criada. */
 export const OBRIGADO = {
-  titulo: "Pagamento recebido",
-  texto: "Obrigado por assinar o Verdash CRM. O recibo chega no e-mail que você informou no pagamento.",
+  titulo: "Obrigado por assinar",
+  texto: "Se o pagamento foi aprovado, o recibo chega no e-mail que você informou.",
   passosTitulo: "O que acontece agora",
   passos: [
     "A Tektus cria a conta da sua empresa com os dados do pagamento.",
