@@ -79,6 +79,7 @@ function urlsPedidas(): string[] {
 
 describe("inbox: o filtro Grupos (#2103)", () => {
   beforeEach(() => {
+    window.localStorage.clear(); // o filtro lembrado de um caso não pode valer no seguinte
     get.mockClear();
     window.history.replaceState(null, "", "/app/inbox");
   });
