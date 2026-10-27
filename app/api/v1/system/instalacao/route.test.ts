@@ -57,7 +57,7 @@ beforeEach(() => {
 describe("GET ?provar=1", () => {
   it("plano com IA propria: nao prova saldo com a chave da instalacao", async () => {
     state.pode = false;
-    const r = (await GET(req())) as { corpo: { prova: { feita: boolean; motivo: string } } };
+    const r = (await GET(req())) as unknown as { corpo: { prova: { feita: boolean; motivo: string } } };
     expect(provarSaldo).not.toHaveBeenCalled();
     expect(r.corpo.prova.feita).toBe(false);
     expect(r.corpo.prova.motivo).toBe("ia propria sem credencial");
