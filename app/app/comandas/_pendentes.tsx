@@ -113,7 +113,7 @@ export function AtendimentosSemComanda({
                 disabled={semPreco || !podeLancar}
                 onChange={() => alternar(p.appointment_id)}
                 data-testid={`pendente-${p.appointment_id}`}
-                className="size-4 rounded-sm border-border accent-accent disabled:opacity-40"
+                className="disabled:opacity-40"
               />
               <span className="flex-1">
                 {p.service_name ?? p.title}

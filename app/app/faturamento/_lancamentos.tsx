@@ -157,7 +157,6 @@ export function ListaDeLancamentos({
               checked={jaPago}
               data-testid="lancamento-ja-pago"
               onChange={(e) => setJaPago(e.target.checked)}
-              className="size-4 rounded-sm border-border accent-accent"
             />
             {t("Já pago")}
           </label>

@@ -490,7 +490,6 @@ function EditBudgetDialog({ status }: { status: BudgetStatus }) {
                   type="checkbox"
                   checked={imediato}
                   onChange={(e) => setImediato(e.target.checked)}
-                  className="h-4 w-4 accent-primary"
                 />
                 {t("Começar a valer agora, sem esperar as 72 horas")}
               </label>

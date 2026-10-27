@@ -140,7 +140,7 @@ export function LevarParaOutroFunilEmLote({
                 type="checkbox"
                 checked={rodar}
                 onChange={(e) => setRodar(e.target.checked)}
-                className="mt-1 accent-primary"
+                className="mt-1"
               />
               <span>
                 {t("Rodar as automações de entrada da etapa")}
