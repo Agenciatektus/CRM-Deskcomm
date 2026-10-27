@@ -1,5 +1,6 @@
 /**
- * Grava o pedido da Nuvemshop em `orders` (sem card ou funil; liga ao contato existente, sem criar).
+ * Grava o pedido da Nuvemshop em `orders`, liga ao contato existente (sem criar) e, se a org
+ * tem o funil "Pedidos do Site", cria/move o card do pedido (`pedido-card.ts`).
  *
  * O webhook chega duplicado e fora de ordem, então o pedido é RELIDO na API e o
  * estado nunca regride (`semRegredir`). Service role: todo filtro leva
@@ -12,6 +13,7 @@ import { eventLogTypeFor, SUBSCRIBED_EVENTS } from "./config";
 import { NuvemshopApiClient } from "./api-client";
 import { credenciaisDaLoja } from "./credenciais";
 import { casarContato } from "./pedido-contato";
+import { sincronizarCardDoPedido } from "./pedido-card";
 import { mapearPedido, PedidoInvalidoError, semRegredir, type PedidoRow } from "./pedido-mapper";
 
 export const PEDIDOS_HANDLER_KEY = "nuvemshop-pedidos.v1";
@@ -82,7 +84,21 @@ export async function processPedido(row: EventRow): Promise<HandlerResult> {
         { onConflict: "organization_id,external_provider,external_id" },
       );
     if (error) return r("error", `gravacao:${error.code ?? "erro"}`);
-    return casou && "motivo" in casou ? r("ok", casou.motivo) : r("ok");
+
+    // Card do pedido (4.3): depois do upsert; falha dele nunca derruba nem repete o pedido.
+    const gravado = semRegredir(novo, atual);
+    const card = await sincronizarCardDoPedido(admin, row.organization_id, {
+      externalId: id,
+      numero: cru["number"] != null ? String(cru["number"]) : null,
+      status: gravado.status,
+      totalCents: gravado.total_cents,
+      contactId: atual?.contact_id ?? (casou && "contactId" in casou ? casou.contactId : null),
+    });
+    const detalhes = [
+      casou && "motivo" in casou ? casou.motivo : null,
+      card.detail === "funil_ausente" ? null : card.detail,
+    ].filter(Boolean);
+    return r("ok", detalhes.join(",") || undefined);
   } catch (err) {
     // Dado ruim não muda na próxima tentativa: pula em vez de ficar em retry.
     if (err instanceof PedidoInvalidoError) return r("skipped", err.message);
