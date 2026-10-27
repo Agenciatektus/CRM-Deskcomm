@@ -1136,6 +1136,9 @@ export const AUDIT_ACTIONS = [
   // a assinatura). Detecção, não correção — o preço de quem já assinou é
   // decisão de quem administra, e o audit é o lugar de vê-la.
   "cobranca.preco_divergente",
+  // Venda direta: a compra paga por link criou a empresa (sem usuário; o
+  // metadata traz compra, plano e origem, nunca o e-mail do comprador).
+  "cobranca.compra_criou_empresa",
   // O servidor MCP externo registrado pela instalação (#2147): gravado (ou
   // apagado, com `registrado: false` no metadata) em
   // `organizations.settings.mcp_externo`. É mutação de TENANT — o endereço que
