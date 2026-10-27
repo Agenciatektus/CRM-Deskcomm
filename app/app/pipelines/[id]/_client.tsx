@@ -189,11 +189,16 @@ export function PipelinePageClient({
         onAbrir={setDossieDaLista}
       />
     );
-  // No celular o dossiê é desta página nas duas vistas (lá não há KanbanBoard).
-  const leadDaLista =
-    (vista === "lista" || celular) && dossieDaLista ? (ordenados.find((l) => l.id === dossieDaLista) ?? null) : null;
   // `/app/leads/:id` redireciona para cá com `?lead=`: no celular quem abre é a página.
   const leadDaUrl = searchParams.get("lead");
+  // No celular o dossiê é desta página nas duas vistas (lá não há KanbanBoard).
+  // O lead da URL vale mesmo fora do recorte: o filtro lembrado não esconde o link.
+  const leadDaLista =
+    (vista === "lista" || celular) && dossieDaLista
+      ? (ordenados.find((l) => l.id === dossieDaLista) ??
+        (dossieDaLista === leadDaUrl ? data?.leads.find((l) => l.id === dossieDaLista) : undefined) ??
+        null)
+      : null;
   useEffect(() => {
     if (celular && leadDaUrl) setDossieDaLista(leadDaUrl);
   }, [celular, leadDaUrl]);
