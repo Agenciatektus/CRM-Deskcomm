@@ -22,6 +22,19 @@ export class IaPropriaSemCredencialError extends Error {
   }
 }
 
+/**
+ * Falha FECHADA continua valendo, mas o log separa "leitura quebrou" (com o
+ * código do erro do banco/PostgREST) de "o plano veda", que não loga nada.
+ */
+function logarLeituraQuebrada(orgId: string, err: unknown): void {
+  console.error('[ia-propria] leitura do plano quebrou; instalação não serve IA (fail-closed)', {
+    orgId,
+    motivo: 'leitura_quebrou',
+    codigo: (err as { code?: unknown } | null)?.code ?? null,
+    erro: err instanceof Error ? err.message.slice(0, 200) : 'desconhecido',
+  });
+}
+
 type Consultavel = Pick<pg.Pool, 'query'> | Pick<pg.PoolClient, 'query'>;
 
 export async function instalacaoPodeServirIa(db: Consultavel, orgId: string): Promise<boolean> {
@@ -32,10 +45,7 @@ export async function instalacaoPodeServirIa(db: Consultavel, orgId: string): Pr
     );
     return rows[0]?.pode === true;
   } catch (err) {
-    console.error('[ia-propria] leitura falhou; instalação não serve IA (fail-closed)', {
-      orgId,
-      erro: err instanceof Error ? err.message.slice(0, 200) : 'desconhecido',
-    });
+    logarLeituraQuebrada(orgId, err);
     return false;
   }
 }
@@ -55,13 +65,10 @@ export async function instalacaoPodeServirIaViaRpc(admin: unknown, orgId: string
       'fn_org_pode_usar_ia_da_instalacao' as never,
       { p_org: orgId } as never,
     );
-    if (error) throw new Error(error.message);
+    if (error) throw Object.assign(new Error(error.message), { code: (error as { code?: string }).code });
     return data === true;
   } catch (err) {
-    console.error('[ia-propria] leitura falhou; instalação não serve IA (fail-closed)', {
-      orgId,
-      erro: err instanceof Error ? err.message.slice(0, 200) : 'desconhecido',
-    });
+    logarLeituraQuebrada(orgId, err);
     return false;
   }
 }

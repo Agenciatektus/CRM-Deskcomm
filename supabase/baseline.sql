@@ -66468,3 +66468,5 @@ $$;
 
 revoke execute on function public.fn_org_pode_usar_ia_da_instalacao(uuid) from public, anon, authenticated;
 grant execute on function public.fn_org_pode_usar_ia_da_instalacao(uuid) to service_role;
+
+notify pgrst, 'reload schema';
