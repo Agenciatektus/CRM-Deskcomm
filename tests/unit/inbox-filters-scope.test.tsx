@@ -14,9 +14,8 @@
  * valendo — inbox filtrado, às vezes vazio, sem nada na tela dizendo por quê.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render as renderSemProvider, screen } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { ReactElement } from "react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { render } from "../helpers/render-com-query";
 import userEvent from "@testing-library/user-event";
 
 import { InboxFilters, visibleInboxTabs, type InboxFiltersValue } from "@/components/inbox/InboxFilters";
@@ -116,12 +115,6 @@ describe("visibleInboxTabs (lógica pura de visões)", () => {
     expect(tabs).toEqual(expect.arrayContaining(["mine", "unassigned", "all"]));
   });
 });
-
-// O popover de filtros lê os filtros salvos (react-query): sem provider, "No QueryClient set".
-function render(ui: ReactElement) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return renderSemProvider(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
-}
 
 describe("InboxFilters render — 3 visões + escopo", () => {
   // Visual v2: as abas deixaram de rolar na horizontal. A intenção do caso antigo
