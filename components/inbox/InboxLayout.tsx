@@ -48,6 +48,8 @@ import { buscaValeConsulta } from "@/lib/inbox/termo-de-busca";
 import { escolhaDaUrl } from "@/lib/inbox/filtros-do-atendimento";
 import { useAutomaticoAtivo } from "@/hooks/ai/useAutomaticoAtivo";
 import { useListaCompacta } from "@/hooks/ui/useListaCompacta";
+import { useFiltroLembrado } from "@/hooks/inbox/useFiltroLembrado";
+import { aplicarFiltroSalvo } from "./filtros/FiltrosSalvos";
 
 /**
  * QUAL COLUNA APARECE NO CELULAR — as duas saem da MESMA pergunta.
@@ -181,6 +183,13 @@ export function InboxLayout({
     ...(tagNaUrl ? { tag: tagNaUrl } : {}),
   });
   const filterValue: InboxFiltersValue = { tab, ...aux };
+  // O filtro de ontem volta ao reabrir o Inbox sem filtro na URL (por atendente).
+  useFiltroLembrado(user?.id, aux, (f) =>
+    setAux((a) => {
+      const { tab: _t, ...rest } = aplicarFiltroSalvo({ tab, ...a }, f);
+      return rest;
+    }),
+  );
   const setFilterValue = useCallback(
     (next: InboxFiltersValue) => {
       if (next.tab !== tab) {

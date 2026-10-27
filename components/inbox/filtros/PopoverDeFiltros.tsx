@@ -11,6 +11,7 @@ import { useT } from "@/hooks/i18n/useT";
 import { cn } from "@/lib/utils";
 
 import type { InboxFiltersValue } from "../InboxFilters";
+import { FiltrosSalvos } from "./FiltrosSalvos";
 
 interface Props {
   value: InboxFiltersValue;
@@ -178,6 +179,8 @@ export function PopoverDeFiltros({
             </Select>
           </Secao>
         )}
+
+        <FiltrosSalvos value={value} onChange={onChange} />
       </PopoverContent>
     </Popover>
   );
