@@ -15,13 +15,35 @@ import { BarraDeFiltros, BotaoDaTelaParaRota, CabecalhoDaPagina, EstadoDaLista, 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Escolha } from "@/components/ui/escolha";
+import { useAuth } from "@/hooks/auth/AuthProvider";
 import { useCampanhas } from "@/hooks/campanhas/useCampanhas";
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
 import { useT } from "@/hooks/i18n/useT";
 import { Megaphone, Plus } from "@/lib/ui/icons";
+import { ROLE_RANK } from "@/lib/auth/types";
 import { STATUS_DA_CAMPANHA } from "@/lib/campanhas/tipos";
 
+/** A API de campanhas pede `manager` até para ler (403 para o resto): a tela diz isso em vez de "Erro ao carregar". */
 export function ListaDeCampanhas() {
+  const t = useT();
+  const { activeOrg } = useAuth();
+  const role = activeOrg?.role;
+  if (role && ROLE_RANK[role] < ROLE_RANK.manager) {
+    return (
+      <Pagina>
+        <CabecalhoDaPagina titulo={t("Campanhas")} />
+        <EmptyState
+          icon={Megaphone}
+          headline={t("Você não tem permissão para ver nem criar campanhas.")}
+          subcopy={t("Peça a um gerente ou administrador da organização.")}
+        />
+      </Pagina>
+    );
+  }
+  return <CampanhasDoGestor />;
+}
+
+function CampanhasDoGestor() {
   const t = useT();
   // A data segue quem está lendo, não o idioma de quem escreveu a tela.
   const idioma = useTagDeIdioma();
