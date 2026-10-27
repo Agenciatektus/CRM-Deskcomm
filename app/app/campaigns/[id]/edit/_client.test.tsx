@@ -27,6 +27,8 @@ const previa = vi.hoisted(() => ({
 
 const salvar = vi.hoisted(() => vi.fn().mockResolvedValue({}));
 
+const lida = vi.hoisted(() => ({ data: undefined as unknown }));
+
 const U = (n: number) => `00000000-0000-4000-8000-00000000000${n}`;
 
 const CAMPANHA: Record<string, unknown> = {
@@ -53,7 +55,7 @@ const CAMPANHA: Record<string, unknown> = {
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (chave: string) => chave }));
 vi.mock("@/hooks/campanhas/useCampanhas", () => ({
-  useCampanha: () => ({ data: CAMPANHA, isLoading: false }),
+  useCampanha: () => ({ data: lida.data, isLoading: false }),
   useEditarCampanha: () => ({ mutateAsync: salvar, isPending: false }),
   usePreviaDaAudiencia: () => previa,
 }));
@@ -73,6 +75,8 @@ describe("prévia da edição de campanha: o aviso do teto de 20.000", () => {
   beforeEach(() => {
     previa.data.truncado = false;
     previa.isPending = false;
+    salvar.mockClear();
+    lida.data = CAMPANHA;
   });
 
   it("recorte truncado: a edição mostra o aviso", async () => {
@@ -98,6 +102,38 @@ describe("prévia da edição de campanha: o aviso do teto de 20.000", () => {
       etapas: [U(2)],
       incluir_contatos: [U(3)],
       excluir_contatos: [U(4)],
+    });
+  });
+
+  it("limpar a tag na tela manda com_alguma_tag vazio", async () => {
+    // sem critério o Salvar não habilita: troca a tag por "sem falar há 30 dias"
+    render(<EditarCampanha id="c1" />);
+    const tag = await screen.findByDisplayValue("vip");
+    fireEvent.change(tag, { target: { value: "" } });
+    // outro critério mantém o Salvar habilitado sem a tag
+    fireEvent.change(screen.getByLabelText("Sem falar com a gente há (dias)"), { target: { value: "30" } });
+    fireEvent.change(screen.getByLabelText("Sem falar com a gente há (dias)"), { target: { value: "30" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+    await waitFor(() => expect(salvar).toHaveBeenCalledTimes(1));
+    expect(salvar.mock.calls[0]?.[0].audience_filter.com_alguma_tag).toEqual([]);
+  });
+
+  it("carga tardia (data undefined e depois a campanha): o filtro salvo ainda vai no PATCH", async () => {
+    // só funis/incluídos: nenhum outro estado do memo muda na carga
+    lida.data = undefined;
+    const { rerender } = render(<EditarCampanha id="c1" />);
+    lida.data = {
+      ...CAMPANHA,
+      entrada_continua: true,
+      audience_filter: { limite: 100, funis: [U(1)], incluir_contatos: [U(3)] },
+    };
+    rerender(<EditarCampanha id="c1" />);
+    await screen.findByDisplayValue("Reativação de clientes parados");
+    fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+    await waitFor(() => expect(salvar).toHaveBeenCalledTimes(1));
+    expect(salvar.mock.calls[0]?.[0].audience_filter).toMatchObject({
+      funis: [U(1)],
+      incluir_contatos: [U(3)],
     });
   });
 });
