@@ -375,6 +375,9 @@ const schema = z.object({
   // listando a TypeSafe como operadora (LGPD). Vazio = o aceite por empresa
   // continua exigido.
   JEV_LIGADO_POR_PADRAO: z.string().optional().default(""),
+  // Teto mensal por empresa do Jev da plataforma, em CENTAVOS DE DÓLAR (a mesma
+  // unidade de `teto_ia_usd_cents` do plano). Vazio ou inválido = 50 (US$ 0,50).
+  JEV_TETO_MENSAL_POR_EMPRESA_USD_CENTS: z.string().optional().default(""),
   // Endereço de TESTE da API do provedor de cobrança. Existe só para o dublê
   // do e2e (tests/e2e/fixtures/provedor-de-cobranca.ts, porta 3995). Quem lê é
   // `baseDeTesteDaCobranca()` (lib/cobranca/provedores/base-de-teste.ts), que
