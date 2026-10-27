@@ -54,8 +54,10 @@ import { lgpdRedactHandler } from "@/workers/lgpd-redact-worker.handler";
 import { mediaDeriveHandler } from "@/workers/media-derive-worker.handler";
 import { mediaPersistHandler } from "@/workers/media-persist-worker.handler";
 import { ragIndexerHandler } from "@/workers/rag-indexer.handler";
+import { pedidosNuvemshopHandler } from "@/lib/nuvemshop/pedidos.handler";
 
 const RODA: EventHandler[] = [
+  pedidosNuvemshopHandler,
   followupReactivityHandler,
   campanhaRespostaHandler,
   avisoDeEtapaHandler,

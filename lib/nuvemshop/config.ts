@@ -57,6 +57,11 @@ export function eventToSlug(event: NuvemshopEvent): string {
   return event.replace("/", "-");
 }
 
+/** Tipo gravado em `event_log` para o evento da loja. Compartilhado com a rota e os consumidores. */
+export function eventLogTypeFor(event: NuvemshopEvent): string {
+  return `nuvemshop.${event.replace("/", "_")}`;
+}
+
 const SLUG_TO_EVENT: Record<string, NuvemshopEvent> = Object.fromEntries(
   SUBSCRIBED_EVENTS.map((e) => [eventToSlug(e), e]),
 );
