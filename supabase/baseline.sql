@@ -63233,7 +63233,7 @@ grant select, insert, update, delete on public.jev_plataforma_uso to service_rol
 create or replace function public.fn_jev_plataforma_registrar(p_org uuid, p_custo_cents numeric)
 returns numeric
 language plpgsql
-security definer
+security invoker
 set search_path = ''
 as $$
 declare
