@@ -20,6 +20,7 @@ const campos = {
   padrao_no_cadastro: z.boolean(),
   oferecido_ao_cliente: z.boolean(),
   ia_propria: z.boolean(),
+  inclui_ia: z.boolean(),
 };
 
 export const novoPlanoSchema = z.strictObject({
@@ -33,6 +34,7 @@ export const novoPlanoSchema = z.strictObject({
   padrao_no_cadastro: campos.padrao_no_cadastro.optional(),
   oferecido_ao_cliente: campos.oferecido_ao_cliente.optional(),
   ia_propria: campos.ia_propria.optional(),
+  inclui_ia: campos.inclui_ia.optional(),
 });
 
 export const edicaoDoPlanoSchema = z
@@ -41,4 +43,4 @@ export const edicaoDoPlanoSchema = z
   .refine((v) => Object.keys(v).length > 0, "Nada para mudar.");
 
 export const COLUNAS_DO_PLANO =
-  "id, nome, preco_cents, moeda, intervalo, trial_dias, max_assentos, max_canais, teto_ia_usd_cents, padrao_no_cadastro, oferecido_ao_cliente, ia_propria, arquivado_em, created_at, updated_at";
+  "id, nome, preco_cents, moeda, intervalo, trial_dias, max_assentos, max_canais, teto_ia_usd_cents, padrao_no_cadastro, oferecido_ao_cliente, ia_propria, inclui_ia, arquivado_em, created_at, updated_at";

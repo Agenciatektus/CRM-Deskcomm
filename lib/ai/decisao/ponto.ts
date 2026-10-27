@@ -39,7 +39,8 @@ import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 import { baseDaApiDoJev, decidir, TETO_PADRAO_MS, type Pergunta, type ResultadoDaDecisao } from "./cliente";
-import { lerConfigDoJev, type IdDaTarefa } from "./config";
+import { type IdDaTarefa } from "./config";
+import { chaveDaPlataforma, configEfetivaDoJev, organizacaoElegivelAoJev } from "./elegibilidade";
 import { ORIGEM_PADRAO, provedorDaCredencial, type OrigemDoJev } from "./origem";
 import { estadoEfetivoDaTarefa, TAREFAS_DO_JEV, type TarefaDoJev } from "./tarefas";
 
@@ -86,15 +87,28 @@ export interface DependenciasDoPonto {
 export interface DestinoDaChave {
   chave: string;
   origem: OrigemDoJev;
+  /**
+   * `true` = a chave é a da PLATAFORMA (`JEV_PLATFORM_API_KEY`), e não uma que a
+   * empresa cadastrou. Ausente = a da empresa. Quem registra uso ou gasto
+   * (fatia 3) separa por aqui.
+   */
+  daPlataforma?: true;
 }
 
 /**
  * A chave do Jev DAQUELA organização, e a ORIGEM que a acompanha: a credencial
  * do provedor da origem (`provedorDaCredencial`) ativa e validada mais recente.
  * No caminho de sempre é a credencial `typesafe`; ligado via OpenRouter é a
- * credencial OpenRouter que a empresa já cadastrou. Nunca uma chave de ambiente
- * global — seria o contrário do BYOK, e uma instalação pagaria a conta de outra.
- * A mesma regra, sobre linhas já lidas, é `credencialEmUsoPeloJev`
+ * credencial OpenRouter que a empresa já cadastrou.
+ *
+ * Sem credencial própria, e SÓ na origem `typesafe`, vale a chave da PLATAFORMA
+ * (`JEV_PLATFORM_API_KEY`) para a empresa elegível (`./elegibilidade.ts`:
+ * assinatura viva num plano com IA). A chave da plataforma só existe numa
+ * instalação hospedada que a definiu; vazia, o recurso está desligado e o
+ * contrário do BYOK nunca acontece por acidente. Uma chave de ambiente jamais
+ * serve outra origem (a OpenRouter é a conta da empresa) nem empresa inelegível:
+ * uma instalação não paga a conta de quem não contratou IA.
+ * A mesma regra, sobre linhas já lidas, é `fonteDaChaveDoJev`
  * (`./credencial.ts`): mudar uma é mudar a outra.
  *
  * "Validada" é a convenção de todo leitor de chave do repo
@@ -133,7 +147,11 @@ export async function destinoDasTarefas(
       .eq("id", organizationId)
       .maybeSingle();
     if (orgErr) throw orgErr;
-    const config = lerConfigDoJev(org?.settings);
+    // Elegibilidade lida no máximo uma vez por chamada (o padrão e a chave da
+    // plataforma perguntam a mesma coisa).
+    let elegibilidade: Promise<boolean> | undefined;
+    const ehElegivel = () => (elegibilidade ??= organizacaoElegivelAoJev(admin, organizationId));
+    const config = await configEfetivaDoJev(org?.settings, ehElegivel);
     if (tarefas.some((t) => estadoEfetivoDaTarefa(config, t) === "desligada")) return null;
     const origem = config.origem;
 
@@ -148,7 +166,14 @@ export async function destinoDasTarefas(
       .limit(1)
       .maybeSingle();
     if (error) throw error;
-    if (!data) return null;
+    if (!data) {
+      // Sem chave própria. FATIA 3: o teto de gasto por empresa, o disjuntor
+      // global e o aviso ao admin entram AQUI, antes de devolver a da plataforma.
+      if (origem !== "typesafe") return null;
+      const daPlataforma = chaveDaPlataforma();
+      if (daPlataforma === null || !(await ehElegivel())) return null;
+      return { chave: daPlataforma, origem, daPlataforma: true };
+    }
     return {
       chave: decryptKey({
         ciphertext: byteaToBuffer(data.api_key_encrypted),

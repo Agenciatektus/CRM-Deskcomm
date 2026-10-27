@@ -42,8 +42,9 @@ import { getRequestPool } from "@/lib/agent-engine/db/request-pool";
 import { llmEdgeConfigFromEnv, temIaDeSempre } from "@/lib/agent-engine/edge/llm/credentials";
 import { camadasEfetivas } from "@/lib/agent-engine/guardrails/camadas-da-org";
 import { haQuemAtendaAOrganizacao } from "@/lib/ai/agents/quem-atende-a-sessao";
-import { credencialEmUsoPeloJev, PROVEDOR_DO_JEV } from "@/lib/ai/decisao/credencial";
+import { credencialEmUsoPeloJev, fonteDaChaveDoJev, PROVEDOR_DO_JEV } from "@/lib/ai/decisao/credencial";
 import {
+  ehConfigDoPadrao,
   ESTADO_DO_MODO,
   ESTADOS_DA_TAREFA,
   gravarConfigDoJev,
@@ -52,6 +53,7 @@ import {
   type ConfigDoJev,
   type MudancaDaConfig,
 } from "@/lib/ai/decisao/config";
+import { configEfetivaDoJev, organizacaoElegivelAoJev, plataformaServeOJev } from "@/lib/ai/decisao/elegibilidade";
 import { CHAVES_DO_CLIMA, type MotorDoClima } from "@/lib/ai/decisao/metadados-do-clima";
 import {
   ORIGENS_DO_JEV,
@@ -707,7 +709,14 @@ export async function PATCH(req: NextRequest): Promise<Response> {
     .eq("id", org.orgId)
     .maybeSingle();
   if (orgErr) return fail("query_failed", orgErr.message, 500, { requestId });
-  const atual = lerConfigDoJev(orgAtual?.settings);
+  // A config que VALE (não só a gravada): empresa elegível, sem nada gravado e
+  // `JEV_LIGADO_POR_PADRAO` virada já está ligada e decidindo.
+  const atual = await configEfetivaDoJev(orgAtual?.settings, () => organizacaoElegivelAoJev(admin, org.orgId));
+  const noPadrao = ehConfigDoPadrao(atual);
+  // A plataforma serve a chave do Jev a esta empresa? Lido uma vez, só se um
+  // portão abaixo precisar.
+  let plataformaServe: Promise<boolean> | undefined;
+  const serveAPlataforma = () => (plataformaServe ??= plataformaServeOJev(admin, org.orgId));
 
   const mudanca: MudancaDaConfig = {};
   if (corpo.origem !== undefined && corpo.origem !== atual.origem) {
@@ -725,7 +734,7 @@ export async function PATCH(req: NextRequest): Promise<Response> {
       .eq("provider", provedorDaCredencial(corpo.origem))
       .eq("is_active", true);
     if (credsErr) return fail("query_failed", credsErr.message, 500, { requestId });
-    if (credencialEmUsoPeloJev(creds ?? [], corpo.origem) === null) {
+    if (fonteDaChaveDoJev(creds ?? [], corpo.origem, await serveAPlataforma()) === null) {
       return fail(
         "jev_exige_chave_validada",
         corpo.origem === "openrouter"
@@ -792,7 +801,7 @@ export async function PATCH(req: NextRequest): Promise<Response> {
       .eq("provider", provedorDaCredencial(atual.origem))
       .eq("is_active", true);
     if (credsErr) return fail("query_failed", credsErr.message, 500, { requestId });
-    if (credencialEmUsoPeloJev(creds ?? [], atual.origem) === null) {
+    if (fonteDaChaveDoJev(creds ?? [], atual.origem, await serveAPlataforma()) === null) {
       return fail(
         "jev_exige_chave_validada",
         t("Para ligar o Jev, cole a chave dele em Credenciais e espere o teste da chave passar."),
@@ -818,12 +827,38 @@ export async function PATCH(req: NextRequest): Promise<Response> {
     mudanca.ligado = true;
   }
 
+  // A empresa está no padrão da plataforma (aceite sintético, nunca gravado).
+  // Desligar grava o desligado, sem aceite nenhum. Qualquer outra mudança é a
+  // empresa assumindo o Jev: ela dá o aceite de verdade, como ao ligar.
+  if (noPadrao && Object.keys(mudanca).length > 0) {
+    if (mudanca.ligado === false) {
+      mudanca.aceite = null;
+    } else if (corpo.aceite_lgpd !== true) {
+      return fail(
+        "jev_exige_aceite",
+        t(
+          "Ligar o Jev manda cada mensagem dos clientes, uma de cada vez e sem o resto da conversa, para a TypeSafe AI, nos Estados Unidos. Para ligar, confirme que você está de acordo.",
+        ),
+        422,
+        { requestId },
+      );
+    } else {
+      mudanca.aceite = { em: new Date().toISOString(), por: user.id, alcance: "mensagem" };
+    }
+  }
+
   // Pedir o estado que já vale não é mutação: sem escrita e sem auditoria.
   if (Object.keys(mudanca).length === 0) {
     return ok({ config: configPublica(atual), alterado: false }, { requestId });
   }
 
-  const gravado = await gravarConfigDoJev({ admin, orgId: org.orgId, actorUserId: user.id, mudanca });
+  const gravado = await gravarConfigDoJev({
+    admin,
+    orgId: org.orgId,
+    actorUserId: user.id,
+    mudanca,
+    ...(noPadrao ? { base: atual } : {}),
+  });
   if (!gravado.ok) {
     return fail("save_failed", t("nada foi gravado — verifique as permissões da organização"), 500, {
       requestId,

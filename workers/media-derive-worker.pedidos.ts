@@ -62,7 +62,7 @@
  * áudio já virou texto, que é o que importava.
  */
 import { detectHumanHandoffRequest } from "@/lib/agent-engine/agent/human-handoff";
-import { lerConfigDoJev } from "@/lib/ai/decisao/config";
+import { configEfetivaDoJev, organizacaoElegivelAoJev } from "@/lib/ai/decisao/elegibilidade";
 import {
   avisarAEquipe,
   avisarPelaRegra,
@@ -172,7 +172,7 @@ export async function avaliarPedidosFalados(admin: Admin, p: PedidoFalado): Prom
       // leitura seria mais pesada que a decisão, e `active_ai_agent_id` é
       // justamente o que o resolvedor escolhe primeiro — `null` quando não há.
       agentId: linha.active_ai_agent_id,
-      config: lerConfigDoJev(settings),
+      config: await configEfetivaDoJev(settings, () => organizacaoElegivelAoJev(admin, p.organizationId)),
       // É o TRANSCRITO que o Jev lê, e a regra de hoje roda sobre ele junto
       // (`regraDeHoje` acrescenta esta mensagem ao conjunto da rajada).
       mensagem: p.transcricao,

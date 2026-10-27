@@ -56,6 +56,10 @@ const envSchema = z.object({
   // Consertar a irmã da OpenAI e deixar esta é o modo de falha desta família:
   // ao mexer aqui, confira as três de uma vez.
   OPENROUTER_API_KEY: z.string().min(1).optional(),
+  // O Jev da plataforma (ver lib/env.ts). Declaradas aqui pelo mesmo motivo da
+  // linha de cima: `loadEnv` remove do `parsed.data` o que o schema não declara.
+  JEV_PLATFORM_API_KEY: z.string().optional(),
+  JEV_LIGADO_POR_PADRAO: z.string().optional(),
   // `AGENT_DEFAULT_MODEL` morava aqui, com `.default('claude-sonnet-4-5')` —
   // um default da Anthropic escrito no schema de ambiente de um produto que
   // também opera com OpenAI. NÃO EXISTIA CONSUMIDOR: nem `loadEnv` nem

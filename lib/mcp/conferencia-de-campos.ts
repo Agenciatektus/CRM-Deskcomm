@@ -25,11 +25,13 @@
  */
 import { conferirCamposDoNegocio, type CampoPersonalizado, type CampoRecusado } from "@/lib/ai/decisao/campo-do-negocio";
 import { lerConfigDoJev } from "@/lib/ai/decisao/config";
+import { configEfetivaDoJev, organizacaoElegivelAoJev } from "@/lib/ai/decisao/elegibilidade";
 import { estadoEfetivoDaTarefa, TAREFA_DA_CONFERENCIA_DE_CAMPO } from "@/lib/ai/decisao/tarefas";
 import type { DependenciasDoPonto } from "@/lib/ai/decisao/ponto";
 import { settingsDoFunil } from "@/lib/leads/campos-exigidos";
 import { camposDoFunil } from "@/lib/leads/campos-do-funil";
 import { scrubMessage } from "@/lib/sentry/scrub";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 import type { McpContext } from "./types";
 
@@ -178,7 +180,9 @@ export async function conferirCamposPersonalizados(
       .select("settings")
       .eq("id", ctx.organizationId)
       .maybeSingle();
-    config = lerConfigDoJev((data as { settings?: unknown } | null)?.settings ?? null);
+    config = await configEfetivaDoJev((data as { settings?: unknown } | null)?.settings ?? null, () =>
+      organizacaoElegivelAoJev(createAdminClient(), ctx.organizationId),
+    );
   } catch {
     config = lerConfigDoJev(null);
   }

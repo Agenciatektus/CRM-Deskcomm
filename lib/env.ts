@@ -364,6 +364,17 @@ const schema = z.object({
   // daqui, é por organização (BYOK). Quem lê é `baseDaApiDoJev()`, em
   // lib/ai/decisao/cliente.ts.
   JEV_API_BASE_URL: z.string().optional().default(""),
+  // O Jev da PLATAFORMA: a chave TypeSafe da instalação, usada por toda empresa
+  // com plano que inclui IA (`cobranca_planos.inclui_ia`) que não cadastrou a
+  // própria. Vazia = recurso desligado: o Jev segue só com a chave de cada
+  // empresa (BYOK). Só o servidor lê (lib/ai/decisao/elegibilidade.ts); nunca
+  // em log, resposta, auditoria ou bundle do cliente.
+  JEV_PLATFORM_API_KEY: z.string().optional().default(""),
+  // "true"/"1" = a empresa elegível sem `settings.jev` gravado já tem o Jev
+  // LIGADO e decidindo, sem aceite individual. Só ligue com o termo do plano
+  // listando a TypeSafe como operadora (LGPD). Vazio = o aceite por empresa
+  // continua exigido.
+  JEV_LIGADO_POR_PADRAO: z.string().optional().default(""),
   // Endereço de TESTE da API do provedor de cobrança. Existe só para o dublê
   // do e2e (tests/e2e/fixtures/provedor-de-cobranca.ts, porta 3995). Quem lê é
   // `baseDeTesteDaCobranca()` (lib/cobranca/provedores/base-de-teste.ts), que

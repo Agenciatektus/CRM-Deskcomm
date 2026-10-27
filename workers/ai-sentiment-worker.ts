@@ -30,7 +30,7 @@ import { computeCost } from "@/lib/ai/cost";
 import { avisarNaCentral, fecharAvisoDoJev } from "@/lib/ai/decisao/aviso";
 import { MODELO_DO_JEV } from "@/lib/ai/decisao/cliente";
 import { medirClima, type ClimaMedido } from "@/lib/ai/decisao/clima";
-import { lerConfigDoJev } from "@/lib/ai/decisao/config";
+import { configEfetivaDoJev, organizacaoElegivelAoJev } from "@/lib/ai/decisao/elegibilidade";
 import { falhasSeguidas } from "@/lib/ai/decisao/disjuntor";
 import { CHAVES_DO_CLIMA, type MotorDoClima } from "@/lib/ai/decisao/metadados-do-clima";
 import { avisarAEquipe, TAREFAS_DOS_PEDIDOS, type PedidosObservados } from "@/lib/ai/decisao/pedidos";
@@ -106,7 +106,9 @@ export async function processSentiment(event: EventRow): Promise<SentimentResult
       .eq("id", event.organization_id)
       .maybeSingle();
     const daOrg = org as { settings?: unknown; locale?: string | null } | null;
-    const configDoJev = lerConfigDoJev(daOrg?.settings);
+    const configDoJev = await configEfetivaDoJev(daOrg?.settings, () =>
+      organizacaoElegivelAoJev(admin, event.organization_id),
+    );
     const climaDoJev = estadoEfetivoDaTarefa(configDoJev, TAREFA_DO_CLIMA);
     // Os pedidos do cliente não dependem do clima: rodam com ele pausado.
     const pedidosRodam = TAREFAS_DOS_PEDIDOS.some((t) => estadoEfetivoDaTarefa(configDoJev, t) !== "desligada");
