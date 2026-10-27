@@ -63,12 +63,12 @@ describe("o PostgREST não serve as compras por link de pagamento", () => {
   it("a forma: evento_id e sessao_id únicos, status e client_reference_id validados, reentrega ignorada", () => {
     sql(`delete from public.${TABELA} where evento_id like 'evt_9080_%';`);
     sql(`insert into public.${TABELA} (provedor, evento_id) values ('stripe', 'evt_9080_a');`);
-    expect(erroSob("service_role", `insert into public.${TABELA} (provedor, evento_id) values ('stripe', 'evt_9080_a')`)).toContain("23505");
+    expect(erroSob("service_role", `insert into public.${TABELA} (provedor, evento_id) values ('stripe', 'evt_9080_a')`)).toContain("cobranca_compras_evento_id_key");
     expect(sql(`insert into public.${TABELA} (provedor, evento_id) values ('stripe', 'evt_9080_a') on conflict (evento_id) do nothing returning 1;`).trim()).toBe("");
     expect(erroSob("service_role", `insert into public.${TABELA} (provedor, evento_id, status) values ('stripe', 'evt_9080_b', 'inventado')`)).toContain("cobranca_compras_status_check");
     expect(erroSob("service_role", `insert into public.${TABELA} (provedor, evento_id, client_reference_id) values ('stripe', 'evt_9080_c', 'a b;')`)).toContain("client_reference_id");
     sql(`update public.${TABELA} set sessao_id = 'cs_9080' where evento_id = 'evt_9080_a';`);
-    expect(erroSob("service_role", `insert into public.${TABELA} (provedor, evento_id, sessao_id) values ('stripe', 'evt_9080_d', 'cs_9080')`)).toContain("23505");
+    expect(erroSob("service_role", `insert into public.${TABELA} (provedor, evento_id, sessao_id) values ('stripe', 'evt_9080_d', 'cs_9080')`)).toContain("cobranca_compras_sessao_id_key");
     sql(`delete from public.${TABELA} where evento_id like 'evt_9080_%';`);
   });
 });
