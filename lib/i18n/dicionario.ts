@@ -2336,6 +2336,7 @@ export const DICIONARIO: Traducoes = {
   "Escolha o tipo de canal.": { es: "Elija el tipo de canal." },
   "Escolha o método.": { es: "Elija el método." },
   "Cadastrar número de telefone (DID)": { es: "Registrar número de teléfono (DID)" },
+  "Ligação telefônica": { es: "Llamada telefónica" },
   "Cada canal tem o seu passo a passo. Dá para conectar mais de um.": { es: "Cada canal tiene su propio paso a paso. Se puede conectar más de uno." },
   "Mais usado": { es: "Más usado" },
   "O número que atende seus clientes.": { es: "El número que atiende a sus clientes." },

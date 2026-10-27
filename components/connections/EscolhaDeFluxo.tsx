@@ -170,7 +170,7 @@ export function EscolhaDeFluxo({
           </Grupo>
           <Grupo rotulo={t("Voz")}>
             <Linha
-              titulo={t("Ligação")}
+              titulo={t("Ligação telefônica")}
               ajuda={t("Chamadas de voz e linha de telefone.")}
               pista={t("Abre voz e telefonia")}
               Icone={Phone}

@@ -33,7 +33,7 @@ describe("EscolhaDeFluxo", () => {
 
   it.each([
     [/Instagram/, "instagram"],
-    [/Ligação/, "voz"],
+    [/Ligação telefônica/, "voz"],
     [/Cadastrar número de telefone/, "telefonia"],
   ])("%s navega para a aba %s", (nome, aba) => {
     const { onFechar } = abrir();
