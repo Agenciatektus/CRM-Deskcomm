@@ -18,6 +18,7 @@ import { useT } from "@/hooks/i18n/useT";
 import type { LeadFilters } from "@/lib/kanban/filters";
 import { ehOrdemDoFunil, ORDENS_DO_FUNIL, type OrdemDoFunil } from "@/lib/kanban/ordem-do-funil";
 import { ArrowsDownUp, CaretDown, Clock, Flag, MagnifyingGlass, Plus, SlidersHorizontal, UserCircle } from "@/lib/ui/icons";
+import { cn } from "@/lib/utils";
 
 import { ChipsAtivos, chipsDosFiltros, useNomeDoDono, type ChipAtivo } from "./ChipsAtivos";
 
@@ -94,7 +95,7 @@ export function BarraDeBusca({
   );
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-2">
+    <div className={cn("flex flex-col gap-2", !celular && "rounded-lg border border-border bg-surface p-2")}>
       <div className="flex flex-wrap items-center gap-2">
         <label className="relative w-full largo:w-80">
           <span className="sr-only">{t("Buscar leads")}</span>
@@ -126,7 +127,7 @@ export function BarraDeBusca({
             {t("Parados")} <span className="tabular-nums opacity-70">{contagens.parados}</span>
           </Chip>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className={cn("flex items-center gap-2", celular ? "w-full" : "ml-auto")}>
           {!celular && (
             <Popover open={painelAberto} onOpenChange={setPainelAberto}>
               <PopoverTrigger asChild>{botaoFiltros}</PopoverTrigger>

@@ -230,7 +230,7 @@ export function PipelinePageClient({
           pipelineId={pipelineId}
           aoTrocarFunil={(id) => router.push(`/app/pipelines/${id}`)}
           leadsDoRecorte={data ? ordenados : undefined}
-          barra={<div className="flex flex-col gap-2 px-4 pt-2">{cabecalho}{barra}</div>}
+          barra={<div className="flex flex-col gap-2 px-4 py-2">{cabecalho}{barra}</div>}
           conteudo={vista === "lista" ? lista(ListaDoFunilCelular) : undefined}
           aoAbrir={setDossieDaLista}
         />

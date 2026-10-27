@@ -7,6 +7,6 @@ export const metadata: Metadata = { title: "Campanhas" };
 
 export default function CampanhasPage() {
   // Auth e organização já vêm garantidas pelo layout de /app; a lista carrega
-  // pela API, que confere o papel `manager` por conta própria.
+  // pela API: `agent` lê em somente leitura; criar, editar e disparar é `manager`.
   return <ListaDeCampanhas />;
 }
