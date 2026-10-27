@@ -136,7 +136,8 @@ export async function registrarUsoDaPlataforma(
   custoUsdCents: number | null,
   agora: number = Date.now(),
 ): Promise<void> {
-  const custo = custoUsdCents ?? CUSTO_ESTIMADO_USD_CENTS;
+  // Sem preço, sem token ou NaN: a estimativa conservadora (NaN viraria null no JSON e gravaria 0).
+  const custo = custoUsdCents !== null && Number.isFinite(custoUsdCents) && custoUsdCents >= 0 ? custoUsdCents : CUSTO_ESTIMADO_USD_CENTS;
   try {
     const { data, error } = await (admin as unknown as UsoAdmin).rpc("fn_jev_plataforma_registrar", {
       p_org: organizationId,
