@@ -584,7 +584,7 @@ function DeOndeResponde({ dados, recarregar }: { dados: DadosDoJev; recarregar: 
             <input
               id="jev-origem-aceite"
               type="checkbox"
-              className="mt-0.5 h-4 w-4 accent-[var(--color-accent)]"
+              className="mt-0.5"
               checked={concordo}
               onChange={(e) => setConcordo(e.target.checked)}
             />
@@ -928,7 +928,7 @@ function ProntoParaLigar({ dados, recarregar }: { dados: DadosDoJev; recarregar:
             <input
               id="jev-aceite"
               type="checkbox"
-              className="mt-0.5 h-4 w-4 accent-[var(--color-accent)]"
+              className="mt-0.5"
               checked={concordo}
               onChange={(e) => setConcordo(e.target.checked)}
               disabled={!dados.pode_editar}

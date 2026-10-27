@@ -100,7 +100,7 @@ export const MAPA = {
   "comp:escolha": { ...os("igual"), ref: r(".inp", 536) },
   "comp:campo-de-data": { ...os("igual"), ref: r("Seletor de data e horário", 479, D), refEscuro: r("Seletor de data e horário", 498, DV) },
   "comp:select-radix": { ...os("igual"), ref: r(".inp", 536) },
-  "comp:checkbox": { ...os("igual"), ref: r(".chk", 626) },
+  "comp:checkbox": { ...os("igual"), ref: r("Caixa de seleção v2 (Comp_Checkbox_v2)", 1, D) },
   "comp:radio": { ...os("sem-equivalente"), ref: null },
   "comp:switch": { ...os("igual"), ref: r(".switch", 258) },
   "comp:chip": { ...os("igual"), ref: r(".chip", 541) },

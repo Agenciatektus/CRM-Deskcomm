@@ -124,7 +124,7 @@ export function BasesDoAgente({ materiais, value, onChange, disabled = false }: 
                 id={`base-${m.id}`}
                 data-testid={`base-${m.id}`}
                 type="checkbox"
-                className="h-4 w-4 shrink-0 rounded-md border-border accent-primary"
+                className="shrink-0"
                 checked={marcados.has(m.id)}
                 onChange={(e) => alternar(m.id, e.target.checked)}
                 disabled={disabled}

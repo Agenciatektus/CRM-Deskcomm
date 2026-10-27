@@ -72,7 +72,7 @@ export function AssinaturaForm({ initial }: { initial: AssinaturaConfig }) {
               checked={form[o.chave]}
               disabled={isPending}
               onChange={(e) => setForm((f) => ({ ...f, [o.chave]: e.target.checked }))}
-              className="mt-1 h-4 w-4 shrink-0 accent-primary"
+              className="mt-1 shrink-0"
             />
             <span className="space-y-1">
               <span className="block text-sm font-medium">{t(o.titulo)}</span>

@@ -44,7 +44,6 @@ export function AgentsListFilters({
           type="checkbox"
           checked={showArchived}
           onChange={(e) => onShowArchivedChange(e.target.checked)}
-          className="size-4"
         />
         {t("Incluir arquivados")}
       </label>
