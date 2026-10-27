@@ -94,7 +94,8 @@ function Grupo({ rotulo, children }: { rotulo: string; children: ReactNode }) {
  * (lista agrupada); no celular vira bottom sheet com alvos de 64 px.
  *
  * `instagramIndisponivel`: texto do motivo. Quando vem, a linha do Instagram fica tracejada,
- * com cadeado, e não navega (continua focável). Sem a prop, nada muda.
+ * com cadeado, e não navega (continua focável). Sem a prop, nada muda. O texto deve vir JÁ
+ * traduzido por quem chama; o componente não aplica t() nele.
  */
 export function EscolhaDeFluxo({
   onWhatsapp,
@@ -126,14 +127,15 @@ export function EscolhaDeFluxo({
         className={cn(
           "max-w-[480px] gap-0 p-0 sm:rounded-2xl",
           // Celular: bottom sheet colado embaixo.
-          "max-sm:bottom-0 max-sm:left-0 max-sm:top-auto max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-t-3xl",
+          "max-sm:bottom-0 max-sm:left-0 max-sm:top-auto max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-t-(--mb-folha-raio) max-sm:data-[state=open]:animate-folha-sobe max-sm:motion-reduce:animate-none",
         )}
       >
+        <span aria-hidden className="mx-auto mt-2 hidden h-(--mb-pegador-altura) w-(--mb-pegador-largura) rounded-full bg-border-strong max-sm:block" />
         <DialogHeader className="px-6 pb-1 pr-14 pt-6">
           <DialogTitle>{t("O que você quer conectar?")}</DialogTitle>
           <DialogDescription>{t("Cada canal tem o seu passo a passo. Dá para conectar mais de um.")}</DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-1 px-3 pb-4 pt-1 max-sm:pb-6" onKeyDown={setas}>
+        <div className="flex flex-col gap-1 px-3 pb-4 pt-1 max-sm:pb-[calc(10px+var(--mb-area-baixo))]" onKeyDown={setas}>
           <Grupo rotulo={t("Mensagens")}>
             <Linha
               destaque
