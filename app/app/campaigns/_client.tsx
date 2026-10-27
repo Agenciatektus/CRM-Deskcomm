@@ -20,15 +20,17 @@ import { useCampanhas } from "@/hooks/campanhas/useCampanhas";
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
 import { useT } from "@/hooks/i18n/useT";
 import { Megaphone, Plus } from "@/lib/ui/icons";
-import { ROLE_RANK } from "@/lib/auth/types";
+import { ROLE_RANK, escreveComoPlatformAdmin } from "@/lib/auth/types";
 import { STATUS_DA_CAMPANHA } from "@/lib/campanhas/tipos";
 
 /** A API de campanhas pede `manager` até para ler (403 para o resto): a tela diz isso em vez de "Erro ao carregar". */
 export function ListaDeCampanhas() {
   const t = useT();
-  const { activeOrg } = useAuth();
+  const { user, activeOrg } = useAuth();
   const role = activeOrg?.role;
-  if (role && ROLE_RANK[role] < ROLE_RANK.manager) {
+  // Mesma exceção do servidor (require-role) e do Meta Ads: platform admin com escopo full, fora do suporte.
+  const platformAdmin = escreveComoPlatformAdmin(user) && !user.support;
+  if (role && ROLE_RANK[role] < ROLE_RANK.manager && !platformAdmin) {
     return (
       <Pagina>
         <CabecalhoDaPagina titulo={t("Campanhas")} />
