@@ -10,6 +10,7 @@ import { useT } from "@/hooks/i18n/useT";
 import { useFiltrosSalvos, type FiltroSalvo } from "@/hooks/inbox/useFiltrosSalvos";
 import { ApiError } from "@/lib/api/types";
 import {
+  filtrosSalvosSchema,
   haFiltroAtivo,
   normalizarFiltros,
   TAMANHO_DO_NOME,
@@ -59,6 +60,17 @@ export function FiltrosSalvos({
 
   const ativo = haFiltroAtivo(value);
   const salvos = lista.data ?? [];
+
+  const aplicar = (f: FiltroSalvo) => {
+    // Linha gravada por versão antiga ou à mão: só aplica o que passa no schema.
+    const lido = filtrosSalvosSchema.safeParse(f.filtros);
+    if (!lido.success) {
+      setErro(t("Este filtro salvo não pôde ser aplicado."));
+      return;
+    }
+    setErro(null);
+    onChange(aplicarFiltroSalvo(value, lido.data));
+  };
 
   const fecharNome = () => {
     setNomeAberto(false);
@@ -112,7 +124,7 @@ export function FiltrosSalvos({
       <li key={f.id} className="flex items-center gap-1">
         <button
           type="button"
-          onClick={() => onChange(aplicarFiltroSalvo(value, f.filtros))}
+          onClick={() => aplicar(f)}
           title={f.nome}
           className="h-8 min-w-0 flex-1 truncate rounded-md px-2 text-left text-sm hover:bg-surface-elevated focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
         >
@@ -154,6 +166,12 @@ export function FiltrosSalvos({
         <p className="px-1 text-xs text-text-subtle">{t("Nenhum filtro salvo ainda.")}</p>
       ) : (
         <ul className="space-y-0.5">{salvos.map(linha)}</ul>
+      )}
+
+      {erro && !nomeAberto && (
+        <p role="alert" className="px-1 text-xs text-error">
+          {erro}
+        </p>
       )}
 
       {ativo &&

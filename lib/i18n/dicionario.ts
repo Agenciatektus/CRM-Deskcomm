@@ -16639,6 +16639,7 @@ export const DICIONARIO: Traducoes = {
   "Filtros ativos": { es: "Filtros activos" },
   "Remover filtro": { es: "Quitar filtro" },
   "Filtros salvos": { es: "Filtros guardados" },
+  "Este filtro salvo não pôde ser aplicado.": { es: "Este filtro guardado no se pudo aplicar." },
   "Carregando filtros salvos": { es: "Cargando filtros guardados" },
   "Não foi possível carregar os filtros salvos.": { es: "No se pudieron cargar los filtros guardados." },
   "Nenhum filtro salvo ainda.": { es: "Aún no hay filtros guardados." },

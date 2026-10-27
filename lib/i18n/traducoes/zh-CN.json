@@ -5769,5 +5769,6 @@
   "Não foi possível salvar o filtro.": "无法保存筛选。",
   "Já existe um filtro salvo com esse nome.": "已存在同名的已保存筛选。",
   "Limite de filtros salvos atingido.": "已达到已保存筛选的上限。",
-  "Filtro salvo não encontrado.": "未找到已保存的筛选。"
+  "Filtro salvo não encontrado.": "未找到已保存的筛选。",
+  "Este filtro salvo não pôde ser aplicado.": "无法应用此已保存的筛选。"
 }
