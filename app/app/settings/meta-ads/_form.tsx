@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -8,52 +8,19 @@ import {
   disconnectAdInsights,
   updateAdInsightsConnection,
 } from "@/app/actions/settings/updateAdInsightsConnection";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { traduzir } from "@/lib/i18n/traducao";
 import type { Idioma } from "@/lib/i18n/idiomas";
+import { DialogosDeMetaAds } from "./_dialogos";
+import { ERRO_EM_PORTUGUES } from "./_erros";
+import { PainelDeStatusMeta } from "./_painel-de-status";
 import { SeletorDeContas } from "./_seletor-de-contas";
 import { DIAS_DE_AVISO_DE_VENCIMENTO } from "@/lib/plataformas-de-anuncio/meta/oauth/validade";
 
 const LINK_DE_CONEXAO = "/api/v1/plataformas-de-anuncio/meta/connect";
-
-/**
- * Cada recusa vira uma frase que diz O QUE FAZER — mesma regra do formulário de
- * Conversões. `cifra_indisponivel` é a que mais importa acertar: é problema de
- * INSTALAÇÃO, e um texto genérico mandaria o admin do tenant refazer um cadastro
- * que já está certo, para falhar igual.
- */
-const ERRO_EM_PORTUGUES: Record<string, string> = {
-  validation_failed: "Confira os campos: algum valor não está no formato esperado.",
-  unauthenticated: "Sua sessão expirou. Entre de novo.",
-  forbidden_tenant: "Você não está em nenhuma organização ativa.",
-  forbidden_role: "Só um administrador da organização pode mudar esta conexão.",
-  mfa_required: "Confirme o segundo fator para salvar esta mudança.",
-  cifra_indisponivel:
-    "Esta instalação está sem a chave mestra de criptografia, e o token não foi gravado. Quem instalou o sistema precisa configurá-la — refazer o cadastro aqui não resolve.",
-  erro_ao_gravar: "Não consegui gravar agora. Tente de novo em instantes.",
-  superada: "Não consegui gravar agora. Tente de novo em instantes.",
-  rate_limited: "Muitas tentativas seguidas. Aguarde um minuto e tente de novo.",
-  token_invalido:
-    "A Meta não reconhece este token: ele está inválido, expirado ou revogado. Gere um novo e cole de novo.",
-  token_de_pagina:
-    "Este é um token de Página. Gere um token de usuário ou de usuário do sistema com a permissão ads_read.",
-  sem_ads_read: "O token não tem a permissão ads_read. Gere-o de novo com essa permissão.",
-  sem_contas: "Este token não enxerga nenhuma conta de anúncio. Confira se o usuário tem acesso às contas.",
-  validacao_indisponivel: "Não consegui validar o token com a Meta agora. Tente de novo em instantes.",
-};
 
 export function FormularioDeMetaAds({
   conectada,
@@ -67,6 +34,8 @@ export function FormularioDeMetaAds({
   oauthDisponivel,
   oauthFalta,
   idioma,
+  metaUserName = null,
+  metaBusinesses = [],
 }: {
   conectada: boolean;
   contaPadrao: string | null;
@@ -84,6 +53,9 @@ export function FormularioDeMetaAds({
   /** Nomes das variáveis de ambiente que faltam para o botão existir. */
   oauthFalta: string[];
   idioma: Idioma;
+  /** Quem conectou e as empresas (BM) que o login alcança; só no login Meta. */
+  metaUserName?: string | null;
+  metaBusinesses?: { id: string; name: string }[];
 }) {
   const t = (texto: string) => traduzir(texto, idioma);
   const router = useRouter();
@@ -93,7 +65,15 @@ export function FormularioDeMetaAds({
   const [conta, setConta] = useState(contaPadrao ?? "");
   const [selecionadas, setSelecionadas] = useState<string[]>(contasPermitidas ?? []);
   const [listaCarregada, setListaCarregada] = useState(false);
-  const aoCarregar = useCallback(() => setListaCarregada(true), []);
+  const [totalDeContas, setTotalDeContas] = useState<number | null>(null);
+  const aoCarregar = useCallback((total: number) => {
+    setListaCarregada(true);
+    setTotalDeContas(total);
+  }, []);
+  const [colarOutro, setColarOutro] = useState(false);
+  const campoDoToken = useRef<HTMLInputElement>(null);
+  const abriuColarOutro = useRef(false);
+  const [confirmarDesconexao, setConfirmarDesconexao] = useState(false);
   // O novo token enxerga menos contas que as liberadas hoje: pede confirmação antes de gravar.
   const [reducao, setReducao] = useState<{ atuais: number; visiveis: number } | null>(null);
 
@@ -101,9 +81,12 @@ export function FormularioDeMetaAds({
   // Server Action recusa. Barrar aqui explica antes de o clique acontecer, em
   // vez de devolver um erro de validação depois.
   const podeSalvar = conectada || token.trim().length >= 20;
+  // Com login Meta, lista vazia seria gravada como "nenhuma conta liberada".
+  const semNenhuma = conectada && via === "oauth" && listaCarregada && selecionadas.length === 0;
 
   function salvar(evento: React.FormEvent, confirmar = false) {
     evento.preventDefault();
+    if (semNenhuma) return;
     startTransition(async () => {
       const resultado = await updateAdInsightsConnection({
         platform: "meta_ads",
@@ -159,69 +142,59 @@ export function FormularioDeMetaAds({
 
   const manualComValidade = conectada && via !== "oauth" && Boolean(expiraEm);
   const venceEmBreve = diasParaVencer !== null && diasParaVencer < DIAS_DE_AVISO_DE_VENCIMENTO;
+  // Ao abrir "Colar outro token" o botão some: o foco vai para o campo que ele abriu.
+  useEffect(() => {
+    if (colarOutro && abriuColarOutro.current) campoDoToken.current?.focus();
+  }, [colarOutro]);
+  const trocaToken = !conectada || via !== "oauth" || colarOutro;
 
   return (
     <>
-      <Card className="flex flex-col gap-3 p-6" data-testid="meta-conectar">
-        <h3 className="font-medium">{t("Conectar com Meta")}</h3>
-        {oauthDisponivel ? (
-          <>
-            <p className="text-sm text-muted-foreground">
+      {conectada ? (
+        <PainelDeStatusMeta
+          nome={metaUserName}
+          via={via}
+          empresas={metaBusinesses}
+          totalDeContas={totalDeContas}
+          expiraEm={expiraEm}
+          diasParaVencer={diasParaVencer}
+          precisaReconectar={precisaReconectar}
+          oauthDisponivel={oauthDisponivel}
+          oauthFalta={oauthFalta}
+          ocupado={isPending}
+          onDesconectar={() => setConfirmarDesconexao(true)}
+          idioma={idioma}
+        />
+      ) : (
+        <Card className="flex flex-col gap-3 p-6" data-testid="meta-conectar">
+          <h3 className="font-medium">{t("Conectar com Meta")}</h3>
+          {oauthDisponivel ? (
+            <>
+              <p className="text-sm text-muted-foreground">
+                {t(
+                  "Entre com a sua conta da Meta e autorize o acesso. O sistema guarda um token de cerca de 60 dias, criptografado, sem você precisar copiar nada.",
+                )}
+              </p>
+              <div>
+                <a href={LINK_DE_CONEXAO}>
+                  <Button type="button" disabled={isPending}>
+                    {t("Conectar com Meta")}
+                  </Button>
+                </a>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground" data-testid="meta-nao-configurado">
               {t(
-                "Entre com a sua conta da Meta e autorize o acesso. O sistema guarda um token de cerca de 60 dias, criptografado, sem você precisar copiar nada.",
-              )}
+                "Conectar com a Meta ainda não está disponível nesta instalação. Quem instalou o sistema precisa configurar",
+              )}{" "}
+              <span className="font-mono text-xs">{oauthFalta.join(` ${t("e")} `)}</span>
+              {". "}
+              {t("Enquanto isso, você pode colar um token à mão abaixo.")}
             </p>
-            {conectada && via === "oauth" && expiraEm && (
-              <p className="text-sm" data-testid="meta-validade">
-                {diasParaVencer !== null && diasParaVencer <= 0
-                  ? `${t("A conexão venceu em")} ${expiraEm}.`
-                  : `${t("Conectada via Meta. O token vale até")} ${expiraEm}.`}
-              </p>
-            )}
-            {precisaReconectar && (
-              <p
-                role="alert"
-                className="text-sm font-medium text-destructive"
-                data-testid="meta-precisa-reconectar"
-              >
-                {t("A Meta recusou renovar o acesso. Reconecte agora.")}
-              </p>
-            )}
-            {venceEmBreve && !precisaReconectar && (
-              <p
-                role="alert"
-                className="text-sm font-medium text-destructive"
-                data-testid="meta-aviso-de-vencimento"
-              >
-                {diasParaVencer !== null && diasParaVencer <= 0
-                  ? t("Reconecte agora para voltar a ler as campanhas.")
-                  : t("O token está perto de vencer. Reconecte para renovar por mais 60 dias.")}
-              </p>
-            )}
-            {conectada && via !== "oauth" && (
-              <p className="text-sm" data-testid="meta-substitui-manual">
-                {t("Conectar com a Meta substitui o token que está salvo agora.")}
-              </p>
-            )}
-            <div>
-              <a href={LINK_DE_CONEXAO}>
-                <Button type="button" disabled={isPending}>
-                  {conectada && via === "oauth" ? t("Reconectar com Meta") : t("Conectar com Meta")}
-                </Button>
-              </a>
-            </div>
-          </>
-        ) : (
-          <p className="text-sm text-muted-foreground" data-testid="meta-nao-configurado">
-            {t(
-              "Conectar com a Meta ainda não está disponível nesta instalação. Quem instalou o sistema precisa configurar",
-            )}{" "}
-            <span className="font-mono text-xs">{oauthFalta.join(` ${t("e")} `)}</span>
-            {". "}
-            {t("Enquanto isso, você pode colar um token à mão abaixo.")}
-          </p>
-        )}
-      </Card>
+          )}
+        </Card>
+      )}
 
       {/* Os dados vêm depois da conexão: com login Meta disponível, o formulário só aparece conectada. */}
       {(conectada || !oauthDisponivel) && (
@@ -235,42 +208,62 @@ export function FormularioDeMetaAds({
                 onPadrao={setConta}
                 onCarregada={aoCarregar}
                 podeAmpliar={podeAmpliar}
+                precisaReconectar={precisaReconectar}
                 idioma={idioma}
               />
             )}
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="access_token">{t("Token de acesso")}</Label>
-              <Input
-                id="access_token"
-                name="meta_access_token"
-                type="password"
-                // O Chrome ignora autocomplete="off" em campo de senha; "new-password" é o que impede o
-                // preenchimento e evita que o campo de busca logo acima vire "usuário" para o gerenciador de senhas.
-                autoComplete="new-password"
-                data-1p-ignore
-                data-lpignore="true"
-                data-form-type="other"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                placeholder={conectada ? t("Guardado — preencha só para trocar") : "EAA…"}
-              />
-              {manualComValidade && (
-                <p className="text-xs" data-testid="meta-validade-manual">
-                  {diasParaVencer !== null && diasParaVencer <= 0
-                    ? `${t("O token colado venceu em")} ${expiraEm}.`
-                    : `${t("O token colado vale até")} ${expiraEm}.`}
-                  {venceEmBreve && diasParaVencer !== null && diasParaVencer > 0 && ` ${t("Cole um novo token antes disso.")}`}
+            {conectada && via === "oauth" && !colarOutro && (
+              <div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  aria-expanded={colarOutro}
+                  aria-controls="access_token"
+                  onClick={() => {
+                    abriuColarOutro.current = true;
+                    setColarOutro(true);
+                  }}
+                >
+                  {t("Colar outro token")}
+                </Button>
+              </div>
+            )}
+            {trocaToken && (
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="access_token">{t("Token de acesso")}</Label>
+                <Input
+                  id="access_token"
+                  ref={campoDoToken}
+                  name="meta_access_token"
+                  type="password"
+                  // O Chrome ignora autocomplete="off" em campo de senha; "new-password" é o que impede o
+                  // preenchimento e evita que o campo de busca logo acima vire "usuário" para o gerenciador de senhas.
+                  autoComplete="new-password"
+                  data-1p-ignore
+                  data-lpignore="true"
+                  data-form-type="other"
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                  placeholder={conectada ? t("Guardado, preencha só para trocar") : "EAA…"}
+                />
+                {manualComValidade && (
+                  <p className="text-xs" data-testid="meta-validade-manual">
+                    {diasParaVencer !== null && diasParaVencer <= 0
+                      ? `${t("O token colado venceu em")} ${expiraEm}.`
+                      : `${t("O token colado vale até")} ${expiraEm}.`}
+                    {venceEmBreve && diasParaVencer !== null && diasParaVencer > 0 && ` ${t("Cole um novo token antes disso.")}`}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  {conectada
+                    ? `${t(
+                        "Já existe um token guardado. Deixe em branco para mantê-lo, ou cole um novo para substituir.",
+                      )}${via !== "oauth" ? ` ${t("Precisa da permissão ads_read.")}` : ""}`
+                    : t("Precisa da permissão ads_read.")}
                 </p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                {conectada
-                  ? `${t(
-                      "Já existe um token guardado. Deixe em branco para mantê-lo, ou cole um novo para substituir.",
-                    )}${via !== "oauth" ? ` ${t("Precisa da permissão ads_read.")}` : ""}`
-                  : t("Precisa da permissão ads_read.")}
-              </p>
-            </div>
+              </div>
+            )}
 
             {!conectada && (
             <div className="flex flex-col gap-2">
@@ -290,16 +283,15 @@ export function FormularioDeMetaAds({
             )}
 
             <div className="flex items-center gap-3">
-              <Button type="submit" disabled={isPending || !podeSalvar}>
+              <Button type="submit" disabled={isPending || !podeSalvar || semNenhuma}>
                 {isPending ? t("Salvando…") : t("Salvar")}
               </Button>
 
-              {conectada && (
-                <Button type="button" variant="outline" disabled={isPending} onClick={desconectar}>
-                  {t("Desconectar")}
-                </Button>
+              {semNenhuma && (
+                <span role="alert" className="text-sm text-muted-foreground" data-testid="meta-nenhuma-liberada">
+                  {t("Nenhuma conta liberada. Marque ao menos uma para salvar.")}
+                </span>
               )}
-
               {!podeSalvar && (
                 <span className="text-sm text-muted-foreground">
                   {t("Cole o token para poder salvar.")}
@@ -307,46 +299,19 @@ export function FormularioDeMetaAds({
               )}
             </div>
 
-            {conectada && (
-              <p className="text-xs text-muted-foreground">
-                {/*
-                Desconectar APAGA a linha — não existe "pausar" nesta feature, e o
-                porquê está no cabeçalho da 0214: como nada roda sozinho, um estado
-                "conectado mas desligado" teria a mesma consequência visível de não
-                estar conectado.
-              */}
-                {t(
-                  "Desconectar apaga o token guardado. A tela de Meta Ads volta a pedir uma conexão, e nenhum dado histórico é perdido — nada é armazenado aqui.",
-                )}
-              </p>
-            )}
           </form>
         </Card>
       )}
 
-      <AlertDialog open={reducao !== null} onOpenChange={(aberto) => !aberto && setReducao(null)}>
-        <AlertDialogContent data-testid="meta-confirmar-reducao">
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("Este token enxerga menos contas")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("Hoje a organização tem {atuais} contas liberadas e o novo token enxerga só {visiveis} delas. Trocar agora pode esconder as demais.")
-                .replace("{atuais}", String(reducao?.atuais ?? 0))
-                .replace("{visiveis}", String(reducao?.visiveis ?? 0))}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("Cancelar")}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                setReducao(null);
-                salvar(e as unknown as React.FormEvent, true);
-              }}
-            >
-              {t("Trocar mesmo assim")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DialogosDeMetaAds
+        confirmarDesconexao={confirmarDesconexao}
+        onDesconexao={setConfirmarDesconexao}
+        onConfirmarDesconexao={desconectar}
+        reducao={reducao}
+        onReducao={setReducao}
+        onConfirmarReducao={(e) => salvar(e as unknown as React.FormEvent, true)}
+        idioma={idioma}
+      />
     </>
   );
 }
