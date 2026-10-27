@@ -4920,6 +4920,12 @@ export const DICIONARIO: Traducoes = {
   "Usando o Jev da plataforma. Cadastre a sua chave para usar a sua conta.": {
     es: "Usando el Jev de la plataforma. Registra tu clave para usar tu cuenta.",
   },
+  "Marque o aceite do envio das mensagens à TypeSafe AI antes de mudar o Jev.": {
+    es: "Marca la aceptación del envío de mensajes a TypeSafe AI antes de cambiar Jev.",
+  },
+  "Cada mensagem que o cliente manda vai para a TypeSafe AI, nos Estados Unidos, uma de cada vez e sem o resto da conversa, para o Jev avaliar. Antes de sair, o sistema apaga CPF, telefone e e-mail do texto. Para mudar qualquer ajuste do Jev, confirme o aceite abaixo. Desligar não pede aceite.": {
+    es: "Cada mensaje que el cliente envía va a TypeSafe AI, en Estados Unidos, uno a la vez y sin el resto de la conversación, para que Jev lo evalúe. Antes de salir, el sistema borra CPF, teléfono y correo del texto. Para cambiar cualquier ajuste de Jev, confirma la aceptación abajo. Apagar no pide aceptación.",
+  },
   "O Jev parou de funcionar": { es: "Jev dejó de funcionar" },
   // Título antigo do mesmo aviso: segue aqui para a busca achar o aviso aberto
   // em espanhol numa instalação que atualizou (`lib/ai/decisao/aviso.ts`).

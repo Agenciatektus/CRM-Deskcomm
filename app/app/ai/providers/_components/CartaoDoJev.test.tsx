@@ -19,7 +19,7 @@ import {
 import { IdiomaProvider } from "@/lib/i18n/IdiomaProvider";
 import { selectDaEscolha } from "@/tests/unit/helpers/controles-do-ds";
 
-import { CartaoDoJev, jevNoPonto, useDadosDoJev, type DadosDoJev } from "./CartaoDoJev";
+import { CartaoDoJev, corpoComAceiteDoPadrao, jevNoPonto, useDadosDoJev, type DadosDoJev } from "./CartaoDoJev";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("@/app/app/ai/credentials/_actions", () => ({ refreshCredentialsView: vi.fn() }));
@@ -1603,5 +1603,55 @@ describe("CartaoDoJev — o aviso da área da saúde (DEC-012 #2)", () => {
     expect(aviso).toHaveTextContent(/Se a sua empresa é da área da saúde/);
     expect(aviso).toHaveTextContent(/LGPD trata como sensível/);
     expect(aviso).toHaveTextContent(/contrato da TypeSafe/);
+  });
+});
+
+describe("CartaoDoJev — empresa no padrão da plataforma (no_padrao)", () => {
+  const decidindo = () => dados({ config: { ligado: true, modo: "decide" } });
+  const noPadrao = () => ({
+    ...decidindo(),
+    config: { ...decidindo().config, no_padrao: true, aceite: null },
+  });
+
+  it("mostra o aceite ANTES de qualquer mudança e o exige: sem marcar, nada é enviado", async () => {
+    montar(noPadrao());
+    expect(screen.getByTestId("jev-aceite-do-padrao")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Voltar a só observar" }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(chamadas.filter((c) => c.metodo === "PATCH")).toEqual([]);
+  });
+
+  it("com o aceite marcado, a mudança sai com aceite_lgpd", async () => {
+    montar(noPadrao());
+    fireEvent.click(screen.getByLabelText(/Concordo com o envio de cada mensagem/));
+    fireEvent.click(screen.getByRole("button", { name: "Voltar a só observar" }));
+    await waitFor(() => expect(recarregar).toHaveBeenCalledTimes(1));
+    expect(chamadas.map((c) => c.corpo)).toEqual([{ modo: "observacao", aceite_lgpd: true }]);
+  });
+
+  it("desligar nunca pede o aceite", async () => {
+    montar(noPadrao());
+    fireEvent.click(screen.getByRole("button", { name: "Desligar" }));
+    await waitFor(() => expect(recarregar).toHaveBeenCalledTimes(1));
+    expect(chamadas.map((c) => c.corpo)).toEqual([{ ligado: false }]);
+  });
+
+  it("controle: sem no_padrao não há bloco de aceite e o corpo segue como era", async () => {
+    montar(decidindo());
+    expect(screen.queryByTestId("jev-aceite-do-padrao")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Voltar a só observar" }));
+    await waitFor(() => expect(recarregar).toHaveBeenCalledTimes(1));
+    expect(chamadas.map((c) => c.corpo)).toEqual([{ modo: "observacao" }]);
+  });
+
+  it("corpoComAceiteDoPadrao: a lógica sozinha", () => {
+    const livre = { exigido: false, dado: false };
+    expect(corpoComAceiteDoPadrao({ modo: "decide" }, livre)).toEqual({ modo: "decide" });
+    expect(corpoComAceiteDoPadrao({ modo: "decide" }, { exigido: true, dado: false })).toBeNull();
+    expect(corpoComAceiteDoPadrao({ modo: "decide" }, { exigido: true, dado: true })).toEqual({
+      modo: "decide",
+      aceite_lgpd: true,
+    });
+    expect(corpoComAceiteDoPadrao({ ligado: false }, { exigido: true, dado: false })).toEqual({ ligado: false });
   });
 });
