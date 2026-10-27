@@ -6,7 +6,7 @@ import { NextRequest } from "next/server";
  * organização dona da loja. Mede a LIGAÇÃO da rota: evento de pedido não toca no cache.
  */
 const invalidar = vi.hoisted(() => vi.fn(async () => {}));
-vi.mock("@/lib/nuvemshop/cache-loja", () => ({ invalidarProdutoDaLoja: invalidar }));
+vi.mock("@/lib/nuvemshop/cache-loja", () => ({ invalidarLojaDaOrg: invalidar }));
 vi.mock("@/lib/audit", () => ({ audit: vi.fn(async () => {}) }));
 vi.mock("@/lib/nuvemshop/oauth", () => ({ verifyHmac: () => true }));
 vi.mock("@/lib/supabase/admin", () => {
@@ -39,13 +39,20 @@ const chamar = (slug: string, id: number) =>
 beforeEach(() => invalidar.mockClear());
 
 describe("webhook Nuvemshop x cache de estoque", () => {
-  it.each(["product-updated", "product-deleted"])("%s invalida o produto da org certa", async (slug) => {
+  it.each([
+    "product-created",
+    "product-updated",
+    "product-deleted",
+    "order-created",
+    "order-paid",
+    "order-cancelled",
+  ])("%s vira a época da org certa", async (slug) => {
     await chamar(slug, 1001);
-    expect(invalidar).toHaveBeenCalledWith("org-1", "1001");
+    expect(invalidar).toHaveBeenCalledWith("org-1");
   });
 
-  it("evento de pedido não invalida", async () => {
-    await chamar("order-created", 77);
+  it("evento que não mexe no saldo não invalida", async () => {
+    await chamar("order-updated", 77);
     expect(invalidar).not.toHaveBeenCalled();
   });
 });

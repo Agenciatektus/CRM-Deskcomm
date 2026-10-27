@@ -19,10 +19,19 @@ import { audit } from "@/lib/audit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { slugToEvent } from "@/lib/nuvemshop/config";
 import { verifyHmac } from "@/lib/nuvemshop/oauth";
-import { invalidarProdutoDaLoja } from "@/lib/nuvemshop/cache-loja";
+import { invalidarLojaDaOrg } from "@/lib/nuvemshop/cache-loja";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+
+const EVENTOS_QUE_MEXEM_NO_ESTOQUE: ReadonlySet<string> = new Set([
+  "product/created",
+  "product/updated",
+  "product/deleted",
+  "order/created",
+  "order/paid",
+  "order/cancelled",
+]);
 
 interface RouteCtx {
   params: Promise<{ event: string }>;
@@ -104,10 +113,10 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<NextRespons
     return fail("unauthenticated", "invalid_signature", 401);
   }
 
-  // Estoque ao vivo: produto mudou ou saiu, o saldo em cache (1 h) deixa de valer. Antes da
-  // checagem de idempotência (reentrega também invalida); nunca lança.
-  if (event === "product/updated" || event === "product/deleted") {
-    await invalidarProdutoDaLoja(integration.organization_id, String(body.id ?? ""));
+  // Estoque ao vivo: produto ou venda mudou o saldo, então vira a época do cache (1 h) da org.
+  // Antes da checagem de idempotência (reentrega também invalida); nunca lança.
+  if (EVENTOS_QUE_MEXEM_NO_ESTOQUE.has(event)) {
+    await invalidarLojaDaOrg(integration.organization_id);
   }
 
   const externalId = externalIdFor(event, body);

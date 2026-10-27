@@ -57,6 +57,8 @@ describe("o catálogo da loja chega ao acervo", () => {
     const worker = ler("workers/rag-indexer.ts");
     const credenciais = ler("lib/nuvemshop/credenciais.ts");
     expect(worker).toContain("credenciaisDaLoja");
+    expect(worker).toContain('from "@/lib/nuvemshop/credenciais"');
+    expect(worker).not.toMatch(/function credenciaisDaLoja/);
     expect(credenciais).toContain('.eq("status", "healthy")');
     // `active` nunca esteve no CHECK de tenant_integrations: connecting,
     // healthy, token_expired, scope_missing, disconnected, rate_limited, error.

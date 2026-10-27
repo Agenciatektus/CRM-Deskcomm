@@ -18,18 +18,20 @@ const fake = {
     loja.dados.set(k, JSON.parse(JSON.stringify(v)));
     return "OK";
   },
-  del: async (k: string) => {
+  incr: async (k: string) => {
     if (loja.fora) throw new Error("redis_off");
-    loja.dados.delete(k);
-    return 1;
+    const n = Number(loja.dados.get(k) ?? 0) + 1;
+    loja.dados.set(k, n);
+    return n;
   },
+  expire: async () => 1,
 };
 return { loja, fake };
 });
 vi.mock("@/lib/ai/rag/debounce", () => ({ getRedis: () => fake }));
 
 import { crmCheckStoreStock, formatarProduto, type ProdutoLoja } from "./loja-ao-vivo";
-import { invalidarProdutoDaLoja } from "@/lib/nuvemshop/cache-loja";
+import { cacheDaBusca, chaveBusca, invalidarLojaDaOrg } from "@/lib/nuvemshop/cache-loja";
 import type { McpContext } from "../types";
 
 const ORG = "22222222-2222-4222-8222-222222222222";
@@ -174,15 +176,51 @@ describe("crm_check_store_stock", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("invalidação (product/updated): apaga o produto e a busca volta à API", async () => {
+  it("invalidação: depois do bump da época a busca volta à API", async () => {
     fetchMock.mockImplementation(async () => json([produtoCru()]));
     await rodar();
-    await invalidarProdutoDaLoja(ORG, "1001");
+    await invalidarLojaDaOrg(ORG);
     fetchMock.mockImplementation(async () => json([produtoCru({ variants: [{ sku: "V-P", values: [], stock_management: true, stock: 1, price: "650.00" }] })]));
     const r = await rodar();
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(r.do_cache).toBe(false);
     expect(r.produtos[0].variantes[0].estoque).toBe(1);
+  });
+
+  it("(a) escrita atrasada de uma época antiga nunca é lida depois do bump", async () => {
+    const velha = await cacheDaBusca<ProdutoLoja>(ORG, "vestido", 5); // época 0, lida no início
+    await invalidarLojaDaOrg(ORG); // o webhook vira a época enquanto a consulta voava
+    await velha.gravar([formatarProduto(produtoCru(), "2026-10-27T00:00:00.000Z")]); // grava atrasada
+    const nova = await cacheDaBusca<ProdutoLoja>(ORG, "vestido", 5);
+    expect(await nova.ler()).toBeNull();
+  });
+
+  it("(d) CONTROLE NEGATIVO: sem a época na chave, a escrita atrasada seria lida", async () => {
+    const velha = await cacheDaBusca<ProdutoLoja>(ORG, "vestido", 5);
+    await invalidarLojaDaOrg(ORG);
+    await velha.gravar([formatarProduto(produtoCru(), "2026-10-27T00:00:00.000Z")]);
+    // A época entra na chave: a gravação velha mora numa chave que a época nova não monta.
+    expect(chaveBusca(ORG, 0, "vestido", 5)).not.toBe(chaveBusca(ORG, 1, "vestido", 5));
+    const gravadas = [...loja.dados.keys()].filter((k) => k.includes(":q:"));
+    expect(gravadas).toEqual([chaveBusca(ORG, 0, "vestido", 5)]);
+    expect(gravadas).not.toContain(chaveBusca(ORG, 1, "vestido", 5));
+  });
+
+  it("(c) stock ausente sem stock_management=false vira disponivel null, nunca false", () => {
+    const p = formatarProduto(
+      produtoCru({ variants: [{ sku: "X", values: [], stock_management: true, stock: null, price: "10.00" }, { sku: "Y", values: [], stock: null, price: "10.00" }] }),
+      "2026-10-27T00:00:00.000Z",
+    );
+    for (const v of p.variantes) expect(v).toMatchObject({ estoque: null, disponivel: null, sem_controle: false });
+  });
+
+  it("corta nome em 200 e variação em 120 caracteres", () => {
+    const p = formatarProduto(
+      produtoCru({ name: { pt: "x".repeat(300) }, attributes: [{ pt: "T" }], variants: [{ values: [{ pt: "y".repeat(300) }], stock_management: false }] }),
+      "2026-10-27T00:00:00.000Z",
+    );
+    expect(p.nome).toHaveLength(200);
+    expect(p.variantes[0]!.variacao).toHaveLength(120);
   });
 
   it("Redis fora do ar: segue sem cache, sem erro", async () => {
@@ -193,12 +231,13 @@ describe("crm_check_store_stock", () => {
     expect(a.produtos).toHaveLength(1);
     expect(b.do_cache).toBe(false);
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    await expect(invalidarProdutoDaLoja(ORG, "1001")).resolves.toBeUndefined();
+    await expect(invalidarLojaDaOrg(ORG)).resolves.toBeUndefined();
   });
 
   it("valida o input: termo com 2+ caracteres, limite 1..5", () => {
     const s = z.object(crmCheckStoreStock.inputSchema);
     expect(s.safeParse({ termo: "a" }).success).toBe(false);
+    expect(s.safeParse({ termo: "a".repeat(101) }).success).toBe(false);
     expect(s.safeParse({ termo: "ab", limite: 6 }).success).toBe(false);
     expect(s.parse({ termo: "ab" }).limite).toBe(5);
   });
