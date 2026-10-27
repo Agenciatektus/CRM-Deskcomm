@@ -39,6 +39,7 @@ export function FunilNoCelular({
   leadsDoRecorte,
   barra,
   conteudo,
+  aoAbrir,
 }: {
   pipelineId: string;
   aoTrocarFunil: (id: string) => void;
@@ -48,6 +49,8 @@ export function FunilNoCelular({
   barra?: ReactNode;
   /** A Lista: no lugar das abas de etapa e dos cartões. */
   conteudo?: ReactNode;
+  /** Abre o dossiê na própria página; sem ele o cartão segue o link do lead. */
+  aoAbrir?: (leadId: string) => void;
 }) {
   const t = useT();
   const funis = useFunisDoMenu();
@@ -119,6 +122,7 @@ export function FunilNoCelular({
           <li key={l.id} className="rounded-2xl bg-surface shadow-[0_0_0_1px_var(--color-border)]">
             <Link
               href={`/app/leads/${l.id}`}
+              onClick={aoAbrir && ((e) => { e.preventDefault(); aoAbrir(l.id); })}
               className="grid grid-cols-[44px_minmax(0,1fr)_auto] items-start gap-3 rounded-t-2xl px-3.5 pt-3.5 pb-2 hover:bg-hover"
             >
               {/* O MESMO avatar e o MESMO nome do card do desktop (proposta de

@@ -23,7 +23,7 @@ export const TOQUE_LONGO_MS = 500;
  * marca e desmarca (e o card não abre). A caixa de seleção existe sempre para
  * o teclado e o leitor de tela; aparece na tela durante a seleção.
  */
-export function ListaDoFunilCelular({ leads, stages, ownerNames, selectedIds, onSelectionChange }: PropsDaLista) {
+export function ListaDoFunilCelular({ leads, stages, ownerNames, selectedIds, onSelectionChange, onAbrir }: PropsDaLista) {
   const t = useT();
   const agora = useMemo(() => new Date(), [leads]); // eslint-disable-line react-hooks/exhaustive-deps
   const etapa = useMemo(() => new Map(stages.map((s) => [s.id, s.name])), [stages]);
@@ -51,6 +51,11 @@ export function ListaDoFunilCelular({ leads, stages, ownerNames, selectedIds, on
       e.preventDefault();
       if (!segurou.current) alterna(id);
       segurou.current = false;
+    } else if (onAbrir) {
+      // Abre o dossiê AQUI. Seguir o href ia a /app/leads/:id, que redireciona de
+      // volta a este funil: a tela recarregava a cada toque e o lead não abria.
+      e.preventDefault();
+      onAbrir(id);
     }
   };
 
