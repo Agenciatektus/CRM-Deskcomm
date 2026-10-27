@@ -1655,3 +1655,21 @@ describe("CartaoDoJev — empresa no padrão da plataforma (no_padrao)", () => {
     expect(corpoComAceiteDoPadrao({ ligado: false }, { exigido: true, dado: false })).toEqual({ ligado: false });
   });
 });
+
+describe("CartaoDoJev — chave própria recusada com a plataforma atendendo", () => {
+  it("mostra o erro da chave e que a plataforma atende; sem erro, a frase não aparece", () => {
+    montar(
+      dados({
+        chave: { validada: true, fonte_da_chave: "plataforma", erro_de_validacao: "auth_failed_401" },
+        config: { ligado: true, modo: "decide" },
+      }),
+    );
+    const aviso = screen.getByTestId("jev-chave-propria-recusada");
+    expect(aviso).toHaveTextContent(/Sua chave foi recusada pela TypeSafe:/);
+    expect(aviso).toHaveTextContent(/Enquanto isso, a plataforma atende\./);
+    expect(screen.getByTestId("jev-da-plataforma")).toBeInTheDocument();
+    cleanup();
+    montar(dados({ chave: { validada: true, fonte_da_chave: "plataforma", erro_de_validacao: null } }));
+    expect(screen.queryByTestId("jev-chave-propria-recusada")).toBeNull();
+  });
+});

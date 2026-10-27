@@ -635,6 +635,8 @@ export async function GET(): Promise<Response> {
         fonte_da_chave: fonteDaChave?.tipo ?? "nenhuma",
         credencial_id: mostrada?.id ?? null,
         rotulo: mostrada?.label ?? null,
+        // O erro da chave PRÓPRIA aparece mesmo com a plataforma servindo:
+        // `validada` fica true por causa dela, e o erro não pode sumir junto.
         erro_de_validacao: mostrada?.validation_error ?? null,
       },
       plataforma_tem_jev: plataformaTemJev(),

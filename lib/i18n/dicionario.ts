@@ -4926,6 +4926,9 @@ export const DICIONARIO: Traducoes = {
   "Cada mensagem que o cliente manda vai para a TypeSafe AI, nos Estados Unidos, uma de cada vez e sem o resto da conversa, para o Jev avaliar. Antes de sair, o sistema apaga CPF, telefone e e-mail do texto. Para mudar qualquer ajuste do Jev, confirme o aceite abaixo. Desligar não pede aceite.": {
     es: "Cada mensaje que el cliente envía va a TypeSafe AI, en Estados Unidos, uno a la vez y sin el resto de la conversación, para que Jev lo evalúe. Antes de salir, el sistema borra CPF, teléfono y correo del texto. Para cambiar cualquier ajuste de Jev, confirma la aceptación abajo. Apagar no pide aceptación.",
   },
+  "Sua chave foi recusada pela TypeSafe:": { es: "Tu clave fue rechazada por TypeSafe:" },
+  "não consegui testar a chave.": { es: "no pude probar la clave." },
+  "Enquanto isso, a plataforma atende.": { es: "Mientras tanto, la plataforma atiende." },
   "O Jev parou de funcionar": { es: "Jev dejó de funcionar" },
   // Título antigo do mesmo aviso: segue aqui para a busca achar o aviso aberto
   // em espanhol numa instalação que atualizou (`lib/ai/decisao/aviso.ts`).

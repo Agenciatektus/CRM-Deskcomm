@@ -1460,3 +1460,22 @@ describe("o Jev da plataforma na rota", () => {
     expect(paraOpenrouter.corpo.error.code).toBe("jev_exige_chave_validada");
   });
 });
+
+describe("chave própria reprovada com a plataforma servindo (P2-C)", () => {
+  it("GET devolve o erro da chave própria, mesmo com a plataforma atendendo", async () => {
+    env.JEV_PLATFORM_API_KEY = "plataforma_segredo_nao_pode_vazar";
+    estado.assinatura = { estado: "ativa", plano: { inclui_ia: true, ia_propria: false } };
+    estado.credenciais = [credencial({ validated_at: null, validation_error: "auth_failed_401" })];
+    const d = (await ler()).corpo.data;
+    expect(d.chave).toMatchObject({ fonte_da_chave: "plataforma", validada: true, erro_de_validacao: "auth_failed_401" });
+    expect(JSON.stringify(d)).not.toContain("plataforma_segredo_nao_pode_vazar");
+  });
+
+  it("controle: chave própria validada => fonte própria e sem erro", async () => {
+    env.JEV_PLATFORM_API_KEY = "plataforma_segredo_nao_pode_vazar";
+    estado.assinatura = { estado: "ativa", plano: { inclui_ia: true, ia_propria: false } };
+    estado.credenciais = [credencial()];
+    const d = (await ler()).corpo.data;
+    expect(d.chave).toMatchObject({ fonte_da_chave: "propria", erro_de_validacao: null });
+  });
+});

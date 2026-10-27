@@ -519,6 +519,16 @@ export function CartaoDoJev({
           {t("Usando o Jev da plataforma. As mensagens processadas pelo Jev são enviadas à TypeSafe AI, nos Estados Unidos, pela conta da Tektus. Cadastre a sua chave para usar a sua conta.")}
         </p>
       )}
+      {/* A chave própria foi recusada e a plataforma atende: o erro dela não pode
+          sumir só porque o Jev segue funcionando. */}
+      {dados.chave.fonte_da_chave === "plataforma" && dados.chave.erro_de_validacao && (
+        <p className="mt-2 text-xs text-warning-fg" data-testid="jev-chave-propria-recusada">
+          {t("Sua chave foi recusada pela TypeSafe:")}{" "}
+          {t(descreverErroDeValidacao(dados.chave.erro_de_validacao, PROVEDOR_DO_JEV).frase) ||
+            t("não consegui testar a chave.")}{" "}
+          {t("Enquanto isso, a plataforma atende.")}
+        </p>
+      )}
       {dados.chave.validada && dados.chave.fonte_da_chave !== "plataforma" && (
         <p className="mt-3 flex items-center gap-1.5 text-xs text-success-fg" data-testid="jev-chave-conferida">
           <span aria-hidden>✓</span>
