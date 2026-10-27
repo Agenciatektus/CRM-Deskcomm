@@ -12,6 +12,6 @@ export const TOOLS_LOJA_AO_VIVO = declararTools([
       "Consulta a loja online na hora e informa preço, promoção, link e quantas peças restam de cada tamanho e cor, para o assistente não prometer o que a loja não tem.",
     oQueToca: "Loja online conectada",
     risco: "seguro",
-    pacotes: ["vender", "atender"],
+    pacotes: ["reter"],
   },
 ]);
