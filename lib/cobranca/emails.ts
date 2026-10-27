@@ -119,6 +119,29 @@ export async function enviarAvisoAosAdmins(
   }
 }
 
+/** Aviso livre aos donos da instalação (platform admins de acesso total). Melhor esforço: nunca lança. */
+export async function avisarDonosDaInstalacao(
+  admin: SupabaseClient,
+  o: { titulo: string; corpo: string; botao: { rotulo: string; href: string } | null },
+): Promise<void> {
+  try {
+    const { data, error } = await admin.from("platform_admins").select("user_id").eq("scope", "full").is("revoked_at", null);
+    if (error) throw new Error(`donos ilegíveis (${error.code ?? "sem_codigo"})`);
+    const para = await emailsDe(admin, ((data ?? []) as Array<{ user_id: string }>).map((l) => l.user_id));
+    if (para.length === 0) return;
+    const marca = await marcaDaSaida(null);
+    const email = buildEmailDaCobranca({
+      ...o,
+      marca,
+      idioma: "pt-BR",
+      rodape: "Você recebe este aviso porque administra esta instalação.",
+    });
+    await enviarParaCada(para, email, marca.nome, { destino: "donos_da_instalacao" });
+  } catch (e) {
+    logger.warn("cobranca.email_nao_saiu", { destino: "donos_da_instalacao", erro: e instanceof Error ? e.message : "desconhecido" });
+  }
+}
+
 /** Troca da chave da instalação (§7a): todo platform admin com acesso total fica sabendo. */
 export async function avisarTrocaDeChave(admin: SupabaseClient, o: { antigo: string | null; novo: string }): Promise<void> {
   try {

@@ -28,6 +28,7 @@ export const CHAVE_DO_MAPA_DE_PLANOS = "VENDA_DIRETA_PLANOS";
 export const LIMITE_DE_COMPRAS_POR_RODADA = 20;
 export const TETO_DE_TENTATIVAS = 10;
 const JANELA_DO_MESMO_EMAIL_MS = 24 * 3600 * 1000;
+export const MOTIVO_DOS_EFEITOS_PENDENTES = "efeitos_pendentes";
 const FORMATO_DO_CLIENT_REFERENCE = /^[A-Za-z0-9_-]{1,200}$/;
 
 export interface CompraGravada {
@@ -231,11 +232,40 @@ export async function processarCompra(
       await deps.aoCriar?.(orgId, { ...atual, status: "criada", organization_id: orgId });
     } catch (e) {
       logger.error("cobranca.compra_ao_criar_falhou", { compra: compra.id, erro: e instanceof Error ? e.message : "desconhecido" });
+      // A empresa existe, o convite não saiu: a rodada repassa só o gancho (motivo `efeitos_pendentes`).
+      try {
+        await gravar(admin, compra.id, { motivo: MOTIVO_DOS_EFEITOS_PENDENTES, tentativas: compra.tentativas + 1 });
+      } catch (g) {
+        logger.error("cobranca.compra_efeitos_nao_marcados", { compra: compra.id, erro: g instanceof Error ? g.message : "desconhecido" });
+      }
     }
     return { tipo: "criada", org: orgId };
   } catch (e) {
     return falhar(e);
   }
+}
+
+/** Repassa SÓ o gancho `aoCriar` de uma compra `criada` que ficou com os efeitos pendentes. Sem RPC, sem releitura. */
+async function repetirEfeitos(admin: SupabaseClient, compraId: string, deps: DependenciasDaCompra): Promise<boolean> {
+  const { data, error } = await admin
+    .from("cobranca_compras")
+    .select(COLUNAS)
+    .eq("id", compraId)
+    .eq("status", "criada")
+    .eq("motivo", MOTIVO_DOS_EFEITOS_PENDENTES)
+    .maybeSingle();
+  if (error) throw new Error(`compra: leitura falhou (${error.code ?? "sem_codigo"})`);
+  const compra = data as CompraGravada | null;
+  if (!compra?.organization_id) return true;
+  try {
+    await deps.aoCriar?.(compra.organization_id, compra);
+  } catch (e) {
+    logger.error("cobranca.compra_ao_criar_falhou", { compra: compra.id, erro: e instanceof Error ? e.message : "desconhecido" });
+    await gravar(admin, compra.id, { tentativas: compra.tentativas + 1 });
+    return false;
+  }
+  await gravar(admin, compra.id, { motivo: null });
+  return true;
 }
 
 export interface ResumoDasCompras {
@@ -261,6 +291,24 @@ export async function processarComprasPendentes(admin: SupabaseClient, deps: Dep
       const r = await processarCompra(admin, id, deps);
       if (r.tipo === "criada") resumo.criadas += 1;
       if (r.tipo === "falhou") resumo.falhas += 1;
+    } catch (e) {
+      resumo.falhas += 1;
+      logger.error("cobranca.compra_rodada_falhou", { compra: id, erro: e instanceof Error ? e.message : "desconhecido" });
+    }
+  }
+  const { data: pendentes, error: erroDosEfeitos } = await admin
+    .from("cobranca_compras")
+    .select("id")
+    .eq("status", "criada")
+    .eq("motivo", MOTIVO_DOS_EFEITOS_PENDENTES)
+    .lt("tentativas", TETO_DE_TENTATIVAS)
+    .order("created_at", { ascending: true })
+    .limit(LIMITE_DE_COMPRAS_POR_RODADA);
+  if (erroDosEfeitos) throw new Error(`compra: fila de efeitos ilegível (${erroDosEfeitos.code ?? "sem_codigo"})`);
+  for (const { id } of (pendentes ?? []) as Array<{ id: string }>) {
+    resumo.lidas += 1;
+    try {
+      if (!(await repetirEfeitos(admin, id, deps))) resumo.falhas += 1;
     } catch (e) {
       resumo.falhas += 1;
       logger.error("cobranca.compra_rodada_falhou", { compra: id, erro: e instanceof Error ? e.message : "desconhecido" });

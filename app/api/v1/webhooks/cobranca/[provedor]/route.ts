@@ -27,6 +27,7 @@ import { ipDoCliente } from "@/lib/http/ip-do-cliente";
 import { adaptador } from "@/lib/cobranca/provedores";
 import type { SinalDoWebhook } from "@/lib/cobranca/provedores/contrato";
 import { processarCompra } from "@/lib/cobranca/compra";
+import { efeitosDaCompra } from "@/lib/cobranca/compra-efeitos";
 import { vendaDiretaLigada } from "@/lib/cobranca/venda-direta";
 import { PROVEDORES_DE_COBRANCA, type ProvedorDeCobranca } from "@/lib/cobranca/vocabulario";
 import { moduloLigado } from "@/lib/instalacao/modulos";
@@ -233,7 +234,7 @@ async function processarComOrcamento(admin: SupabaseClient, compraId: string): P
     const estouro = new Promise<"estourou">((resolver) => {
       relogio = setTimeout(() => resolver("estourou"), ORCAMENTO_DA_COMPRA_MS);
     });
-    const r = await Promise.race([processarCompra(admin, compraId), estouro]);
+    const r = await Promise.race([processarCompra(admin, compraId, efeitosDaCompra(admin)), estouro]);
     if (r === "estourou") logger.warn("cobranca.compra_orcamento_estourado", { compra: compraId });
   } catch (e) {
     logger.warn("cobranca.compra_nao_processada_na_hora", { compra: compraId, erro: e instanceof Error ? e.message : "desconhecido" });

@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { bancoFalso, valorDoFiltro, type BancoFalso, type Cadeia, type Resposta } from "@/tests/helpers/banco-falso-da-cobranca";
 
-const h = vi.hoisted(() => ({ sincronizar: vi.fn(), aplicarRegua: vi.fn(), compras: vi.fn() }));
+const h = vi.hoisted(() => ({ sincronizar: vi.fn(), aplicarRegua: vi.fn(), compras: vi.fn(), efeito: vi.fn() }));
 vi.mock("./compra", () => ({ processarComprasPendentes: h.compras }));
+vi.mock("./compra-efeitos", () => ({ efeitosDaCompra: () => ({ aoCriar: h.efeito, aoDuplicar: h.efeito }) }));
 vi.mock("./sincronizar", () => ({ sincronizar: h.sincronizar, aplicarRegua: h.aplicarRegua }));
 vi.mock("@/lib/logger", () => ({ logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 
@@ -125,6 +126,7 @@ describe("rodadaDaCobranca", () => {
     const r = await rodar();
     expect(h.compras).toHaveBeenCalledTimes(1);
     expect(h.compras.mock.calls[0]?.[0]).toBe(banco.cliente);
+    expect(h.compras.mock.calls[0]?.[1]).toEqual({ aoCriar: h.efeito, aoDuplicar: h.efeito });
     expect(r.compras).toEqual({ lidas: 3, criadas: 2, falhas: 1 });
   });
 

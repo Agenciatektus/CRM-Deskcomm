@@ -21,6 +21,7 @@ interface Mundo {
   erroDaSessao: string | null;
   erroDaRpc: { code: string; message: string } | null;
   fila: Array<{ id: string }>;
+  filaDeEfeitos: Array<{ id: string }>;
 }
 let m: Mundo;
 let banco: BancoFalso;
@@ -40,6 +41,7 @@ function responder(c: Cadeia): Resposta {
       const campos = argumentos(c, "update")?.[0] as Record<string, unknown>;
       return "sessao_id" in campos && m.erroDaSessao ? { error: { code: m.erroDaSessao, message: "dup" } } : {};
     }
+    if (valorDoFiltro(c, "eq", "motivo") === "efeitos_pendentes" && valorDoFiltro(c, "eq", "id") === undefined) return { data: m.filaDeEfeitos };
     if (valorDoFiltro(c, "eq", "email") !== undefined) return { data: m.irmas };
     if (valorDoFiltro(c, "eq", "id") !== undefined) return { data: m.compra };
     return { data: m.fila };
@@ -54,6 +56,7 @@ const rodar = (id = `compra-${n}`) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  aoCriar.mockReset();
   n += 1;
   m = {
     compra: { id: `compra-${n}`, evento_id: `evt_${n}`, status: "recebida", organization_id: null, tentativas: 0, email: null, nome_empresa: null, plano_chave: null },
@@ -63,6 +66,7 @@ beforeEach(() => {
     erroDaSessao: null,
     erroDaRpc: null,
     fila: [],
+    filaDeEfeitos: [],
   };
   lida = {
     sessaoId: `cs_test_${n}`,
@@ -218,6 +222,7 @@ describe("processarCompra", () => {
   it("falha do gancho aoCriar não desfaz a empresa criada", async () => {
     aoCriar.mockRejectedValue(new Error("convite fora"));
     expect(await rodar()).toEqual({ tipo: "criada", org: `org-${n}` });
+    expect(ultima()).toEqual({ motivo: "efeitos_pendentes", tentativas: 1 });
   });
 
   it("o e-mail sai mascarado para log", () => {
@@ -230,11 +235,36 @@ describe("processarComprasPendentes", () => {
   it("lê só recebida, aguardando_pagamento e falhou, com tentativas abaixo do teto, por created_at, no máximo 20", async () => {
     m.fila = [{ id: `compra-${n}` }];
     const r = await processarComprasPendentes(banco.cliente as never, { adaptador: () => ({ lerCompra }) as never, modoDaChave: async () => "teste", sincronizar, agora: () => AGORA });
-    const consulta = banco.cadeias.find((c) => c.passos.some((p) => p.metodo === "order"))!;
+    const consulta = banco.cadeias.find((c) => c.passos.some((p) => p.metodo === "in"))!;
     expect(argumentos(consulta, "in")).toEqual(["status", ["recebida", "aguardando_pagamento", "falhou"]]);
     expect(argumentos(consulta, "lt")).toEqual(["tentativas", TETO_DE_TENTATIVAS]);
     expect(argumentos(consulta, "order")).toEqual(["created_at", { ascending: true }]);
     expect(argumentos(consulta, "limit")).toEqual([LIMITE_DE_COMPRAS_POR_RODADA]);
     expect(r).toEqual({ lidas: 1, criadas: 1, falhas: 0 });
+  });
+
+  it("retentativa: criada com efeitos_pendentes roda SÓ aoCriar (sem RPC, sem releitura) e limpa o motivo", async () => {
+    m.filaDeEfeitos = [{ id: `compra-${n}` }];
+    m.compra = { id: `compra-${n}`, evento_id: `evt_${n}`, status: "criada", organization_id: `org-${n}`, tentativas: 1, email: "a@exemplo.com", nome_empresa: "Empresa", plano_chave: "pro" };
+    const r = await processarComprasPendentes(banco.cliente as never, { adaptador: () => ({ lerCompra }) as never, sincronizar, aoCriar });
+    const fila = banco.cadeias.find((c) => c.tabela === "cobranca_compras" && valorDoFiltro(c, "eq", "motivo") === "efeitos_pendentes" && valorDoFiltro(c, "eq", "id") === undefined)!;
+    expect(valorDoFiltro(fila, "eq", "status")).toBe("criada");
+    expect(argumentos(fila, "lt")).toEqual(["tentativas", TETO_DE_TENTATIVAS]);
+    expect(aoCriar).toHaveBeenCalledTimes(1);
+    expect(aoCriar).toHaveBeenCalledWith(`org-${n}`, expect.objectContaining({ id: `compra-${n}`, nome_empresa: "Empresa" }));
+    expect(banco.rpcs).toEqual([]);
+    expect(lerCompra).not.toHaveBeenCalled();
+    expect(sincronizar).not.toHaveBeenCalled();
+    expect(ultima()).toEqual({ motivo: null });
+    expect(r).toEqual({ lidas: 1, criadas: 0, falhas: 0 });
+  });
+
+  it("retentativa que falha de novo: mantém o motivo, soma a tentativa e conta falha", async () => {
+    m.filaDeEfeitos = [{ id: `compra-${n}` }];
+    m.compra = { id: `compra-${n}`, evento_id: `evt_${n}`, status: "criada", organization_id: `org-${n}`, tentativas: 3, email: "a@exemplo.com", nome_empresa: "Empresa", plano_chave: "pro" };
+    aoCriar.mockRejectedValue(new Error("convite fora"));
+    const r = await processarComprasPendentes(banco.cliente as never, { aoCriar });
+    expect(ultima()).toEqual({ tentativas: 4 });
+    expect(r.falhas).toBe(1);
   });
 });

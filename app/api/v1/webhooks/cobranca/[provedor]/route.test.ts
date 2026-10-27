@@ -11,6 +11,7 @@ const h = vi.hoisted(() => ({
   baldes: [] as string[],
   aviso: vi.fn(),
   processar: vi.fn(),
+  efeitos: vi.fn(() => ({ aoCriar: () => undefined, aoDuplicar: () => undefined })),
   banco: undefined as unknown as BancoFalso,
 }));
 vi.mock("@/lib/instalacao/modulos", () => ({ moduloLigado: async () => h.ligada }));
@@ -23,6 +24,7 @@ vi.mock("@/lib/ai/dispatcher/rate-limit", () => ({
   },
 }));
 vi.mock("@/lib/cobranca/compra", () => ({ processarCompra: h.processar }));
+vi.mock("@/lib/cobranca/compra-efeitos", () => ({ efeitosDaCompra: h.efeitos }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => h.banco.cliente }));
 vi.mock("@/lib/logger", () => ({ logger: { warn: h.aviso, error: vi.fn(), info: vi.fn() } }));
 
@@ -263,6 +265,9 @@ describe("venda direta: compra da LP de cliente desconhecido (fatia 2)", () => {
     expect(res.status).toBe(200);
     expect(h.processar).toHaveBeenCalledTimes(1);
     expect(h.processar.mock.calls[0]?.[1]).toBe("compra-d-111");
+    expect(h.efeitos).toHaveBeenCalledWith(h.banco.cliente);
+    expect(h.processar.mock.calls[0]?.[2]).toBe(h.efeitos.mock.results[0]?.value);
+    expect(h.processar.mock.calls[0]?.[2]).toHaveProperty("aoCriar");
   });
 
   it("(d) reentrega (conflito ignorado, sem linha devolvida): relê o id pelo evento e processa", async () => {

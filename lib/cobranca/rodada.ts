@@ -21,6 +21,7 @@ import { logger } from "@/lib/logger";
 import { ehOperante } from "@/lib/organizacao/operante";
 
 import { processarComprasPendentes, type ResumoDasCompras } from "./compra";
+import { efeitosDaCompra } from "./compra-efeitos";
 import { vendaDiretaLigada } from "./venda-direta";
 import { aplicarRegua, sincronizar, type DependenciasDaCobranca } from "./sincronizar";
 
@@ -101,7 +102,7 @@ export async function rodadaDaCobranca(admin: SupabaseClient, deps: Dependencias
   resumo.avisosDeIa = await avisarTetoDeIa(admin);
   if (await vendaDiretaLigada(admin)) {
     try {
-      resumo.compras = await processarComprasPendentes(admin);
+      resumo.compras = await processarComprasPendentes(admin, efeitosDaCompra(admin));
     } catch (e) {
       logger.error("cobranca.rodada_compras_falhou", { erro: e instanceof Error ? e.message : "desconhecido" });
     }
