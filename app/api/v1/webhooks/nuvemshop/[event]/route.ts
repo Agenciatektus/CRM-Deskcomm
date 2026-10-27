@@ -17,7 +17,7 @@ import type { NextRequest, NextResponse } from "next/server";
 import { fail, ok } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { slugToEvent } from "@/lib/nuvemshop/config";
+import { eventLogTypeFor, slugToEvent } from "@/lib/nuvemshop/config";
 import { verifyHmac } from "@/lib/nuvemshop/oauth";
 import { invalidarLojaDaOrg } from "@/lib/nuvemshop/cache-loja";
 
@@ -123,13 +123,18 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<NextRespons
 
   // Idempotent log insert. webhook_events_log doesn't have a unique constraint
   // on (provider, external_id) yet, so we manually check for an existing row.
-  const { data: existing } = await admin
-    .from("webhook_events_log")
-    .select("id")
-    .eq("provider", "nuvemshop")
-    .eq("organization_id", integration.organization_id)
-    .eq("external_id", externalId)
-    .maybeSingle();
+  // `order/*` NÃO deduplica: o mesmo pedido gera vários `order/updated`
+  // (envio, rastreio, entrega) e a chave evento:loja:id derrubava do 2º em
+  // diante. O consumidor relê a API e é idempotente, então reentrega é inofensiva.
+  const { data: existing } = event.startsWith("order/")
+    ? { data: null }
+    : await admin
+        .from("webhook_events_log")
+        .select("id")
+        .eq("provider", "nuvemshop")
+        .eq("organization_id", integration.organization_id)
+        .eq("external_id", externalId)
+        .maybeSingle();
 
   if (existing) {
     return ok({ accepted: true, idempotent: true });
@@ -165,7 +170,7 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<NextRespons
 
   // event_type for event_log must match `^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$`.
   // Map e.g. "order/created" -> "nuvemshop.order_created".
-  const eventLogType = `nuvemshop.${event.replace("/", "_")}`;
+  const eventLogType = eventLogTypeFor(event);
 
   // ── O CATÁLOGO NUNCA CHEGAVA AO ACERVO ────────────────────────────────────
   //
