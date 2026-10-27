@@ -6,7 +6,7 @@
  * de `buscarCandidatos` só protege o operador se a edição — que é onde uma
  * campanha grande é conferida de novo — também mostrar o recibo.
  */
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { EditarCampanha } from "./_client";
@@ -25,14 +25,25 @@ const previa = vi.hoisted(() => ({
   },
 }));
 
+const salvar = vi.hoisted(() => vi.fn().mockResolvedValue({}));
+
+const U = (n: number) => `00000000-0000-4000-8000-00000000000${n}`;
+
 const CAMPANHA: Record<string, unknown> = {
   id: "c1",
   name: "Reativação de clientes parados",
   status: "draft",
-  channel_session_id: "",
+  channel_session_id: "s1",
   base_legal: "consent",
   lia_ref: null,
-  audience_filter: { com_alguma_tag: ["vip"], limite: 100 },
+  audience_filter: {
+    com_alguma_tag: ["vip"],
+    limite: 100,
+    funis: [U(1)],
+    etapas: [U(2)],
+    incluir_contatos: [U(3)],
+    excluir_contatos: [U(4)],
+  },
   message_body: "Oi {{nome}}",
   pipeline_id: null,
   stage_id: null,
@@ -43,7 +54,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: 
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (chave: string) => chave }));
 vi.mock("@/hooks/campanhas/useCampanhas", () => ({
   useCampanha: () => ({ data: CAMPANHA, isLoading: false }),
-  useEditarCampanha: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useEditarCampanha: () => ({ mutateAsync: salvar, isPending: false }),
   usePreviaDaAudiencia: () => previa,
 }));
 vi.mock("@/hooks/channels/useChannelSessions", () => ({
@@ -74,6 +85,20 @@ describe("prévia da edição de campanha: o aviso do teto de 20.000", () => {
     render(<EditarCampanha id="c1" />);
     expect(await screen.findByDisplayValue("Reativação de clientes parados")).toBeInTheDocument();
     expect(screen.queryByText(AVISO)).not.toBeInTheDocument();
+  });
+
+  it("salvar preserva funis, etapas, incluir e excluir contatos", async () => {
+    render(<EditarCampanha id="c1" />);
+    const nome = await screen.findByDisplayValue("Reativação de clientes parados");
+    fireEvent.change(nome, { target: { value: "Outro nome" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+    await waitFor(() => expect(salvar).toHaveBeenCalled());
+    expect(salvar.mock.calls[0]?.[0].audience_filter).toMatchObject({
+      funis: [U(1)],
+      etapas: [U(2)],
+      incluir_contatos: [U(3)],
+      excluir_contatos: [U(4)],
+    });
   });
 });
 

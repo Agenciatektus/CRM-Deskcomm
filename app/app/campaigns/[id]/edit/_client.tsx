@@ -135,6 +135,9 @@ export function EditarCampanha({ id }: { id: string }) {
 
   const filtro = useMemo(
     () => ({
+      // Parte do filtro salvo: o PATCH grava o objeto inteiro e a tela não edita
+      // funis, etapas, incluir/excluir_contatos (apagá-los reinclui excluídos).
+      ...((campanha.data?.audience_filter ?? {}) as Record<string, unknown>),
       com_alguma_tag: listar(comAlgumaTag),
       sem_tags: listar(semTags),
       sem_interacao_ha_dias: semInteracao ? Number(semInteracao) : null,
@@ -142,7 +145,7 @@ export function EditarCampanha({ id }: { id: string }) {
       excluir: excluirMesclado(excluirOriginal, excluirCompra),
       limite: Number(limite) || 100,
     }),
-    [comAlgumaTag, semTags, semInteracao, compra, excluirCompra, excluirOriginal, limite],
+    [campanha.data?.audience_filter, comAlgumaTag, semTags, semInteracao, compra, excluirCompra, excluirOriginal, limite],
   );
 
   const temCriterio =
