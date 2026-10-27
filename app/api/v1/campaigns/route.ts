@@ -18,7 +18,7 @@ import type { NextRequest } from "next/server";
 import { fail, ok } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
-import { ROLE_RANK } from "@/lib/auth/types";
+import { ROLE_RANK, escreveComoPlatformAdmin } from "@/lib/auth/types";
 import { FILTRO_VAZIO } from "@/lib/campanhas/audiencia";
 import { gravarPool } from "@/lib/campanhas/pool-de-numeros";
 import {
@@ -49,7 +49,10 @@ export async function GET(req: NextRequest): Promise<Response> {
   const authz = await requireRole("agent", { requestId, resource: "campaigns" });
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
-  const colunas = ROLE_RANK[authz.org.role] >= ROLE_RANK.manager ? COLUNAS_DO_GESTOR : COLUNAS_DA_LISTA;
+  const gestor =
+    ROLE_RANK[authz.org.role] >= ROLE_RANK.manager ||
+    (escreveComoPlatformAdmin(authz.user) && !authz.user.support);
+  const colunas = gestor ? COLUNAS_DO_GESTOR : COLUNAS_DA_LISTA;
 
   const params = Object.fromEntries(new URL(req.url).searchParams.entries());
   const parsed = listarCampanhasSchema.safeParse(params);

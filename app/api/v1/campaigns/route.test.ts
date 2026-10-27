@@ -7,8 +7,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ROLE_RANK, type Role } from "@/lib/auth/types";
 
-const sessao = vi.hoisted(() => ({ role: null as string | null }));
+const sessao = vi.hoisted(() => ({ role: null as string | null, admin: false }));
 const select = vi.hoisted(() => vi.fn());
+const eq = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/auth/require-role", async () => {
   const { ROLE_RANK } = await vi.importActual<typeof import("@/lib/auth/types")>("@/lib/auth/types");
@@ -17,7 +18,7 @@ vi.mock("@/lib/auth/require-role", async () => {
       const r = (c: number, code: string) => ({ ok: false, response: Response.json({ error: { code } }, { status: c }) });
       if (!sessao.role) return r(401, "unauthorized");
       if (ROLE_RANK[sessao.role as Role] < ROLE_RANK[min]) return r(403, "forbidden");
-      return { ok: true, user: { idioma: "pt-BR" }, org: { orgId: "org", role: sessao.role } };
+      return { ok: true, user: { idioma: "pt-BR", is_platform_admin: sessao.admin, platform_admin_scope: sessao.admin ? "full" : null, support: null }, org: { orgId: "org-da-sessao", role: sessao.role } };
     }),
   };
 });
@@ -27,7 +28,11 @@ vi.mock("@/lib/audit", () => ({ audit: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => {
     const q: Record<string, unknown> = {};
-    for (const m of ["eq", "order", "limit", "or"]) q[m] = () => q;
+    for (const m of ["order", "limit", "or"]) q[m] = () => q;
+    q.eq = (...a: unknown[]) => {
+      eq(...a);
+      return q;
+    };
     q.select = (cols: string) => {
       select(cols);
       return q;
@@ -47,6 +52,8 @@ const post = (url = "http://localhost/api/v1/campaigns") =>
 describe("papéis das campanhas", () => {
   beforeEach(() => {
     select.mockClear();
+    eq.mockClear();
+    sessao.admin = false;
     sessao.role = null;
   });
 
@@ -61,6 +68,13 @@ describe("papéis das campanhas", () => {
     sessao.role = "agent";
     expect((await GET(get())).status).toBe(200);
     expect(select.mock.calls[0]?.[0]).not.toContain("passos");
+    expect(eq).toHaveBeenCalledWith("organization_id", "org-da-sessao");
+  });
+  it("platform admin full (role de agent, sem membership) recebe passos", async () => {
+    sessao.role = "agent";
+    sessao.admin = true;
+    expect((await GET(get())).status).toBe(200);
+    expect(select.mock.calls[0]?.[0]).toContain("passos");
   });
   it("manager GET: 200, com passos", async () => {
     sessao.role = "manager";
