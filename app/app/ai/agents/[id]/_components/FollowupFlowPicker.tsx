@@ -64,7 +64,7 @@ export function FollowupFlowPicker({ value, onChange, disabled }: Props) {
           >
             <input
               type="checkbox"
-              className="mt-1 h-4 w-4 rounded-md border-border accent-primary"
+              className="mt-1"
               checked={checked}
               onChange={() => toggle(f.id)}
               disabled={disabled}

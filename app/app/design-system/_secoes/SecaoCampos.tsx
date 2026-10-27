@@ -122,13 +122,13 @@ export function SecaoCampos({ tema }: { tema: Tema }) {
       <Exemplo nome={t("Caixa de seleção e opção")} mapa="comp:checkbox" tema={tema}>
         <div className="flex flex-wrap gap-6 text-ui">
           <label className="flex items-center gap-2">
-            <input type="checkbox" className="size-4 accent-primary" defaultChecked /> {t("Marcada")}
+            <input type="checkbox" defaultChecked /> {t("Marcada")}
           </label>
           <label className="flex items-center gap-2">
-            <input type="checkbox" className="size-4 accent-primary" /> {t("Desmarcada")}
+            <input type="checkbox" /> {t("Desmarcada")}
           </label>
           <label className="flex items-center gap-2 text-text-subtle">
-            <input type="checkbox" className="size-4 accent-primary" disabled /> {t("Desativado")}
+            <input type="checkbox" disabled /> {t("Desativado")}
           </label>
           <label className="flex items-center gap-2">
             <input type="radio" name={`ds-radio-${tema}`} className="size-4 accent-primary" defaultChecked /> {t("Opção A")}

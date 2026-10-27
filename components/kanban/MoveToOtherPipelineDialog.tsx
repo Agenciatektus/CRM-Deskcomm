@@ -167,7 +167,7 @@ export function FormularioDeOutroFunil({
               type="checkbox"
               checked={rodarAutomacoes}
               onChange={(e) => setRodarAutomacoes(e.target.checked)}
-              className="mt-1 accent-primary"
+              className="mt-1"
             />
             <span>
               {t("Rodar as automações de entrada da etapa")}

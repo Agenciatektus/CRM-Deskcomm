@@ -120,7 +120,7 @@ export function LinhaDeTarefa({
           aria-label={`${t("Selecionar")} ${tarefa.title}`}
           checked={!!selecionada}
           onChange={() => aoSelecionar(tarefa)}
-          className="mt-0.5 size-4 shrink-0 accent-(--color-accent)"
+          className="mt-0.5 shrink-0"
         />
       )}
       <button

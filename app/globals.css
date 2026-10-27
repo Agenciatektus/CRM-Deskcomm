@@ -2333,59 +2333,109 @@ select:not([multiple]):not([size]) {
   }
 }
 
-/* ─── Caixa de marcar (checkbox) do design system: o `.chk` do protótipo ────────
-   (Main.dc.html:626, igual no MainVerdash). Uma regra só para os ~50
-   `<input type="checkbox">` nativos do app (a cerca de controles nativos exige o
-   input nativo; aqui só a APARÊNCIA muda). Sem isto o navegador desenhava a caixa
-   dele: clara no escuro e fora dos tokens (pedido do Peterson, 19/10; o mapa já a
-   marcava "diferente" em lib/design-system/mapa.ts). 16px, raio 4px, borda 1,5px
-   em `--color-border-strong` (o `--line-2`), fundo transparente; marcada = accent
-   com o "✓" do protótipo (traço 3) em `--color-accent-fg`. Em `@layer base`: quem
-   passa `size-*`/`h-*` por className continua mandando no tamanho. */
+/* ─── Caixa de marcar (checkbox) do design system v2 (placa Comp_Checkbox_v2) ───
+   Uma regra só para os `<input type="checkbox">` nativos do app (a cerca de
+   controles nativos exige o input nativo; aqui só a APARÊNCIA muda). Origem: a
+   caixa da Lista do funil. 18px, raio 5px, borda 1,5px. Borda desmarcada = mistura
+   de `--color-text-subtle` com `--color-border-strong` (3,7:1 contra a superfície;
+   a antiga `border-strong` pura dava 1,5:1). Marcada: no claro, `--color-accent`
+   sólido (a régua da marca garante o `accent-fg`); no escuro, o degradê da pele
+   com véu preto de 18% para o check branco chegar a 4,5:1 (sem véu mede 3,4:1).
+   O check e o menos usam % do lado, então escalam em `size-4`/`h-4 w-4`
+   (16px) sem pixel fixo. Em `@layer base`: quem passa `size-*`/`h-*` por
+   className continua mandando no tamanho. */
 @layer base {
+  :root,
+  body,
+  body [data-theme] {
+    --cbx-line: color-mix(in oklch, var(--color-text-subtle) 70%, var(--color-border-strong));
+    --cbx-bg: var(--color-surface);
+    --cbx-on: var(--color-accent);
+    --cbx-fg: var(--color-accent-fg);
+    --cbx-halo-on: color-mix(in srgb, var(--color-accent) 34%, transparent);
+  }
+  [data-theme="dark"] body,
+  body [data-theme="dark"] {
+    --cbx-line: color-mix(in oklch, var(--color-text-subtle) 55%, var(--color-border-strong));
+    --cbx-bg: var(--color-bg);
+    --cbx-on: linear-gradient(oklch(0 0 0 / 0.18), oklch(0 0 0 / 0.18)), var(--pele-grad);
+    --cbx-fg: var(--pele-grad-fg);
+  }
   input[type="checkbox"] {
     appearance: none;
     display: inline-grid;
     place-items: center;
     flex-shrink: 0;
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
     margin: 0;
-    border: 1.5px solid var(--color-border-strong);
-    border-radius: 4px;
-    background-color: transparent;
+    border: 1.5px solid var(--cbx-line);
+    border-radius: 5px;
+    background: var(--cbx-bg);
     cursor: pointer;
-    transition: background-color 120ms ease, border-color 120ms ease;
+    transition:
+      background-color 120ms var(--ease-out, ease),
+      border-color 120ms var(--ease-out, ease),
+      box-shadow 120ms var(--ease-out, ease),
+      transform 80ms var(--ease-out, ease);
   }
   input[type="checkbox"]:hover:not(:disabled) {
-    border-color: var(--color-accent);
+    border-color: var(--color-text-subtle);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 22%, transparent);
   }
   input[type="checkbox"]:checked,
   input[type="checkbox"]:indeterminate {
-    background-color: var(--color-accent);
-    border-color: var(--color-accent);
+    background: var(--cbx-on);
+    border-color: transparent;
+  }
+  input[type="checkbox"]:checked:hover:not(:disabled),
+  input[type="checkbox"]:indeterminate:hover:not(:disabled) {
+    border-color: transparent;
+    box-shadow: 0 0 0 3px var(--cbx-halo-on);
   }
   input[type="checkbox"]:checked::after {
     content: "";
-    width: 69%;
-    height: 69%;
-    background-color: var(--color-accent-fg);
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / contain no-repeat;
+    width: 67%;
+    height: 67%;
+    background-color: var(--cbx-fg);
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l5 5L20 7'/%3E%3C/svg%3E") center / contain no-repeat;
   }
   input[type="checkbox"]:indeterminate::after {
     content: "";
-    width: 50%;
-    height: 2px;
+    width: 56%;
+    height: 11%;
+    min-height: 2px;
     border-radius: 1px;
-    background-color: var(--color-accent-fg);
+    background-color: var(--cbx-fg);
+  }
+  input[type="checkbox"]:active:not(:disabled) {
+    transform: scale(0.9);
   }
   input[type="checkbox"]:focus-visible {
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
   }
   input[type="checkbox"]:disabled {
-    opacity: 0.5;
     cursor: not-allowed;
+    background: var(--color-surface-elevated);
+    border-color: var(--color-border-strong);
+    box-shadow: none;
+  }
+  input[type="checkbox"]:disabled:checked,
+  input[type="checkbox"]:disabled:indeterminate {
+    background: var(--color-border-strong);
+  }
+  input[type="checkbox"]:disabled:checked::after,
+  input[type="checkbox"]:disabled:indeterminate::after {
+    background-color: var(--color-text-subtle);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    input[type="checkbox"] {
+      transition: none;
+    }
+    input[type="checkbox"]:active:not(:disabled) {
+      transform: none;
+    }
   }
 }
 /* Alto contraste do Windows (`forced-colors`): o navegador apaga o fundo e o
@@ -2393,11 +2443,12 @@ select:not([multiple]):not([size]) {
 @media (forced-colors: active) {
   input[type="checkbox"] {
     forced-color-adjust: none;
+    background: Canvas;
     border-color: CanvasText;
   }
   input[type="checkbox"]:checked,
   input[type="checkbox"]:indeterminate {
-    background-color: Highlight;
+    background: Highlight;
     border-color: Highlight;
   }
   input[type="checkbox"]:checked::after,

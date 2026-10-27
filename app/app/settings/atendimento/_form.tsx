@@ -276,7 +276,7 @@ export function AtendimentoForm({ initial }: { initial: AtendimentoConfig }) {
             onChange={(e) =>
               setForm((f) => ({ ...f, handoff_return_after_minutes: e.target.checked ? 60 : null }))
             }
-            className="mt-1 h-4 w-4 shrink-0 accent-primary"
+            className="mt-1 shrink-0"
           />
           <span className="space-y-1">
             <span className="block text-sm font-medium">
@@ -364,7 +364,7 @@ export function AtendimentoForm({ initial }: { initial: AtendimentoConfig }) {
             onChange={(e) =>
               setForm((f) => ({ ...f, conversation_stays_with_attendant: e.target.checked }))
             }
-            className="mt-1 h-4 w-4 shrink-0 accent-primary"
+            className="mt-1 shrink-0"
           />
           <span className="space-y-1">
             <span className="block text-sm font-medium">{t("A conversa fica com quem atendeu")}</span>

@@ -201,7 +201,6 @@ export function AcrescentarEtiqueta({ idioma }: { idioma: Idioma }) {
         <label className="flex items-center gap-2">
           <input
             type="checkbox"
-            className="size-4 accent-primary"
             checked={emConversas}
             onChange={(e) => setEmConversas(e.target.checked)}
           />
@@ -210,7 +209,6 @@ export function AcrescentarEtiqueta({ idioma }: { idioma: Idioma }) {
         <label className="flex items-center gap-2">
           <input
             type="checkbox"
-            className="size-4 accent-primary"
             checked={emContatos}
             onChange={(e) => setEmContatos(e.target.checked)}
           />

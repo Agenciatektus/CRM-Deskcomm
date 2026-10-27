@@ -66,7 +66,7 @@ export function OpcoesDaTrocaDeFunil({
             type="checkbox"
             checked={config.rodar_automacoes_de_entrada === true}
             onChange={(e) => onChange({ ...config, rodar_automacoes_de_entrada: e.target.checked })}
-            className="mt-1 accent-primary"
+            className="mt-1"
           />
           <span>
             {t("Rodar as automações de entrada da etapa")}
