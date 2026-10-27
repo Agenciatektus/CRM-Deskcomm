@@ -79,9 +79,12 @@ export function FormularioDeMetaAds({
   // Server Action recusa. Barrar aqui explica antes de o clique acontecer, em
   // vez de devolver um erro de validação depois.
   const podeSalvar = conectada || token.trim().length >= 20;
+  // Com login Meta, lista vazia seria gravada como "nenhuma conta liberada".
+  const semNenhuma = conectada && via === "oauth" && listaCarregada && selecionadas.length === 0;
 
   function salvar(evento: React.FormEvent, confirmar = false) {
     evento.preventDefault();
+    if (semNenhuma) return;
     startTransition(async () => {
       const resultado = await updateAdInsightsConnection({
         platform: "meta_ads",
@@ -269,10 +272,15 @@ export function FormularioDeMetaAds({
             )}
 
             <div className="flex items-center gap-3">
-              <Button type="submit" disabled={isPending || !podeSalvar}>
+              <Button type="submit" disabled={isPending || !podeSalvar || semNenhuma}>
                 {isPending ? t("Salvando…") : t("Salvar")}
               </Button>
 
+              {semNenhuma && (
+                <span role="alert" className="text-sm text-muted-foreground" data-testid="meta-nenhuma-liberada">
+                  {t("Nenhuma conta liberada. Marque ao menos uma para salvar.")}
+                </span>
+              )}
               {!podeSalvar && (
                 <span className="text-sm text-muted-foreground">
                   {t("Cole o token para poder salvar.")}
