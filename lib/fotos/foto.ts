@@ -107,14 +107,26 @@ function versao(caminho: string): string {
   return nome.slice(0, 8);
 }
 
+/** Larguras que a rota de foto aceita em `?w=` (qualquer outra = original). */
+export const LARGURAS_DE_FOTO = [32, 64, 128, 256] as const;
+
+/** Acrescenta `w=` a uma URL de foto (com ou sem `?v=`). Sem largura, devolve a URL como veio. */
+export function comLargura(url: string, largura?: number): string {
+  return largura ? `${url}${url.includes("?") ? "&" : "?"}w=${largura}` : url;
+}
+
 /** A URL da foto de uma pessoa (a rota que confere quem pede e assina). */
-export function urlDaFotoDoUsuario(userId: string, caminho?: string | null): string {
+export function urlDaFotoDoUsuario(userId: string, caminho?: string | null, largura?: number): string {
   const base = `/api/v1/usuarios/${encodeURIComponent(userId)}/foto`;
-  return caminho ? `${base}?v=${versao(caminho)}` : base;
+  return comLargura(caminho ? `${base}?v=${versao(caminho)}` : base, largura);
 }
 
 /** A URL da foto de uma organização, ou `null` quando ela não tem foto. */
-export function urlDaFotoDaOrganizacao(orgId: string, caminho: string | null | undefined): string | null {
+export function urlDaFotoDaOrganizacao(
+  orgId: string,
+  caminho: string | null | undefined,
+  largura?: number,
+): string | null {
   if (!fotoDaOrganizacao(caminho, orgId)) return null;
-  return `/api/v1/organizacoes/${encodeURIComponent(orgId)}/foto?v=${versao(caminho!.trim())}`;
+  return comLargura(`/api/v1/organizacoes/${encodeURIComponent(orgId)}/foto?v=${versao(caminho!.trim())}`, largura);
 }
