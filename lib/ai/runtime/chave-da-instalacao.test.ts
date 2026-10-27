@@ -4,7 +4,7 @@ const state = vi.hoisted(() => ({ serve: true, chamadas: 0 }));
 
 vi.mock("@/lib/cobranca/ia-propria", () => ({
   MENSAGEM_IA_PROPRIA_SEM_CREDENCIAL: "msg",
-  instalacaoPodeServirIaViaRpc: async () => {
+  instalacaoPodeServirIaComMemo: async () => {
     state.chamadas += 1;
     return state.serve;
   },

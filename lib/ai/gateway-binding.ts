@@ -30,7 +30,7 @@ import { DEEPSEEK_ENDPOINT, REQUESTY_ENDPOINT } from "@/lib/agent-engine/edge/ll
 import { fetchParaDestinoDaOrganizacao } from "@/lib/automation/destinos-internos-autorizados";
 import { decryptKey, byteaToBuffer } from "@/lib/crypto/aes_gcm";
 import { logger } from "@/lib/logger";
-import { CODIGO_IA_PROPRIA_SEM_CREDENCIAL, instalacaoPodeServirIaViaRpc } from "@/lib/cobranca/ia-propria";
+import { CODIGO_IA_PROPRIA_SEM_CREDENCIAL, instalacaoPodeServirIaComMemo } from "@/lib/cobranca/ia-propria";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 import { escolherModeloNoCatalogo } from "./agents/escolher-modelo";
@@ -438,7 +438,7 @@ async function padraoDaInstalacao(
   // Plano com IA própria (migration 9075): todos os degraus abaixo leem chave do
   // env (gateway.ts). Se o banco diz que a instalação não serve esta empresa,
   // recusa antes de qualquer degrau. Fail-closed; sem plano, nada muda.
-  if (!(await instalacaoPodeServirIaViaRpc(createAdminClient(), contexto.organizationId))) {
+  if (!(await instalacaoPodeServirIaComMemo(createAdminClient(), contexto.organizationId))) {
     return recusar(providerEfetivo ?? "", CODIGO_IA_PROPRIA_SEM_CREDENCIAL);
   }
 

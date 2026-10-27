@@ -22,8 +22,10 @@ vi.mock("@/lib/supabase/admin", () => {
 });
 
 import { resolverChaveOpenAiDaVoz } from "@/lib/ai/agents";
+import { invalidarMemoIaPropria } from "@/lib/cobranca/ia-propria";
 
 beforeEach(() => {
+  invalidarMemoIaPropria();
   state.credencial = null;
   state.rpc = { data: true, error: null };
   process.env.OPENAI_API_KEY = "chave-ficticia-env";

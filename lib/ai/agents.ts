@@ -6,7 +6,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { AGENT_CONFIG_DEFAULTS, agentConfigSchema } from "@/lib/ai/guardrails-schema";
 import { byteaToBuffer, decryptKey } from "@/lib/crypto/aes_gcm";
-import { instalacaoPodeServirIaViaRpc } from "@/lib/cobranca/ia-propria";
+import { instalacaoPodeServirIaComMemo } from "@/lib/cobranca/ia-propria";
 
 export interface VoiceAgentConfig {
   id: string;
@@ -64,7 +64,7 @@ export async function resolverChaveOpenAiDaVoz(organizationId: string): Promise<
     // aconteceu no INFO deste arquivo se aplicável; não vale a pena arriscar
     // ecoar detalhe de credencial no log do worker.
   }
-  if (!(await instalacaoPodeServirIaViaRpc(createAdminClient(), organizationId))) return "";
+  if (!(await instalacaoPodeServirIaComMemo(createAdminClient(), organizationId))) return "";
   return process.env.OPENAI_API_KEY ?? "";
 }
 

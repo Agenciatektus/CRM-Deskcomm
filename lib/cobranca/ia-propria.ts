@@ -60,6 +60,11 @@ interface ComRpc {
  * banco por supabase-js (embeddings). Mesma função SQL, mesma falha FECHADA.
  */
 export async function instalacaoPodeServirIaViaRpc(admin: unknown, orgId: string): Promise<boolean> {
+  return (await lerViaRpc(admin, orgId)) === true;
+}
+
+/** true/false lidos com sucesso; null = leitura quebrou (já logada). */
+async function lerViaRpc(admin: unknown, orgId: string): Promise<boolean | null> {
   try {
     const { data, error } = await (admin as ComRpc).rpc(
       'fn_org_pode_usar_ia_da_instalacao' as never,
@@ -69,6 +74,32 @@ export async function instalacaoPodeServirIaViaRpc(admin: unknown, orgId: string
     return data === true;
   } catch (err) {
     logarLeituraQuebrada(orgId, err);
-    return false;
+    return null;
   }
+}
+
+const MEMO_IA_PROPRIA_MS = 30_000;
+const memoIaPropria = new Map<string, { pode: boolean; ate: number }>();
+
+/**
+ * `instalacaoPodeServirIaViaRpc` com memo de 30 s por org, para os caminhos
+ * quentes (cada turno do agente). Só memoriza true/false lidos com sucesso:
+ * leitura quebrada devolve false (fail-closed) SEM gravar no memo.
+ */
+export async function instalacaoPodeServirIaComMemo(
+  admin: unknown,
+  orgId: string,
+  agora: number = Date.now(),
+): Promise<boolean> {
+  const memo = memoIaPropria.get(orgId);
+  if (memo !== undefined && memo.ate > agora) return memo.pode;
+  const lido = await lerViaRpc(admin, orgId);
+  if (lido === null) return false;
+  memoIaPropria.set(orgId, { pode: lido, ate: agora + MEMO_IA_PROPRIA_MS });
+  return lido;
+}
+
+/** Só para teste: esquece o memo. */
+export function invalidarMemoIaPropria(): void {
+  memoIaPropria.clear();
 }

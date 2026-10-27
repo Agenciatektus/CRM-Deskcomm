@@ -45,7 +45,7 @@ import { decidirElegibilidadeDaConversaViaSupabase } from "@/lib/ai/elegibilidad
 import { ttlDaAutorizacaoMs } from "@/lib/ai/elegibilidade/gate";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
-  instalacaoPodeServirIaViaRpc,
+  instalacaoPodeServirIaComMemo,
   MENSAGEM_IA_PROPRIA_SEM_CREDENCIAL,
 } from "@/lib/cobranca/ia-propria";
 import { audit } from "@/lib/audit";
@@ -193,7 +193,7 @@ export async function chaveDaInstalacaoParaOrg(
 ): Promise<{ apiKey: string | null; bloqueada: boolean }> {
   const apiKey = chaveDePlataforma(provider);
   if (!apiKey) return { apiKey: null, bloqueada: false };
-  if (!(await instalacaoPodeServirIaViaRpc(createAdminClient(), organizationId))) {
+  if (!(await instalacaoPodeServirIaComMemo(createAdminClient(), organizationId))) {
     return { apiKey: null, bloqueada: true };
   }
   return { apiKey, bloqueada: false };

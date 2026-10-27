@@ -4,7 +4,7 @@ const state = vi.hoisted(() => ({ serve: true, resolve: vi.fn() }));
 
 vi.mock("@/lib/cobranca/ia-propria", () => ({
   CODIGO_IA_PROPRIA_SEM_CREDENCIAL: "ia_propria_sem_credencial",
-  instalacaoPodeServirIaViaRpc: async () => state.serve,
+  instalacaoPodeServirIaComMemo: async () => state.serve,
 }));
 vi.mock("@/lib/logger", () => ({ logger: { warn: vi.fn(), info: vi.fn(), error: vi.fn() } }));
 vi.mock("@/lib/supabase/admin", () => ({

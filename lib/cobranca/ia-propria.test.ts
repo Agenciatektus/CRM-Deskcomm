@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
-import { IaPropriaSemCredencialError, instalacaoPodeServirIa, instalacaoPodeServirIaViaRpc } from "./ia-propria";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
+import { IaPropriaSemCredencialError, instalacaoPodeServirIa, instalacaoPodeServirIaViaRpc, instalacaoPodeServirIaComMemo, invalidarMemoIaPropria } from "./ia-propria";
 
 const db = (fn: () => Promise<unknown>) => ({ query: fn }) as never;
 
@@ -37,6 +37,58 @@ describe("instalacaoPodeServirIaViaRpc", () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     expect(await instalacaoPodeServirIaViaRpc(rpc(async () => ({ data: true, error: { message: "x" } })), "o")).toBe(false);
     expect(await instalacaoPodeServirIaViaRpc(rpc(async () => { throw new Error("boom"); }), "o")).toBe(false);
+    log.mockRestore();
+  });
+});
+
+describe("instalacaoPodeServirIaComMemo", () => {
+  beforeEach(() => invalidarMemoIaPropria());
+  afterEach(() => vi.useRealTimers());
+  const rpcContado = (data: unknown) => {
+    const fn = vi.fn(async () => ({ data, error: null }));
+    return { admin: { rpc: fn }, fn };
+  };
+
+  it("devolve o mesmo valor dentro do TTL sem nova consulta", async () => {
+    const { admin, fn } = rpcContado(true);
+    expect(await instalacaoPodeServirIaComMemo(admin, "o")).toBe(true);
+    expect(await instalacaoPodeServirIaComMemo(admin, "o")).toBe(true);
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+  it("memoriza false tambem, por org", async () => {
+    const { admin, fn } = rpcContado(false);
+    expect(await instalacaoPodeServirIaComMemo(admin, "a")).toBe(false);
+    expect(await instalacaoPodeServirIaComMemo(admin, "a")).toBe(false);
+    await instalacaoPodeServirIaComMemo(admin, "b");
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+  it("expira apos 30 s", async () => {
+    vi.useFakeTimers();
+    const { admin, fn } = rpcContado(true);
+    await instalacaoPodeServirIaComMemo(admin, "o");
+    vi.advanceTimersByTime(29_000);
+    await instalacaoPodeServirIaComMemo(admin, "o");
+    expect(fn).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(2_000);
+    await instalacaoPodeServirIaComMemo(admin, "o");
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+  it("invalidar limpa o memo", async () => {
+    const { admin, fn } = rpcContado(true);
+    await instalacaoPodeServirIaComMemo(admin, "o");
+    invalidarMemoIaPropria();
+    await instalacaoPodeServirIaComMemo(admin, "o");
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+  it("falha de leitura nao e memoizada (fail-closed, tenta de novo)", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const fn = vi.fn()
+      .mockRejectedValueOnce(new Error("boom"))
+      .mockResolvedValueOnce({ data: true, error: null });
+    const admin = { rpc: fn };
+    expect(await instalacaoPodeServirIaComMemo(admin, "o")).toBe(false);
+    expect(await instalacaoPodeServirIaComMemo(admin, "o")).toBe(true);
+    expect(fn).toHaveBeenCalledTimes(2);
     log.mockRestore();
   });
 });
