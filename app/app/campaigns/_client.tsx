@@ -23,7 +23,7 @@ import { Megaphone, Plus } from "@/lib/ui/icons";
 import { ROLE_RANK, escreveComoPlatformAdmin } from "@/lib/auth/types";
 import { STATUS_DA_CAMPANHA } from "@/lib/campanhas/tipos";
 
-/** A API de campanhas pede `manager` até para ler (403 para o resto): a tela diz isso em vez de "Erro ao carregar". */
+/** A API deixa `agent`+ LER a lista (somente leitura); criar, editar e disparar é `manager`. Abaixo de agent (403), a tela diz isso em vez de "Erro ao carregar". */
 export function ListaDeCampanhas() {
   const t = useT();
   const { user, activeOrg } = useAuth();

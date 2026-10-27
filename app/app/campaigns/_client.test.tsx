@@ -21,8 +21,8 @@ vi.mock("@/components/campanhas/EstadoDaCampanha", () => ({ EstadoDaCampanha: ()
 vi.mock("@/components/ui/button", () => ({ Button: ({ children }: { children: React.ReactNode }) => <span>{children}</span> }));
 vi.mock("@/components/ui/escolha", () => ({ Escolha: () => null }));
 
-const logar = (role: string, user: Record<string, unknown> = {}) => {
-  auth.value = { user: { is_platform_admin: false, platform_admin_scope: null, support: null, ...user }, activeOrg: { role } };
+const logar = (role: string | undefined, user: Record<string, unknown> = {}) => {
+  auth.value = { user: { is_platform_admin: false, platform_admin_scope: null, support: null, ...user }, activeOrg: role ? { role } : undefined };
 };
 
 describe("ListaDeCampanhas", () => {
@@ -41,6 +41,29 @@ describe("ListaDeCampanhas", () => {
     expect(screen.getByText(/Você pode apenas visualizar as campanhas/)).toBeTruthy();
     expect(screen.queryByText("Nova campanha")).toBeNull();
     expect(screen.queryByRole("link")).toBeNull();
+  });
+
+  it("manager com lista cheia acha o link da linha (controle positivo)", () => {
+    logar("manager");
+    consulta.value = {
+      isLoading: false, isError: false, refetch: vi.fn(),
+      data: { pages: [{ data: [{ id: "c1", name: "Black Friday", status: "draft", snapshot_eligible: 3, snapshot_excluded: 0 }] }] },
+    };
+    render(<ListaDeCampanhas />);
+    expect(screen.getByRole("link").getAttribute("href")).toBe("/app/campaigns/c1");
+  });
+
+  it("ai_operator vê somente leitura", () => {
+    logar("ai_operator");
+    render(<ListaDeCampanhas />);
+    expect(screen.getByText(/Você pode apenas visualizar as campanhas/)).toBeTruthy();
+  });
+
+  it("role ausente trata como manager (o servidor decide)", () => {
+    logar(undefined);
+    render(<ListaDeCampanhas />);
+    expect(screen.queryByText(/Você pode apenas visualizar/)).toBeNull();
+    expect(screen.queryByText("Você não tem permissão para ver nem criar campanhas.")).toBeNull();
   });
 
   it("viewer vê o estado sem permissão", () => {
