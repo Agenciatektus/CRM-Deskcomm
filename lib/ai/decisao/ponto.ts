@@ -34,6 +34,7 @@
  * default.
  */
 import { allowlistedFetch, buildAllowlist } from "@/lib/agent-engine/edge/egress";
+import { costCents } from "@/lib/agent-engine/edge/llm/pricing";
 import { byteaToBuffer, decryptKey } from "@/lib/crypto/aes_gcm";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -41,6 +42,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { baseDaApiDoJev, decidir, TETO_PADRAO_MS, type Pergunta, type ResultadoDaDecisao } from "./cliente";
 import { type IdDaTarefa } from "./config";
 import { chaveDaPlataforma, configEfetivaDoJev, organizacaoElegivelAoJev } from "./elegibilidade";
+import {
+  abrirDisjuntorGlobal,
+  estadoDoDisjuntorGlobal,
+  fecharDisjuntorGlobal,
+  registrarUsoDaPlataforma,
+  tetoAtingido,
+} from "./plataforma";
 import { ORIGEM_PADRAO, provedorDaCredencial, type OrigemDoJev } from "./origem";
 import { estadoEfetivoDaTarefa, TAREFAS_DO_JEV, type TarefaDoJev } from "./tarefas";
 
@@ -93,6 +101,8 @@ export interface DestinoDaChave {
    * (fatia 3) separa por aqui.
    */
   daPlataforma?: true;
+  /** A chamada é a tentativa da meia-abertura do disjuntor global: o resultado fecha ou reabre. */
+  sondaDoDisjuntor?: true;
 }
 
 /**
@@ -167,12 +177,22 @@ export async function destinoDasTarefas(
       .maybeSingle();
     if (error) throw error;
     if (!data) {
-      // Sem chave própria. FATIA 3: o teto de gasto por empresa, o disjuntor
-      // global e o aviso ao admin entram AQUI, antes de devolver a da plataforma.
+      // Sem chave própria. Só a origem TypeSafe, só empresa elegível, e só se a
+      // conta compartilhada está protegida (`./plataforma.ts`): teto do mês da
+      // empresa e disjuntor global. Qualquer trava fechada = null, a IA de
+      // sempre, sem erro e sem rede.
       if (origem !== "typesafe") return null;
       const daPlataforma = chaveDaPlataforma();
       if (daPlataforma === null || !(await ehElegivel())) return null;
-      return { chave: daPlataforma, origem, daPlataforma: true };
+      if (await tetoAtingido(admin, organizationId)) return null;
+      const disjuntor = await estadoDoDisjuntorGlobal(admin);
+      if (disjuntor === "aberto") return null;
+      return {
+        chave: daPlataforma,
+        origem,
+        daPlataforma: true,
+        ...(disjuntor === "tentativa" ? { sondaDoDisjuntor: true as const } : {}),
+      };
     }
     return {
       chave: decryptKey({
@@ -297,7 +317,7 @@ export async function decidirNoPonto(
       { allowlist, fetchImpl: deps.fetchImpl, log: logger },
     );
 
-  return decidir(
+  const resultado = await decidir(
     {
       chave: destino.chave,
       estado: entrada.estado,
@@ -308,4 +328,48 @@ export async function decidirNoPonto(
     },
     { fetchImpl: fetchContido, baseUrl: base },
   );
+  return destino.daPlataforma === true
+    ? aposChamadaDaPlataforma(entrada.organizationId, destino, resultado)
+    : resultado;
+}
+
+/**
+ * O que acontece depois de uma chamada feita com a chave da PLATAFORMA: o gasto
+ * entra no teto da empresa, e a falha da CONTA da instalação (402 ou 401) abre o
+ * disjuntor global. Essa falha não é da empresa, que não tem conta na TypeSafe:
+ * ela volta como `disjuntor_aberto` (nada de "confira o saldo na sua conta", nem
+ * pedido de ação), e a IA de sempre assume calada. Nunca lança.
+ */
+async function aposChamadaDaPlataforma(
+  organizationId: string,
+  destino: DestinoDaChave,
+  resultado: ResultadoDaDecisao,
+): Promise<ResultadoDaDecisao> {
+  try {
+    const admin = createAdminClient();
+    if (resultado.ok) {
+      await registrarUsoDaPlataforma(
+        admin,
+        organizationId,
+        costCents(resultado.modelo, {
+          inputTokens: resultado.uso.tokensDeEntrada,
+          outputTokens: resultado.uso.tokensDeSaida,
+          cacheReadTokens: 0,
+          cacheWriteTokens: 0,
+        }),
+      );
+      if (destino.sondaDoDisjuntor) await fecharDisjuntorGlobal(admin);
+      return resultado;
+    }
+    if (resultado.motivo === "sem_credito" || resultado.motivo === "credencial_invalida") {
+      await abrirDisjuntorGlobal(admin, resultado.motivo);
+      return { ok: false, motivo: "disjuntor_aberto", exigeAcao: false, defeitoNosso: false, status: null };
+    }
+  } catch (erro) {
+    logger.warn("o pós-chamada do Jev da plataforma falhou", {
+      organizationId,
+      erro: erro instanceof Error ? erro.name : typeof erro,
+    });
+  }
+  return resultado;
 }
