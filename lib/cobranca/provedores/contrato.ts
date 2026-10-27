@@ -123,6 +123,26 @@ export interface WebhookPreparado {
   desfazer(): Promise<void>;
 }
 
+/** A compra por link de pagamento, RELIDA na API a partir do id do evento. Nada do corpo do webhook entra aqui. */
+export interface CompraLida {
+  readonly sessaoId: string;
+  /** Modo do EVENTO/sessão (`livemode`), para comparar com o modo da chave gravada. */
+  readonly modo: Modo;
+  /** `mode` da sessão (`subscription`, `payment`, `setup`). */
+  readonly modoDaSessao: string;
+  /** `payment_status` (`paid`, `unpaid`, `no_payment_required`). */
+  readonly pagamento: string;
+  readonly status: string | null;
+  readonly clienteRef: string | null;
+  readonly assinaturaRef: string | null;
+  readonly intervaloDaAssinatura: "month" | "year" | null;
+  readonly email: string | null;
+  readonly nome: string | null;
+  readonly planoChave: string | null;
+  readonly nomeDaEmpresa: string | null;
+  readonly clientReferenceId: string | null;
+}
+
 export interface AdaptadorDeCobranca {
   readonly id: ProvedorDeCobranca;
   testarChave(opcoes?: { modoExigido?: Modo }): Promise<ResultadoDoTesteDaChave>;
@@ -166,4 +186,6 @@ export interface AdaptadorDeCobranca {
   expirarSessao(sessaoId: string): Promise<void>;
   cancelarNoFim(assinaturaRef: string): Promise<void>;
   urlDeGerenciar(p: { clienteRef: string; urlDeVolta: string }): Promise<string | null>;
+  /** Venda direta (só Stripe): evento -> sessão de checkout -> compra, tudo relido na API. */
+  lerCompra?(eventoId: string): Promise<CompraLida>;
 }

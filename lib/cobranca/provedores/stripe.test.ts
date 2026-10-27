@@ -880,4 +880,39 @@ describe("trocarPlano, cancelarNoFim, prepararWebhook e portal", () => {
     expect(await conta.adaptador.urlDeGerenciar({ clienteRef: "cus_1", urlDeVolta: "https://crm.example.com/x" })).toBe(url);
     expect(conta.portais).toHaveLength(1);
   });
+
+  it("⭐ lerCompra: evento -> sessão (expand subscription) e o mapeamento dos campos da API", async () => {
+    const { adaptador, chamadas } = montar({
+      "GET /events/evt_lc_1": { corpo: { id: "evt_lc_1", data: { object: { id: "cs_lc_1" } } } },
+      "GET /checkout/sessions/cs_lc_1": {
+        corpo: {
+          id: "cs_lc_1", livemode: false, mode: "subscription", payment_status: "paid", status: "complete",
+          client_reference_id: "afiliado_lc", customer: "cus_lc_1",
+          subscription: { id: "sub_lc_1", items: { data: [{ price: { recurring: { interval: "year" } } }] } },
+          customer_details: { email: "lc@exemplo.com", name: "Lia Compradora" },
+          metadata: { plano: "com_a" },
+          custom_fields: [{ key: "outro", text: { value: "x" } }, { key: "nome_da_empresa", text: { value: "Lia Ltda" } }],
+        },
+      },
+    });
+    expect(await adaptador.lerCompra!("evt_lc_1")).toEqual({
+      sessaoId: "cs_lc_1", modo: "teste", modoDaSessao: "subscription", pagamento: "paid", status: "complete",
+      clienteRef: "cus_lc_1", assinaturaRef: "sub_lc_1", intervaloDaAssinatura: "year",
+      email: "lc@exemplo.com", nome: "Lia Compradora", planoChave: "com_a", nomeDaEmpresa: "Lia Ltda", clientReferenceId: "afiliado_lc",
+    });
+    expect(chamadas.map((c) => c.rota)).toEqual(["GET /events/evt_lc_1", "GET /checkout/sessions/cs_lc_1"]);
+    expect(chamadas[1]?.url.searchParams.getAll("expand[]")).toEqual(["subscription"]);
+  });
+
+  it("lerCompra: sessão live é modo producao, assinatura em string e campos ausentes viram null; forma inesperada é resposta_invalida", async () => {
+    const { adaptador } = montar({
+      "GET /events/evt_lc_2": { corpo: { data: { object: { id: "cs_lc_2" } } } },
+      "GET /checkout/sessions/cs_lc_2": { corpo: { id: "cs_lc_2", livemode: true, mode: "payment", payment_status: "unpaid", subscription: "sub_lc_2" } },
+      "GET /events/evt_lc_3": { corpo: { data: {} } },
+    });
+    expect(await adaptador.lerCompra!("evt_lc_2")).toMatchObject({
+      modo: "producao", modoDaSessao: "payment", assinaturaRef: "sub_lc_2", intervaloDaAssinatura: null, email: null, planoChave: null, nomeDaEmpresa: null, clienteRef: null,
+    });
+    await expect(adaptador.lerCompra!("evt_lc_3")).rejects.toMatchObject({ codigo: "resposta_invalida" });
+  });
 });
