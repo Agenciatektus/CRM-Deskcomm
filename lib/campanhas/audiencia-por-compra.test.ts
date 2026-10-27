@@ -243,11 +243,11 @@ describe("buscarCandidatos com compra e exclusão", () => {
     expect(await ids(banco, { compras_min: 1, excluir: {} })).toEqual([A, B]);
   });
 
-  it("incluído à mão entra mesmo que a exclusão o pegue (como `excluir_contatos`)", async () => {
+  it("incluído à mão que a exclusão pega NÃO entra; o que ela não pega continua entrando", async () => {
     const banco = bancoFalso([A, B, C, D], PEDIDOS);
     expect(
-      await ids(banco, { compras_min: 1, incluir_contatos: [B], excluir: { ultima_compra_ha_dias_max: 30 } }),
-    ).toEqual([A, B]);
+      await ids(banco, { compras_min: 1, incluir_contatos: [B, D], excluir: { ultima_compra_ha_dias_max: 30 } }),
+    ).toEqual([A, D]);
   });
 
   it("pedidos paginados: max_rows pequeno não perde a compra recente da pessoa", async () => {

@@ -39,12 +39,17 @@ import {
   CamposDeCompraDoFiltro,
   compraDoFiltro,
   criteriosDeCompra,
-  excluirDoFiltro,
   temCriterioDeCompra,
 } from "../../_campos-de-compra";
 import type { SaidasDaCadencia } from "@/lib/cadencia/saidas";
 import type { PassoDaRegua } from "@/lib/regua/timeline";
 import { useAgentesPublicados, useEtapas, useFunis } from "@/hooks/campanhas/useDestinoDaCampanha";
+
+/** Mantém o que o `excluir` gravado tem além da compra (tags/funil/silêncio via API); null se nada sobra. */
+function excluirMesclado(original: Record<string, unknown> | null, compra: typeof COMPRA_VAZIA) {
+  const novo = { ...original, ...criteriosDeCompra(compra) };
+  return Object.values(novo).some((v) => v !== null && !(Array.isArray(v) && v.length === 0)) ? novo : null;
+}
 
 export function EditarCampanha({ id }: { id: string }) {
   const t = useT();
@@ -85,6 +90,8 @@ export function EditarCampanha({ id }: { id: string }) {
   const [etapaDeEntrada, setEtapaDeEntrada] = useState("");
   const [compra, setCompra] = useState(COMPRA_VAZIA);
   const [excluirCompra, setExcluirCompra] = useState(COMPRA_VAZIA);
+  // O `excluir` gravado (pode ter tags/funil/silêncio via API): a tela só edita os 4 campos de compra.
+  const [excluirOriginal, setExcluirOriginal] = useState<Record<string, unknown> | null>(null);
   const [carregado, setCarregado] = useState(false);
 
   const funis = useFunis();
@@ -106,6 +113,7 @@ export function EditarCampanha({ id }: { id: string }) {
     setSemInteracao(f.sem_interacao_ha_dias == null ? "" : String(f.sem_interacao_ha_dias));
     setCompra(compraDoFiltro(f));
     setExcluirCompra(compraDoFiltro(f.excluir));
+    setExcluirOriginal(f.excluir && typeof f.excluir === "object" ? (f.excluir as Record<string, unknown>) : null);
     setLimite(f.limite == null ? "100" : String(f.limite));
     setVariantes([c.message_body ?? "", ...(c.message_variants ?? [])]);
     setPassos(c.passos ?? []);
@@ -131,17 +139,17 @@ export function EditarCampanha({ id }: { id: string }) {
       sem_tags: listar(semTags),
       sem_interacao_ha_dias: semInteracao ? Number(semInteracao) : null,
       ...criteriosDeCompra(compra),
-      excluir: excluirDoFiltro(excluirCompra),
+      excluir: excluirMesclado(excluirOriginal, excluirCompra),
       limite: Number(limite) || 100,
     }),
-    [comAlgumaTag, semTags, semInteracao, compra, excluirCompra, limite],
+    [comAlgumaTag, semTags, semInteracao, compra, excluirCompra, excluirOriginal, limite],
   );
 
   const temCriterio =
     filtro.com_alguma_tag.length > 0 ||
     filtro.sem_tags.length > 0 ||
     filtro.sem_interacao_ha_dias !== null ||
-    temCriterioDeCompra(filtro);
+    temCriterioDeCompra(criteriosDeCompra(compra));
 
   if (campanha.isLoading || !carregado) {
     return (

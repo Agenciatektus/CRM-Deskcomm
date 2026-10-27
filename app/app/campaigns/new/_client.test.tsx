@@ -94,4 +94,12 @@ describe("nova campanha: critérios de compra no filtro", () => {
     expect(f.gasto_min_centavos).toBe(15000);
     expect(f.excluir).toBeNull();
   });
+
+  it("sem nenhum critério, 'Ver quantas pessoas' fica desligado; com um campo de compra, liga", () => {
+    render(<NovaCampanha />);
+    const botao = screen.getByRole("button", { name: "Ver quantas pessoas" });
+    expect(botao).toBeDisabled();
+    preencher("Gasto total mínimo (R$)", "10", 0);
+    expect(botao).toBeEnabled();
+  });
 });

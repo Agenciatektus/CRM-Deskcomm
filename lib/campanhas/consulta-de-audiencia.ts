@@ -349,8 +349,8 @@ async function semExcluidos(
  * `TETO_DE_IDS_DE_NEGOCIO` E há pelo menos uma linha além dele — a prévia
  * avisa o operador em vez de cortar calada (#2404).
  *
- * O bloco `excluir` é subtração do RECORTE: como `excluir_contatos`, não tira
- * quem foi incluído à mão (`incluir_contatos` é a vontade explícita do operador).
+ * O bloco `excluir` também tira quem foi incluído à mão, como `excluir_contatos`
+ * (veto `excluidosAMao` na preparação e na elegibilidade).
  */
 export async function buscarCandidatos(
   admin: SupabaseClient,
@@ -461,7 +461,7 @@ export async function buscarCandidatos(
       },
     );
     if (erroExtras) throw new Error(`audiência: incluídos — ${erroExtras.message}`);
-    linhas.push(...(extras ?? []));
+    linhas.push(...(await semExcluidos(extras ?? [], new Set(), casaExclusao)));
   }
 
   // ─── Os campos personalizados que o TEXTO usa ───

@@ -185,7 +185,7 @@ export function NovaCampanha() {
     filtro.funis.length > 0 ||
     filtro.etapas.length > 0 ||
     filtro.sem_interacao_ha_dias !== null ||
-    temCriterioDeCompra(filtro);
+    temCriterioDeCompra(criteriosDeCompra(compra));
 
   const podeSalvar =
     nome.trim() !== "" &&
