@@ -7,7 +7,7 @@
  */
 import type pg from "pg";
 
-import { detectarLacoComRobo, JANELA_LACO_MS, type MensagemDaConversa } from "./laco-com-robo";
+import { detectarLacoComRobo, JANELA_LACO_MS, MOTIVO_LACO_PREFIXO, type MensagemDaConversa } from "./laco-com-robo";
 
 interface Log {
   warn(msg: string, f?: Record<string, unknown>): void;
@@ -58,10 +58,10 @@ export async function conversaEmLacoComRobo(
   });
   try {
     await pool.query(
-      // Sem last_handoff_at de propósito: o cron de devolução automática devolveria a conversa e o laço recomeçaria.
+      // O cron de devolução automática ignora conversa com este motivo (`avaliarDevolucao`), senão devolveria à IA e o laço recomeçaria.
       `update conversations set bot_silenced_until = 'infinity', last_handoff_reason = $3
         where organization_id = $1 and id = $2`,
-      [input.organizationId, input.conversationId, `Automático pausado: laço com robô (${motivo === "volume" ? "volume" : "repetição"})`],
+      [input.organizationId, input.conversationId, `${MOTIVO_LACO_PREFIXO} (${motivo === "volume" ? "volume" : "repetição"})`],
     );
   } catch (err) {
     log.warn("[laco-com-robo] silenciar falhou", {

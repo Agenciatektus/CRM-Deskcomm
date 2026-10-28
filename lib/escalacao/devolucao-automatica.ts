@@ -1,3 +1,4 @@
+import { MOTIVO_LACO_PREFIXO } from "@/lib/ai/elegibilidade/laco-com-robo";
 /**
  * DEVOLUÇÃO AUTOMÁTICA AO AGENTE — a regra pura, sem banco.
  *
@@ -59,6 +60,7 @@ export interface ConversaEmHandoff {
   assigned_at: string | null;
   bot_silenced_until: string | null;
   last_handoff_at: string | null;
+  last_handoff_reason?: string | null;
   last_outbound_at: string | null;
   status_changed_at: string | null;
 }
@@ -122,6 +124,7 @@ export type MotivoDeNaoDevolver =
   | "status_nao_devolvivel"
   | "sessao_sem_agente"
   | "sem_relogio"
+  | "laco_com_robo"
   | "dentro_do_prazo";
 
 export function avaliarDevolucao(
@@ -131,6 +134,8 @@ export function avaliarDevolucao(
   const minutos = sel.prazoPorOrg.get(c.organization_id);
   if (minutos === undefined) return { devolver: false, motivo: "sem_prazo" };
   if (!estaComHumanoDuravel(c)) return { devolver: false, motivo: "nao_esta_com_humano" };
+  // Silenciada pelo freio de laço com robô: devolver faria o laço recomeçar.
+  if (c.last_handoff_reason?.startsWith(MOTIVO_LACO_PREFIXO)) return { devolver: false, motivo: "laco_com_robo" };
   if (!STATUS_DEVOLVIVEIS.has(c.status ?? "")) {
     return { devolver: false, motivo: "status_nao_devolvivel" };
   }

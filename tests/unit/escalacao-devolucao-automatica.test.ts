@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { MOTIVO_LACO_PREFIXO } from "@/lib/ai/elegibilidade/laco-com-robo";
+
 import {
   avaliarDevolucao,
   lerPrazoDeDevolucaoMinutos,
@@ -90,6 +92,20 @@ describe("avaliarDevolucao — quem vence", () => {
       devolver: true,
       minutos: 60,
     });
+  });
+
+  it("conversa silenciada pelo freio de laço com robô, prazo vencido: NÃO devolve", () => {
+    const c = conversa({
+      last_handoff_at: null,
+      last_outbound_at: min(500),
+      last_handoff_reason: `${MOTIVO_LACO_PREFIXO} (volume)`,
+    });
+    expect(avaliarDevolucao(c, selecao(60))).toEqual({ devolver: false, motivo: "laco_com_robo" });
+  });
+
+  it("controle negativo: outro motivo com prazo vencido continua sendo devolvido", () => {
+    const c = conversa({ last_handoff_at: min(500), last_handoff_reason: "low_sentiment" });
+    expect(avaliarDevolucao(c, selecao(60))).toEqual({ devolver: true, minutos: 60 });
   });
 
   it("dentro do prazo: não devolve — inclusive no minuto exato anterior", () => {

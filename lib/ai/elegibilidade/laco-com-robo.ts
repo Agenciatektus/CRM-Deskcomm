@@ -4,6 +4,8 @@
  * Função PURA; a leitura e o efeito moram em `consulta-laco.ts`.
  */
 
+/** Prefixo do `last_handoff_reason` gravado ao silenciar; a devolução automática o usa para NÃO devolver. */
+export const MOTIVO_LACO_PREFIXO = "Automático pausado: laço com robô";
 export const JANELA_LACO_MS = 60 * 60 * 1000;
 /** Bolhas da IA na janela (o agente divide a resposta em várias bolhas curtas). */
 export const LIMITE_VOLUME_IA = 16;
