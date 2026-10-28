@@ -34,9 +34,22 @@ import { Escolha } from "@/components/ui/escolha";
 import { useCampanha, useEditarCampanha, usePreviaDaAudiencia } from "@/hooks/campanhas/useCampanhas";
 import { channelLabel, useChannelSessions } from "@/hooks/channels/useChannelSessions";
 import { useT } from "@/hooks/i18n/useT";
+import {
+  COMPRA_VAZIA,
+  CamposDeCompraDoFiltro,
+  compraDoFiltro,
+  criteriosDeCompra,
+  temCriterioDeCompra,
+} from "../../_campos-de-compra";
 import type { SaidasDaCadencia } from "@/lib/cadencia/saidas";
 import type { PassoDaRegua } from "@/lib/regua/timeline";
 import { useAgentesPublicados, useEtapas, useFunis } from "@/hooks/campanhas/useDestinoDaCampanha";
+
+/** Mantém o que o `excluir` gravado tem além da compra (tags/funil/silêncio via API); null se nada sobra. */
+function excluirMesclado(original: Record<string, unknown> | null, compra: typeof COMPRA_VAZIA) {
+  const novo = { ...original, ...criteriosDeCompra(compra) };
+  return Object.values(novo).some((v) => v !== null && !(Array.isArray(v) && v.length === 0)) ? novo : null;
+}
 
 export function EditarCampanha({ id }: { id: string }) {
   const t = useT();
@@ -75,6 +88,10 @@ export function EditarCampanha({ id }: { id: string }) {
   // O MODO DE PÚBLICO (9039). Carregado do rascunho; só muda por escolha.
   const [continua, setContinua] = useState(false);
   const [etapaDeEntrada, setEtapaDeEntrada] = useState("");
+  const [compra, setCompra] = useState(COMPRA_VAZIA);
+  const [excluirCompra, setExcluirCompra] = useState(COMPRA_VAZIA);
+  // O `excluir` gravado (pode ter tags/funil/silêncio via API): a tela só edita os 4 campos de compra.
+  const [excluirOriginal, setExcluirOriginal] = useState<Record<string, unknown> | null>(null);
   const [carregado, setCarregado] = useState(false);
 
   const funis = useFunis();
@@ -94,6 +111,9 @@ export function EditarCampanha({ id }: { id: string }) {
     setComAlgumaTag(juntar(f.com_alguma_tag));
     setSemTags(juntar(f.sem_tags));
     setSemInteracao(f.sem_interacao_ha_dias == null ? "" : String(f.sem_interacao_ha_dias));
+    setCompra(compraDoFiltro(f));
+    setExcluirCompra(compraDoFiltro(f.excluir));
+    setExcluirOriginal(f.excluir && typeof f.excluir === "object" ? (f.excluir as Record<string, unknown>) : null);
     setLimite(f.limite == null ? "100" : String(f.limite));
     setVariantes([c.message_body ?? "", ...(c.message_variants ?? [])]);
     setPassos(c.passos ?? []);
@@ -115,18 +135,24 @@ export function EditarCampanha({ id }: { id: string }) {
 
   const filtro = useMemo(
     () => ({
+      // Parte do filtro salvo: o PATCH grava o objeto inteiro e a tela não edita
+      // funis, etapas, incluir/excluir_contatos (apagá-los reinclui excluídos).
+      ...((campanha.data?.audience_filter ?? {}) as Record<string, unknown>),
       com_alguma_tag: listar(comAlgumaTag),
       sem_tags: listar(semTags),
       sem_interacao_ha_dias: semInteracao ? Number(semInteracao) : null,
+      ...criteriosDeCompra(compra),
+      excluir: excluirMesclado(excluirOriginal, excluirCompra),
       limite: Number(limite) || 100,
     }),
-    [comAlgumaTag, semTags, semInteracao, limite],
+    [campanha.data?.audience_filter, comAlgumaTag, semTags, semInteracao, compra, excluirCompra, excluirOriginal, limite],
   );
 
   const temCriterio =
     filtro.com_alguma_tag.length > 0 ||
     filtro.sem_tags.length > 0 ||
-    filtro.sem_interacao_ha_dias !== null;
+    filtro.sem_interacao_ha_dias !== null ||
+    temCriterioDeCompra(criteriosDeCompra(compra));
 
   if (campanha.isLoading || !carregado) {
     return (
@@ -282,6 +308,13 @@ export function EditarCampanha({ id }: { id: string }) {
               onChange={(e) => setSemInteracao(e.target.value)}
             />
           </div>
+          <CamposDeCompraDoFiltro
+            prefixo="e-compra"
+            compra={compra}
+            onCompra={setCompra}
+            excluir={excluirCompra}
+            onExcluir={setExcluirCompra}
+          />
           <div className="space-y-2">
             <Label htmlFor="e-limite">{t("Máximo de contatos nesta campanha")}</Label>
             <Input

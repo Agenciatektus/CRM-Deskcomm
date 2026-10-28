@@ -6,7 +6,7 @@
  * de `buscarCandidatos` só protege o operador se a edição — que é onde uma
  * campanha grande é conferida de novo — também mostrar o recibo.
  */
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { EditarCampanha } from "./_client";
@@ -25,14 +25,27 @@ const previa = vi.hoisted(() => ({
   },
 }));
 
-const CAMPANHA = {
+const salvar = vi.hoisted(() => vi.fn().mockResolvedValue({}));
+
+const lida = vi.hoisted(() => ({ data: undefined as unknown }));
+
+const U = (n: number) => `00000000-0000-4000-8000-00000000000${n}`;
+
+const CAMPANHA: Record<string, unknown> = {
   id: "c1",
   name: "Reativação de clientes parados",
   status: "draft",
-  channel_session_id: "",
+  channel_session_id: "s1",
   base_legal: "consent",
   lia_ref: null,
-  audience_filter: { com_alguma_tag: ["vip"], limite: 100 },
+  audience_filter: {
+    com_alguma_tag: ["vip"],
+    limite: 100,
+    funis: [U(1)],
+    etapas: [U(2)],
+    incluir_contatos: [U(3)],
+    excluir_contatos: [U(4)],
+  },
   message_body: "Oi {{nome}}",
   pipeline_id: null,
   stage_id: null,
@@ -42,8 +55,8 @@ const CAMPANHA = {
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (chave: string) => chave }));
 vi.mock("@/hooks/campanhas/useCampanhas", () => ({
-  useCampanha: () => ({ data: CAMPANHA, isLoading: false }),
-  useEditarCampanha: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useCampanha: () => ({ data: lida.data, isLoading: false }),
+  useEditarCampanha: () => ({ mutateAsync: salvar, isPending: false }),
   usePreviaDaAudiencia: () => previa,
 }));
 vi.mock("@/hooks/channels/useChannelSessions", () => ({
@@ -55,6 +68,15 @@ vi.mock("@/hooks/campanhas/useDestinoDaCampanha", () => ({
   useEtapas: () => ({ data: [], isLoading: false }),
   useAgentesPublicados: () => ({ data: [], isLoading: false }),
 }));
+
+const FILTRO_PADRAO = { ...(CAMPANHA.audience_filter as Record<string, unknown>) };
+
+// Reset global: um teste que troca a campanha lida ou o filtro não vaza para os outros.
+beforeEach(() => {
+  salvar.mockClear();
+  lida.data = CAMPANHA;
+  CAMPANHA.audience_filter = { ...FILTRO_PADRAO };
+});
 
 const AVISO = /bateu o teto de 20\.000 negócios desta prévia/;
 
@@ -74,5 +96,75 @@ describe("prévia da edição de campanha: o aviso do teto de 20.000", () => {
     render(<EditarCampanha id="c1" />);
     expect(await screen.findByDisplayValue("Reativação de clientes parados")).toBeInTheDocument();
     expect(screen.queryByText(AVISO)).not.toBeInTheDocument();
+  });
+
+  it("salvar preserva funis, etapas, incluir e excluir contatos", async () => {
+    render(<EditarCampanha id="c1" />);
+    const nome = await screen.findByDisplayValue("Reativação de clientes parados");
+    fireEvent.change(nome, { target: { value: "Outro nome" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+    await waitFor(() => expect(salvar).toHaveBeenCalled());
+    expect(salvar.mock.calls[0]?.[0].audience_filter).toMatchObject({
+      funis: [U(1)],
+      etapas: [U(2)],
+      incluir_contatos: [U(3)],
+      excluir_contatos: [U(4)],
+    });
+  });
+
+  it("limpar a tag na tela manda com_alguma_tag vazio", async () => {
+    // sem critério o Salvar não habilita: troca a tag por "sem falar há 30 dias"
+    render(<EditarCampanha id="c1" />);
+    const tag = await screen.findByDisplayValue("vip");
+    fireEvent.change(tag, { target: { value: "" } });
+    // outro critério mantém o Salvar habilitado sem a tag
+    fireEvent.change(screen.getByLabelText("Sem falar com a gente há (dias)"), { target: { value: "30" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+    await waitFor(() => expect(salvar).toHaveBeenCalledTimes(1));
+    expect(salvar.mock.calls[0]?.[0].audience_filter.com_alguma_tag).toEqual([]);
+  });
+
+  it("carga tardia (data undefined e depois a campanha): o filtro salvo ainda vai no PATCH", async () => {
+    // só funis/incluídos: nenhum outro estado do memo muda na carga
+    lida.data = undefined;
+    const { rerender } = render(<EditarCampanha id="c1" />);
+    lida.data = {
+      ...CAMPANHA,
+      entrada_continua: true,
+      audience_filter: { limite: 100, funis: [U(1)], incluir_contatos: [U(3)] },
+    };
+    rerender(<EditarCampanha id="c1" />);
+    await screen.findByDisplayValue("Reativação de clientes parados");
+    fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+    await waitFor(() => expect(salvar).toHaveBeenCalledTimes(1));
+    expect(salvar.mock.calls[0]?.[0].audience_filter).toMatchObject({
+      funis: [U(1)],
+      incluir_contatos: [U(3)],
+    });
+  });
+});
+
+describe("edição: hidratação dos critérios de compra", () => {
+  it("filtro antigo, sem os campos novos, abre vazio sem quebrar", async () => {
+    render(<EditarCampanha id="c1" />);
+    const campos = await screen.findAllByLabelText("Gasto total mínimo (R$)");
+    expect(campos[0]).toHaveValue("");
+    expect(campos[1]).toHaveValue("");
+  });
+
+  it("filtro com excluir preenchido hidrata os campos", async () => {
+    CAMPANHA.audience_filter = {
+      com_alguma_tag: ["vip"],
+      ultima_compra_ha_dias_min: 60,
+      gasto_min_centavos: 15000,
+      excluir: { ultima_compra_ha_dias_max: 30, compras_min: 2 },
+      limite: 100,
+    };
+    render(<EditarCampanha id="c1" />);
+    const min = await screen.findAllByLabelText("Última compra há pelo menos (dias)");
+    expect(min[0]).toHaveValue(60);
+    expect(screen.getAllByLabelText("Gasto total mínimo (R$)")[0]).toHaveValue("150,00");
+    expect(screen.getAllByLabelText("Última compra há no máximo (dias)")[1]).toHaveValue(30);
+    expect(screen.getAllByLabelText("Pelo menos N compras")[1]).toHaveValue(2);
   });
 });
