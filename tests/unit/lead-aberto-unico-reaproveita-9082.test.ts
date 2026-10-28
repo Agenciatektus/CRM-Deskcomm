@@ -127,6 +127,16 @@ describe("9082: createLeadHandler reaproveita o aberto", () => {
     expect(erro).toMatchObject({ status: 409, code: "lead_aberto_existente" });
   });
 
+  it("com external_id (webhook, um card por evento): cria mesmo com aberto no funil (não pergunta)", async () => {
+    const b = banco({ abertoNaLeitura: [true] });
+    const lead = await createLeadHandler(b.cliente, ctx, { ...payload("webhook"), external_id: "ev-2" });
+    expect(lead).toMatchObject({ id: NOVO });
+    expect(lead).not.toHaveProperty("reaproveitado");
+    expect(b.leituras()).toBe(0);
+    expect(b.inseridos).toHaveLength(1);
+    expect(leadCreated()).toHaveLength(1);
+  });
+
   it("CONTROLE: manual cria mesmo com aberto no funil (não pergunta)", async () => {
     const b = banco({ abertoNaLeitura: [true] });
     const lead = await createLeadHandler(b.cliente, ctx, payload("manual"));

@@ -618,7 +618,9 @@ export async function createLeadHandler(
   // Origem automática ou lote com negócio aberto do contato neste funil:
   // devolve o que existe (`reaproveitado: true`), sem INSERT e sem
   // `lead.created`. Antes da régua de campos: reaproveitar não cria nada.
-  const leadUnico = !!input.contact_id && entraNoLeadUnico(input.source);
+  // Com `external_id` fica de fora (o índice também): a captação cria um card
+  // POR EVENTO, com idempotência própria por source+external_id.
+  const leadUnico = !!input.contact_id && !input.external_id && entraNoLeadUnico(input.source);
   const abertoDoContato = async () => {
     const { data } = await supabase
       .from("crm_leads")

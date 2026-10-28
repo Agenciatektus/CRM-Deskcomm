@@ -16,6 +16,7 @@ import { sql } from "./gov-helpers";
  *    origens fora dele é a de `ORIGENS_FORA_DO_LEAD_UNICO`;
  *  - no banco: whatsapp + importacao_planilha no mesmo contato/funil é 23505;
  *  - whatsapp + manual NÃO é barrado (par legítimo em produção);
+ *  - lead com external_id (webhook: um card por evento) NÃO é barrado;
  *  - nuvemshop x2 e retomada + whatsapp não são barrados (card por pedido;
  *    retomada abre card novo apontando para o perdido);
  *  - índice INVALID dá WARNING no texto da migration e do baseline;
@@ -25,7 +26,7 @@ import { sql } from "./gov-helpers";
  */
 
 const INDICE = "crm_leads_um_aberto_por_contato_no_funil";
-const PREDICADO = "where status = 'open' and contact_id is not null and source not in ('manual', 'nuvemshop', 'retomada')";
+const PREDICADO = "where status = 'open' and contact_id is not null and source not in ('manual', 'nuvemshop', 'retomada') and external_id is null";
 
 const raiz = join(__dirname, "..", "..");
 const migration = readdirSync(join(raiz, "supabase", "migrations")).find((f) => /^\d{14}_9082_/.test(f));
@@ -111,6 +112,19 @@ describe("9082: no banco", () => {
 
   it("nuvemshop x2 não é barrado (um card por pedido)", () => {
     expect(prova(`${lead(1, "nuvemshop")}\n${lead(2, "nuvemshop")}`)).toContain("provado");
+  });
+
+  it("whatsapp + webhook com external_id no mesmo contato e funil NÃO é barrado (um card por evento)", () => {
+    expect(
+      prova(`${lead(1, "whatsapp")}
+insert into crm_leads(id,organization_id,pipeline_id,stage_id,contact_id,title,source,external_id) values
+ ('${id(201)}','${ORG}','${VENDAS}','${S_V}','${CONTATO}','D9082 evento 1','webhook','ev-1'),
+ ('${id(202)}','${ORG}','${VENDAS}','${S_V}','${CONTATO}','D9082 evento 2','webhook','ev-2');`),
+    ).toContain("provado");
+  });
+
+  it("CONTROLE: webhook SEM external_id + whatsapp é barrado", () => {
+    expect(() => prova(`${lead(1, "whatsapp")}\n${lead(2, "webhook")}`)).toThrow(new RegExp(INDICE));
   });
 
   it("retomada + whatsapp não é barrado (card novo apontando para o perdido)", () => {

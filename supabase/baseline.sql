@@ -66724,7 +66724,7 @@ begin
   select count(*) into v_grupos from (
     select 1
       from public.crm_leads
-     where status = 'open' and contact_id is not null and source not in ('manual', 'nuvemshop', 'retomada')
+     where status = 'open' and contact_id is not null and source not in ('manual', 'nuvemshop', 'retomada') and external_id is null
      group by organization_id, contact_id, pipeline_id
     having count(*) > 1
   ) d;
@@ -66734,7 +66734,7 @@ begin
   end if;
   create unique index crm_leads_um_aberto_por_contato_no_funil
     on public.crm_leads (organization_id, contact_id, pipeline_id)
-    where status = 'open' and contact_id is not null and source not in ('manual', 'nuvemshop', 'retomada');
+    where status = 'open' and contact_id is not null and source not in ('manual', 'nuvemshop', 'retomada') and external_id is null;
 end $$;
 
 notify pgrst, 'reload schema';
