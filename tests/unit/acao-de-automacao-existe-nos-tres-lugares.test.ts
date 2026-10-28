@@ -47,7 +47,7 @@ describe("ação de automação: schema, executor e tela concordam", () => {
 
   /**
    * `ai_decide` (#1970, upstream) é montada só no editor VISUAL de automações
-   * (`app/app/webhooks/automacoes/[id]`): ela é uma caixa que se ramifica em
+   * (`app/app/automacoes/[id]`): ela é uma caixa que se ramifica em
    * opções, e o seletor linear do `RuleEditor` não tem como desenhar isso. A
    * exceção é nominal e vigiada: a caixa visual tem de conhecê-la pelo tipo.
    */
@@ -58,7 +58,7 @@ describe("ação de automação: schema, executor e tela concordam", () => {
   });
 
   it("a ação que fica fora do seletor existe no schema e é desenhada pelo editor visual", () => {
-    const visual = readFileSync("app/app/webhooks/automacoes/[id]/_components/visual.ts", "utf8");
+    const visual = readFileSync("app/app/automacoes/[id]/_components/visual.ts", "utf8");
     for (const tipo of SO_NO_EDITOR_VISUAL) {
       expect(doSchema).toContain(tipo);
       expect(daTela).not.toContain(tipo);

@@ -204,6 +204,8 @@ describe("hubSections", () => {
       "/app/products",
       "/app/imports",
       "/app/settings/tenant/pipelines",
+      // O motor de regras do CRM inteiro: montagem, então hub e ⌘K, sem sidebar.
+      "/app/automacoes",
       "/app/proposals",
     ]);
   });
