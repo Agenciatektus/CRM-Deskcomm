@@ -43,7 +43,7 @@ async function atorDoConvite(admin: SupabaseClient): Promise<{ id: string; nome:
     .select("user_id")
     .eq("scope", "full")
     .is("revoked_at", null)
-    .order("created_at", { ascending: true })
+    .order("granted_at", { ascending: true })
     .limit(1);
   if (error) throw new Error(`convite: donos ilegíveis (${error.code ?? "sem_codigo"})`);
   const id = ((data ?? []) as Array<{ user_id: string }>)[0]?.user_id;
