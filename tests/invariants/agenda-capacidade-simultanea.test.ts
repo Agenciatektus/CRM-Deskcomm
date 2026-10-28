@@ -31,7 +31,11 @@ function marca(dono: string, inicio: string, fim: string): string | null {
          values ('${ORG}', '${dono}', 'cliente', '${inicio}', '${fim}', 'confirmed');`);
     return null;
   } catch (e) {
-    return /23P01|23505/.exec(String((e as { stderr?: string }).stderr ?? e))?.[0] ?? "outro";
+    // O psql mostra a mensagem, não o SQLSTATE: cada recusa tem um nome próprio.
+    const saida = String((e as { stderr?: string }).stderr ?? e);
+    if (saida.includes("agenda_capacidade_esgotada")) return "23P01";
+    if (saida.includes("agenda_mesmo_instante")) return "23505";
+    return "outro";
   }
 }
 

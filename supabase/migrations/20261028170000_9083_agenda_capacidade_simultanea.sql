@@ -24,8 +24,8 @@
 --
 -- Reverter (antes, cancele ou desloque compromissos de mesmo início das orgs com
 -- capacidade > 1, senão o índice único não volta):
---   drop trigger if exists trg_agenda_capacidade_insert on public.calendar_appointments;
---   drop trigger if exists trg_agenda_capacidade_update on public.calendar_appointments;
+--   drop trigger if exists trg_zzz_agenda_capacidade_insert on public.calendar_appointments;
+--   drop trigger if exists trg_zzz_agenda_capacidade_update on public.calendar_appointments;
 --   drop function if exists public.fn_agenda_respeita_capacidade();
 --   -- reaplicar fn_google_appointment da migration 0654 (o bloco `exists(... other ...)`)
 --   drop function if exists public.fn_agenda_lotada(uuid, uuid, uuid, timestamptz, timestamptz);
@@ -91,16 +91,19 @@ end;
 $$;
 revoke all on function public.fn_agenda_respeita_capacidade() from public, anon, authenticated;
 
-drop trigger if exists trg_agenda_capacidade_insert on public.calendar_appointments;
-create trigger trg_agenda_capacidade_insert
+-- `zzz`: gatilho BEFORE roda em ordem alfabética, e este conta por ÚLTIMO, depois de quem
+-- ainda mexe no horário ou recusa por outro motivo (`trg_zz_meet_stamp`) — como o índice
+-- único, que só era checado depois de todos.
+drop trigger if exists trg_zzz_agenda_capacidade_insert on public.calendar_appointments;
+create trigger trg_zzz_agenda_capacidade_insert
   before insert on public.calendar_appointments
   for each row when (new.status in ('pending', 'confirmed') and new.owner_user_id is not null)
   execute function public.fn_agenda_respeita_capacidade();
 
 -- Só quando a OCUPAÇÃO muda: confirmar um pendente ou trocar a anotação de um compromisso
 -- que já está de pé não recalcula nada (e não trava linha antiga sobreposta).
-drop trigger if exists trg_agenda_capacidade_update on public.calendar_appointments;
-create trigger trg_agenda_capacidade_update
+drop trigger if exists trg_zzz_agenda_capacidade_update on public.calendar_appointments;
+create trigger trg_zzz_agenda_capacidade_update
   before update of starts_at, ends_at, owner_user_id, status on public.calendar_appointments
   for each row when (
     new.status in ('pending', 'confirmed') and new.owner_user_id is not null
