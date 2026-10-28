@@ -69,6 +69,7 @@ const SUCESSO: ResultadoDaConsulta = {
   ok: true,
   slots: [{ inicio: new Date("2026-09-01T14:00:00Z"), fim: new Date("2026-09-01T14:30:00Z") }],
   fusoDaRegra: "America/Sao_Paulo",
+  capacidade: 1,
   publicouHorarios: true,
   fusoSuposto: false,
   fontesDefasadas: [],

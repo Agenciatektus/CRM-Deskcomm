@@ -222,7 +222,7 @@ export function ScheduleDialog({
   open: boolean;
   onOpenChange: (o: boolean) => void;
   /** Devolve as janelas que o SERVIDOR guardou — é daqui que o resumo lê. */
-  onSave: (windows: ScheduleWindow[], timezone: string) => Promise<ScheduleWindow[]>;
+  onSave: (windows: ScheduleWindow[], timezone: string, simultaneos: number) => Promise<ScheduleWindow[]>;
   isPending: boolean;
   organizationTimezone?: string;
 }) {
@@ -231,6 +231,7 @@ export function ScheduleDialog({
   const defaultTimezone = fusoOferecidoOuPadrao(organizationTimezone);
   const [timezone, setTimezone] = useState(initial?.timezone || defaultTimezone);
   const [windows, setWindows] = useState<ScheduleWindow[]>(initial?.windows ?? []);
+  const [simultaneos, setSimultaneos] = useState(attendant.availability?.simultaneous_appointments ?? 1);
   /**
    * O que o SERVIDOR guardou no último "Salvar", lido do RETORNO da gravação.
    * `null` enquanto nada foi publicado nesta abertura do diálogo.
@@ -243,13 +244,14 @@ export function ScheduleDialog({
   const [gravacao, setGravacao] = useState<{
     rascunho: ScheduleWindow[];
     timezone: string;
+    simultaneos: number;
     janelas: ScheduleWindow[];
   } | null>(null);
   // O resumo vale para o rascunho que foi gravado. Mexeu depois (outra faixa,
   // o botão de copiar, o fuso)? O resumo sai e o "Salvar" volta — senão a
   // edição sumiria no "Fechar" sem aviso, que é o defeito da #2312 de novo.
   const publicado =
-    gravacao && gravacao.rascunho === windows && gravacao.timezone === timezone
+    gravacao && gravacao.rascunho === windows && gravacao.timezone === timezone && gravacao.simultaneos === simultaneos
       ? gravacao.janelas
       : null;
   /** Desligado quando não há o que copiar ou quando a cópia estouraria a rota. */
@@ -257,7 +259,7 @@ export function ScheduleDialog({
 
   async function salvar() {
     try {
-      setGravacao({ rascunho: windows, timezone, janelas: await onSave(windows, timezone) });
+      setGravacao({ rascunho: windows, timezone, simultaneos, janelas: await onSave(windows, timezone, simultaneos) });
     } catch {
       // O erro já virou toast no hook (`showApiError`) e o diálogo fica ABERTO:
       // fechar depois de uma gravação que falhou seria dizer que deu certo.
@@ -295,6 +297,25 @@ export function ScheduleDialog({
                 </option>
               ))}
             </Escolha>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="simultaneos">{t("Atendimentos simultâneos na agenda")}</Label>
+            <Input
+              id="simultaneos"
+              type="number"
+              min={1}
+              max={20}
+              value={simultaneos}
+              className="h-9 w-24"
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                if (Number.isInteger(n) && n >= 1 && n <= 20) setSimultaneos(n);
+              }}
+            />
+            <p className="text-xs text-muted-foreground">
+              {t("Quantos clientes esta pessoa atende ao mesmo tempo. Use 1 para um cliente por vez; num salão, a química age enquanto ela atende outra cliente.")}
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -703,13 +724,13 @@ export function AttendantsClient({ canManage, organizationTimezone }: Props) {
           onOpenChange={(o) => !o && setScheduleFor(null)}
           isPending={patch.isPending}
           organizationTimezone={organizationTimezone}
-          onSave={async (windows, timezone) => {
+          onSave={async (windows, timezone, simultaneos) => {
             // `mutateAsync`, e não `mutate`: o resumo lê o RETORNO da gravação
             // (issue #2312) — fechar o diálogo no `onSuccess` era exatamente o
             // que impedia a pessoa de conferir o que ficou publicado.
             const resposta = await patch.mutateAsync({
               userId: scheduleFor.userId,
-              patch: { schedule: { timezone, windows } },
+              patch: { schedule: { timezone, windows }, simultaneous_appointments: simultaneos },
             });
             return resposta?.data?.schedule?.windows ?? [];
           }}

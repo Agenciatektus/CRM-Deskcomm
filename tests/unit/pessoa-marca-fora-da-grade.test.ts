@@ -238,6 +238,8 @@ function agenda(
     bufferAntesMin?: number;
     /** Intervalo depois do atendimento (`buffer_after_minutes`). */
     bufferDepoisMin?: number;
+    /** Atendimentos simultâneos do dono (`simultaneous_appointments`, migration 9083). */
+    simultaneos?: number;
   } = {},
 ): Banco {
   return bancoEmMemoria({
@@ -263,6 +265,7 @@ function agenda(
       {
         organization_id: ORG,
         user_id: DONO,
+        simultaneous_appointments: args.simultaneos ?? 1,
         schedule: {
           timezone: "America/Sao_Paulo",
           windows: [{ dow: 3, start: "09:00", end: args.fimDaJornada ?? "18:00" }],
@@ -695,4 +698,37 @@ describe("tomada durante consulta da agenda", () => {
       expect(criados(banco)).toHaveLength(0);
     },
   );
+});
+
+describe("atendimentos simultâneos (migration 9083): a capacidade chega à grade E ao encaixe", () => {
+  const OCUPA_10H = () => agendamento(NA_GRADE, "2026-10-07T14:00:00.000Z");
+
+  it("a IA NA grade em cima de UM compromisso MARCA quando a pessoa atende 2 ao mesmo tempo", async () => {
+    const banco = agenda({ agendamentos: [OCUPA_10H()], simultaneos: 2 });
+    await marcarAgendamentoHandler(banco.client, ctx(AGENTE), { event_type_id: TIPO, starts_at: NA_GRADE });
+    expect(criados(banco), "a capacidade da jornada não chegou ao motor da grade").toHaveLength(1);
+  });
+
+  it("a IA NA grade com a capacidade CHEIA é RECUSADA", async () => {
+    const banco = agenda({
+      agendamentos: [OCUPA_10H(), agendamento(NA_GRADE, "2026-10-07T14:00:00.000Z", { id: "ag-segundo" })],
+      simultaneos: 2,
+    });
+    await expect(
+      marcarAgendamentoHandler(banco.client, ctx(AGENTE), { event_type_id: TIPO, starts_at: NA_GRADE }),
+    ).rejects.toMatchObject(RECUSA);
+  });
+
+  it("o ENCAIXE da pessoa em cima de UM compromisso MARCA com capacidade 2", async () => {
+    const banco = agenda({ agendamentos: [OCUPA_10H()], simultaneos: 2 });
+    await marcarAgendamentoHandler(banco.client, ctx(PESSOA), { event_type_id: TIPO, starts_at: FORA_DA_GRADE });
+    expect(criados(banco), "o encaixe não recebeu a capacidade que a grade usa").toHaveLength(1);
+  });
+
+  it("o ENCAIXE em cima do GOOGLE continua RECUSADO com capacidade 2 — evento de fora ocupa inteiro", async () => {
+    const banco = agenda({ eventosDoGoogle: [eventoDoGoogle(NA_GRADE, "2026-10-07T14:00:00.000Z")], simultaneos: 2 });
+    await expect(
+      marcarAgendamentoHandler(banco.client, ctx(PESSOA), { event_type_id: TIPO, starts_at: FORA_DA_GRADE }),
+    ).rejects.toMatchObject(RECUSA);
+  });
 });

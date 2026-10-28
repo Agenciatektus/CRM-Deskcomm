@@ -239,6 +239,8 @@ export const availabilityPatchSchema = z
     // grande sem deixar passar número de digitação errada.
     capacity: z.number().int().min(1).max(CAPACIDADE_MAXIMA),
     schedule: availabilityScheduleSchema,
+    // Atendimentos da AGENDA ao mesmo tempo (migration 9083). O teto é o CHECK do banco.
+    simultaneous_appointments: z.number().int().min(1).max(20),
   })
   .partial()
   .refine((v) => Object.keys(v).length > 0, {
