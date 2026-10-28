@@ -71,10 +71,9 @@ export function montarEmail(entrada: EntradaEmail): { html: string; text: string
   };
   const T = TOKENS_EMAIL;
   const nome = DEFAULT_APP_NAME;
-  const base = (env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/\/+$/, "");
-  const app = (env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
-  const logo = base
-    ? `<img src="${escapeHtml(`${base}/storage/v1/object/public/brand-logos/platform/email-simbolo.png`)}" width="55" height="60" alt="${escapeHtml(nome)}" style="display:block;border:0;outline:none;text-decoration:none;margin:0 auto 16px;width:55px;height:60px">`
+    const app = (env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
+  const logo = app
+    ? `<img src="${escapeHtml(`${app}/email/simbolo.png`)}" width="55" height="60" alt="${escapeHtml(nome)}" style="display:block;border:0;outline:none;text-decoration:none;margin:0 auto 16px;width:55px;height:60px">`
     : "";
   const p = (s: string, cor: string = T.suave, tam = 15, mb = 14) =>
     `<p style="margin:0 0 ${mb}px;font-family:${FONTE};font-size:${tam}px;line-height:1.6;color:${cor}">${escapeHtml(s)}</p>`;

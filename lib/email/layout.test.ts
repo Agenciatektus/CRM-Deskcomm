@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const envFalso = vi.hoisted(() => ({ NEXT_PUBLIC_SUPABASE_URL: "https://sb.exemplo.com" }));
+const envFalso = vi.hoisted(() => ({ NEXT_PUBLIC_APP_URL: "https://app.exemplo.com" }));
 vi.mock("@/lib/env", () => ({ env: envFalso }));
 
 import { montarEmail, TOKENS_EMAIL as T } from "@/lib/email/layout";
@@ -27,12 +27,12 @@ const contraste = (a: string, b: string) => {
 
 describe("montarEmail", () => {
   beforeEach(() => {
-    envFalso.NEXT_PUBLIC_SUPABASE_URL = "https://sb.exemplo.com";
+    envFalso.NEXT_PUBLIC_APP_URL = "https://app.exemplo.com";
   });
 
   it("traz logo, botao e meta de esquema escuro", () => {
     const { html } = montarEmail(base);
-    expect(html).toContain("https://sb.exemplo.com/storage/v1/object/public/brand-logos/platform/email-simbolo.png");
+    expect(html).toContain("https://app.exemplo.com/email/simbolo.png");
     expect(html).toContain("Abrir");
     expect(html).toContain("a=1&amp;b=2");
     expect(html).toContain('name="color-scheme" content="dark"');
@@ -50,7 +50,7 @@ describe("montarEmail", () => {
   });
 
   it("sem base de URL, omite a imagem", () => {
-    envFalso.NEXT_PUBLIC_SUPABASE_URL = "";
+    envFalso.NEXT_PUBLIC_APP_URL = "";
     expect(montarEmail(base).html).not.toContain("<img");
   });
 
