@@ -31,6 +31,11 @@ describe("segurança da prévia: leituras de cenário não podem virar escrita",
     expect(SCENARIO_READS.has("crm_search_knowledge")).toBe(true);
   });
 
+  it("consulta estoque e preço da loja conectada no modo teste, sem contato", () => {
+    // Só usa a organização; sem isto o Testar caía em "vou confirmar com a equipe".
+    expect(SCENARIO_READS.has("crm_check_store_stock")).toBe(true);
+  });
+
   it("dado de contato continua exigindo contato real no modo teste", () => {
     expect(SCENARIO_READS.has("crm_get_contact")).toBe(false);
     expect(SCENARIO_READS.has("crm_search_contacts")).toBe(false);
