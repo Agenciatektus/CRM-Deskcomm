@@ -98,18 +98,17 @@ describe("prévia da edição de campanha: o aviso do teto de 20.000", () => {
     expect(screen.queryByText(AVISO)).not.toBeInTheDocument();
   });
 
-  it("salvar preserva funis, etapas, incluir e excluir contatos", async () => {
+  it("salvar NÃO reenvia funis, etapas, incluir e excluir contatos (o servidor preserva)", async () => {
     render(<EditarCampanha id="c1" />);
     const nome = await screen.findByDisplayValue("Reativação de clientes parados");
     fireEvent.change(nome, { target: { value: "Outro nome" } });
     fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
     await waitFor(() => expect(salvar).toHaveBeenCalled());
-    expect(salvar.mock.calls[0]?.[0].audience_filter).toMatchObject({
-      funis: [U(1)],
-      etapas: [U(2)],
-      incluir_contatos: [U(3)],
-      excluir_contatos: [U(4)],
-    });
+    const enviado = salvar.mock.calls[0]?.[0].audience_filter;
+    for (const k of ["funis", "etapas", "incluir_contatos", "excluir_contatos"]) {
+      expect(enviado).not.toHaveProperty(k);
+    }
+    expect(enviado).toMatchObject({ com_alguma_tag: ["vip"], limite: 100 });
   });
 
   it("limpar a tag na tela manda com_alguma_tag vazio", async () => {
@@ -124,7 +123,7 @@ describe("prévia da edição de campanha: o aviso do teto de 20.000", () => {
     expect(salvar.mock.calls[0]?.[0].audience_filter.com_alguma_tag).toEqual([]);
   });
 
-  it("carga tardia (data undefined e depois a campanha): o filtro salvo ainda vai no PATCH", async () => {
+  it("carga tardia (data undefined e depois a campanha): o PATCH leva só o que a tela edita", async () => {
     // só funis/incluídos: nenhum outro estado do memo muda na carga
     lida.data = undefined;
     const { rerender } = render(<EditarCampanha id="c1" />);
@@ -137,10 +136,7 @@ describe("prévia da edição de campanha: o aviso do teto de 20.000", () => {
     await screen.findByDisplayValue("Reativação de clientes parados");
     fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
     await waitFor(() => expect(salvar).toHaveBeenCalledTimes(1));
-    expect(salvar.mock.calls[0]?.[0].audience_filter).toMatchObject({
-      funis: [U(1)],
-      incluir_contatos: [U(3)],
-    });
+    expect(salvar.mock.calls[0]?.[0].audience_filter).not.toHaveProperty("incluir_contatos");
   });
 });
 

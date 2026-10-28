@@ -134,11 +134,10 @@ export function EditarCampanha({ id }: { id: string }) {
     [variantes],
   );
 
-  const filtro = useMemo(
+  // O que esta tela edita. É SÓ isto que o PATCH leva: o servidor mescla sobre o
+  // filtro salvo, então funis/etapas/contatos incluídos no meio da edição ficam.
+  const editados = useMemo(
     () => ({
-      // Parte do filtro salvo: o PATCH grava o objeto inteiro e a tela não edita
-      // funis, etapas, incluir/excluir_contatos (apagá-los reinclui excluídos).
-      ...limparFiltroSalvo(campanha.data?.audience_filter),
       com_alguma_tag: listar(comAlgumaTag),
       sem_tags: listar(semTags),
       sem_interacao_ha_dias: semInteracao ? Number(semInteracao) : null,
@@ -146,7 +145,12 @@ export function EditarCampanha({ id }: { id: string }) {
       excluir: excluirMesclado(excluirOriginal, excluirCompra),
       limite: Number(limite) || 100,
     }),
-    [campanha.data?.audience_filter, comAlgumaTag, semTags, semInteracao, compra, excluirCompra, excluirOriginal, limite],
+    [comAlgumaTag, semTags, semInteracao, compra, excluirCompra, excluirOriginal, limite],
+  );
+  // O filtro inteiro, só para a prévia (que não mescla no servidor).
+  const filtro = useMemo(
+    () => ({ ...limparFiltroSalvo(campanha.data?.audience_filter), ...editados }),
+    [campanha.data?.audience_filter, editados],
   );
 
   const temCriterio =
@@ -472,7 +476,7 @@ export function EditarCampanha({ id }: { id: string }) {
               message_variants: extras,
               base_legal: baseLegal,
               lia_ref: liaRef.trim() || null,
-              audience_filter: filtro,
+              audience_filter: editados,
               pipeline_id: funil || null,
               stage_id: etapa || null,
               agent_id: agente || null,

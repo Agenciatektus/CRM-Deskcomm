@@ -14,6 +14,7 @@ import type { NextRequest } from "next/server";
 import { fail, ok } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
 import { carregarCampanha } from "@/lib/campanhas/acoes";
+import { filtroDeAudienciaSchema, limparFiltroSalvo } from "@/lib/campanhas/audiencia";
 import { problemaNaEntradaContinua } from "@/lib/campanhas/entrada-continua";
 import { ehEditavel, ehTerminal } from "@/lib/campanhas/maquina-de-estados";
 import { gravarPool, lerPoolExtra } from "@/lib/campanhas/pool-de-numeros";
@@ -179,6 +180,21 @@ export async function PATCH(
     "agent_id",
   ] as const) {
     if (entrada[campo] !== undefined) mudanca[campo] = entrada[campo];
+  }
+  // O servidor mescla: a tela manda só o que edita, e o resto do filtro salvo
+  // (ex.: contato incluído pelo Funil com a edição aberta) fica como está no banco.
+  if (entrada.audience_filter !== undefined) {
+    const mesclado = filtroDeAudienciaSchema.safeParse({
+      ...limparFiltroSalvo(campanha.audience_filter),
+      ...entrada.audience_filter,
+    });
+    if (!mesclado.success) {
+      return fail("validation_failed", t("Dados inválidos."), 422, {
+        requestId,
+        details: { audience_filter: mesclado.error.issues.map((i) => i.message) },
+      });
+    }
+    mudanca.audience_filter = mesclado.data;
   }
   if (entrada.base_legal !== undefined) mudanca.base_legal = entrada.base_legal;
   if (entrada.lia_ref !== undefined) mudanca.lia_ref = entrada.lia_ref;

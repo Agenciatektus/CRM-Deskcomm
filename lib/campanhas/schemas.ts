@@ -147,7 +147,9 @@ export const editarCampanhaSchema = z
     message_variants: baseDaCampanha.message_variants,
     base_legal: baseDaCampanha.base_legal.optional(),
     lia_ref: baseDaCampanha.lia_ref,
-    audience_filter: filtroDeAudienciaSchema.optional(),
+    // PARCIAL: a rota mescla sobre o filtro salvo e valida o resultado com o
+    // `filtroDeAudienciaSchema` completo (chave ausente = preservada).
+    audience_filter: z.record(z.string(), z.unknown()).optional(),
     passos: baseDaCampanha.passos,
     saidas: baseDaCampanha.saidas,
     entrada_continua: baseDaCampanha.entrada_continua,
