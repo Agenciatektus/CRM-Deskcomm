@@ -2,7 +2,8 @@
  * Layout base dos e-mails transacionais: identidade ESCURA do produto, fixa
  * (sem white-label por organização). Tabelas e estilo inline com `bgcolor`
  * (clientes com modo escuro forçado ignoram CSS); o `<style>` só acrescenta
- * o que degrada bem sem ele: grade de pontos, brilhos de canto, degradê do
+ * o que degrada bem sem ele: a moldura da página (brilhos de canto do CRM), o
+ * fundo e a trama de pontos da coluna de conversa do Inbox, o degradê do
  * botão e o ajuste de celular.
  */
 import { env } from "@/lib/env";
@@ -10,7 +11,7 @@ import { DEFAULT_APP_NAME } from "@/lib/branding";
 
 export const TOKENS_EMAIL = {
   fundo: "#0d0e11",
-  cartao: "#181a1c",
+  cartao: "#111315",
   caixa: "#202327",
   borda: "#26292d",
   texto: "#f0f2f4",
@@ -105,8 +106,8 @@ export function montarEmail(e: EntradaEmail): { html: string; text: string } {
 <style>
 body{margin:0;padding:0;background:${T.fundo}}
 .pre{display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;max-height:0;max-width:0;overflow:hidden;font-size:1px;line-height:1px;mso-hide:all}
-.grade{background-color:${T.fundo};background-image:radial-gradient(circle at 1px 1px,rgba(42,82,216,0.22) 1px,transparent 0);background-size:14px 14px}
-.cartao{background-color:${T.cartao};background-image:radial-gradient(ellipse 60% 50% at 100% 0%,rgba(42,82,216,0.26) 0%,rgba(42,82,216,0.06) 34%,transparent 64%),radial-gradient(ellipse 50% 40% at 0% 100%,rgba(43,200,143,0.12) 0%,transparent 56%);background-repeat:no-repeat}
+.grade{background-color:${T.fundo};background-image:radial-gradient(672px 352px at -96px -96px,rgba(42,82,216,0.16),transparent 70%),radial-gradient(576px 288px at 100% -128px,rgba(43,140,173,0.10),transparent 70%);background-repeat:no-repeat}
+.cartao{background-color:${T.cartao};background-image:radial-gradient(ellipse 80% 42% at 50% -12%,rgba(43,140,173,0.13),transparent 62%),radial-gradient(circle at 1px 1px,rgba(255,255,255,0.07) 1px,transparent 0);background-size:auto,18px 18px;background-repeat:no-repeat,repeat}
 .cta{background-image:linear-gradient(90deg,${T.botao} 0%,${T.botaoFim} 100%);box-shadow:0 14px 36px -10px rgba(42,82,216,0.55)}
 @media (max-width:600px){.cont{width:100%!important}.px{padding-left:24px!important;padding-right:24px!important}.h1{font-size:26px!important}}
 </style>
