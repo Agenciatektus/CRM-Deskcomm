@@ -34,6 +34,7 @@ import { Escolha } from "@/components/ui/escolha";
 import { useCampanha, useEditarCampanha, usePreviaDaAudiencia } from "@/hooks/campanhas/useCampanhas";
 import { channelLabel, useChannelSessions } from "@/hooks/channels/useChannelSessions";
 import { useT } from "@/hooks/i18n/useT";
+import { filtroDeAudienciaSchema, limparFiltroSalvo } from "@/lib/campanhas/audiencia";
 import {
   COMPRA_VAZIA,
   CamposDeCompraDoFiltro,
@@ -103,7 +104,7 @@ export function EditarCampanha({ id }: { id: string }) {
   useEffect(() => {
     const c = campanha.data;
     if (!c || carregado) return;
-    const f = (c.audience_filter ?? {}) as Record<string, unknown>;
+    const f = limparFiltroSalvo(c.audience_filter);
     setNome(c.name);
     setCanal(c.channel_session_id);
     setBaseLegal(c.base_legal === "legitimate_interest" ? "legitimate_interest" : "consent");
@@ -133,11 +134,10 @@ export function EditarCampanha({ id }: { id: string }) {
     [variantes],
   );
 
-  const filtro = useMemo(
+  // O que esta tela edita. É SÓ isto que o PATCH leva: o servidor mescla sobre o
+  // filtro salvo, então funis/etapas/contatos incluídos no meio da edição ficam.
+  const editados = useMemo(
     () => ({
-      // Parte do filtro salvo: o PATCH grava o objeto inteiro e a tela não edita
-      // funis, etapas, incluir/excluir_contatos (apagá-los reinclui excluídos).
-      ...((campanha.data?.audience_filter ?? {}) as Record<string, unknown>),
       com_alguma_tag: listar(comAlgumaTag),
       sem_tags: listar(semTags),
       sem_interacao_ha_dias: semInteracao ? Number(semInteracao) : null,
@@ -145,14 +145,27 @@ export function EditarCampanha({ id }: { id: string }) {
       excluir: excluirMesclado(excluirOriginal, excluirCompra),
       limite: Number(limite) || 100,
     }),
-    [campanha.data?.audience_filter, comAlgumaTag, semTags, semInteracao, compra, excluirCompra, excluirOriginal, limite],
+    [comAlgumaTag, semTags, semInteracao, compra, excluirCompra, excluirOriginal, limite],
+  );
+  // O filtro inteiro, só para a prévia (que não mescla no servidor).
+  const filtro = useMemo(
+    () => ({ ...limparFiltroSalvo(campanha.data?.audience_filter), ...editados }),
+    [campanha.data?.audience_filter, editados],
   );
 
-  const temCriterio =
-    filtro.com_alguma_tag.length > 0 ||
-    filtro.sem_tags.length > 0 ||
-    filtro.sem_interacao_ha_dias !== null ||
-    temCriterioDeCompra(criteriosDeCompra(compra));
+  // Mesmo critério do servidor (o refine do schema): conta também funis, etapas e
+  // contatos incluídos do filtro salvo, que a tela não edita mas preserva.
+  const temCriterio = filtroDeAudienciaSchema.safeParse(filtro).success;
+  const salvo = limparFiltroSalvo(campanha.data?.audience_filter);
+  const preservados = [
+    [t("contatos incluídos"), listaDoSalvo(salvo.incluir_contatos)],
+    [t("funis"), listaDoSalvo(salvo.funis)],
+    [t("etapas"), listaDoSalvo(salvo.etapas)],
+    [t("excluídos à mão"), listaDoSalvo(salvo.excluir_contatos)],
+  ]
+    .filter(([, n]) => (n as number) > 0)
+    .map(([nome, n]) => `${nome as string}: ${n as number}`)
+    .join(", ");
 
   if (campanha.isLoading || !carregado) {
     return (
@@ -326,6 +339,11 @@ export function EditarCampanha({ id }: { id: string }) {
             />
           </div>
         </div>
+        {preservados !== "" && (
+          <p className="text-xs text-muted-foreground">
+            {t("Também no público")}: {preservados}
+          </p>
+        )}
         <div className="flex flex-wrap items-center gap-3">
           <Button
             type="button"
@@ -471,7 +489,7 @@ export function EditarCampanha({ id }: { id: string }) {
               message_variants: extras,
               base_legal: baseLegal,
               lia_ref: liaRef.trim() || null,
-              audience_filter: filtro,
+              audience_filter: editados,
               pipeline_id: funil || null,
               stage_id: etapa || null,
               agent_id: agente || null,
@@ -500,4 +518,8 @@ function listar(bruto: string): string[] {
 
 function juntar(valor: unknown): string {
   return Array.isArray(valor) ? valor.filter((v) => typeof v === "string").join(", ") : "";
+}
+
+function listaDoSalvo(v: unknown): number {
+  return Array.isArray(v) ? v.length : 0;
 }

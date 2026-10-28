@@ -98,18 +98,17 @@ describe("prévia da edição de campanha: o aviso do teto de 20.000", () => {
     expect(screen.queryByText(AVISO)).not.toBeInTheDocument();
   });
 
-  it("salvar preserva funis, etapas, incluir e excluir contatos", async () => {
+  it("salvar NÃO reenvia funis, etapas, incluir e excluir contatos (o servidor preserva)", async () => {
     render(<EditarCampanha id="c1" />);
     const nome = await screen.findByDisplayValue("Reativação de clientes parados");
     fireEvent.change(nome, { target: { value: "Outro nome" } });
     fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
     await waitFor(() => expect(salvar).toHaveBeenCalled());
-    expect(salvar.mock.calls[0]?.[0].audience_filter).toMatchObject({
-      funis: [U(1)],
-      etapas: [U(2)],
-      incluir_contatos: [U(3)],
-      excluir_contatos: [U(4)],
-    });
+    const enviado = salvar.mock.calls[0]?.[0].audience_filter;
+    for (const k of ["funis", "etapas", "incluir_contatos", "excluir_contatos"]) {
+      expect(enviado).not.toHaveProperty(k);
+    }
+    expect(enviado).toMatchObject({ com_alguma_tag: ["vip"], limite: 100 });
   });
 
   it("limpar a tag na tela manda com_alguma_tag vazio", async () => {
@@ -124,7 +123,7 @@ describe("prévia da edição de campanha: o aviso do teto de 20.000", () => {
     expect(salvar.mock.calls[0]?.[0].audience_filter.com_alguma_tag).toEqual([]);
   });
 
-  it("carga tardia (data undefined e depois a campanha): o filtro salvo ainda vai no PATCH", async () => {
+  it("carga tardia (data undefined e depois a campanha): o PATCH leva só o que a tela edita", async () => {
     // só funis/incluídos: nenhum outro estado do memo muda na carga
     lida.data = undefined;
     const { rerender } = render(<EditarCampanha id="c1" />);
@@ -137,10 +136,7 @@ describe("prévia da edição de campanha: o aviso do teto de 20.000", () => {
     await screen.findByDisplayValue("Reativação de clientes parados");
     fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
     await waitFor(() => expect(salvar).toHaveBeenCalledTimes(1));
-    expect(salvar.mock.calls[0]?.[0].audience_filter).toMatchObject({
-      funis: [U(1)],
-      incluir_contatos: [U(3)],
-    });
+    expect(salvar.mock.calls[0]?.[0].audience_filter).not.toHaveProperty("incluir_contatos");
   });
 });
 
@@ -168,3 +164,43 @@ describe("edição: hidratação dos critérios de compra", () => {
     expect(screen.getAllByLabelText("Pelo menos N compras")[1]).toHaveValue(2);
   });
 });
+
+describe("edição: chave desconhecida no filtro salvo (#405)", () => {
+  it("a prévia não leva a chave que o schema não conhece", async () => {
+    previa.mutate.mockClear();
+    CAMPANHA.audience_filter = { ...FILTRO_PADRAO, chave_removida: true };
+    render(<EditarCampanha id="c1" />);
+    await screen.findByDisplayValue("Reativação de clientes parados");
+    fireEvent.click(screen.getByRole("button", { name: "Ver quantas pessoas" }));
+    await waitFor(() => expect(previa.mutate).toHaveBeenCalled());
+    const enviado = previa.mutate.mock.calls[0]?.[0].audience_filter;
+    expect(enviado).not.toHaveProperty("chave_removida");
+    expect(enviado).toMatchObject({ com_alguma_tag: ["vip"] });
+  });
+});
+
+describe("edição: público só com contatos incluídos ou funis (#403)", () => {
+  it("abre com os botões habilitados e lista o que preserva", async () => {
+    CAMPANHA.audience_filter = { limite: 100, incluir_contatos: [U(3), U(5)], funis: [U(1)], excluir_contatos: [U(4)] };
+    render(<EditarCampanha id="c1" />);
+    await screen.findByDisplayValue("Reativação de clientes parados");
+    expect(screen.getByRole("button", { name: "Salvar alterações" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Ver quantas pessoas" })).toBeEnabled();
+    expect(screen.getByText(/contatos incluídos: 2, funis: 1, excluídos à mão: 1/)).toBeInTheDocument();
+  });
+
+  it("só funil (sem contatos) também habilita", async () => {
+    CAMPANHA.audience_filter = { limite: 100, funis: [U(1)] };
+    render(<EditarCampanha id="c1" />);
+    await screen.findByDisplayValue("Reativação de clientes parados");
+    expect(screen.getByRole("button", { name: "Salvar alterações" })).toBeEnabled();
+  });
+
+  it("sem critério nenhum segue travado", async () => {
+    CAMPANHA.audience_filter = { limite: 100 };
+    render(<EditarCampanha id="c1" />);
+    await screen.findByDisplayValue("Reativação de clientes parados");
+    expect(screen.getByRole("button", { name: "Salvar alterações" })).toBeDisabled();
+  });
+});
+
