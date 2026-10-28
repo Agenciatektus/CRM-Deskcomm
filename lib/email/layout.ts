@@ -46,6 +46,8 @@ export interface EntradaEmail {
   /** Atenção em destaque, no pé do cartão. */
   aviso?: string;
   rodape?: string[];
+  /** Link clicável logo abaixo do rodapé. */
+  rodapeLink?: { rotulo: string; href: string };
   nota?: string;
 }
 
@@ -89,7 +91,11 @@ export function montarEmail(e: EntradaEmail): { html: string; text: string } {
   const aviso = e.aviso
     ? `${linha}<tr><td class="px" style="padding:20px 44px 36px"><p style="margin:0;font-family:${FONTE};font-size:13px;line-height:1.6;color:${T.suave}"><span style="color:${T.aviso};font-weight:700">Atenção:</span> ${escapeHtml(e.aviso)}</p></td></tr>`
     : `<tr><td style="padding:0 0 36px;font-size:0;line-height:0">&nbsp;</td></tr>`;
-  const rodape = [...(e.rodape ?? [])].map((s) => p(s, T.suave, 12, 4)).join("");
+  const rodape =
+    [...(e.rodape ?? [])].map((s) => p(s, T.suave, 12, 4)).join("") +
+    (e.rodapeLink
+      ? `<p style="margin:0 0 4px;font-family:${FONTE};font-size:12px;line-height:1.6"><a href="${escapeHtml(e.rodapeLink.href)}" style="color:${T.destaque};text-decoration:underline">${escapeHtml(e.rodapeLink.rotulo)}</a></p>`
+      : "");
   const rodapeApp = app
     ? `<p style="margin:0;font-family:${FONTE};font-size:12px;line-height:1.7;color:${T.suave}">${escapeHtml(nome)}, <a href="${escapeHtml(app)}" style="color:${T.suave};text-decoration:underline">${escapeHtml(app.replace(/^https?:\/\//, ""))}</a></p>`
     : p(nome, T.suave, 12, 0);
@@ -142,6 +148,7 @@ ${aviso}
     ...(e.nota ? [e.nota] : []),
     ...(e.aviso ? [`Atenção: ${e.aviso}`] : []),
     ...(e.rodape ?? []),
+    ...(e.rodapeLink ? [e.rodapeLink.href] : []),
   ].join("\n\n");
 
   return { html, text };
