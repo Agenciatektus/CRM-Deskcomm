@@ -60,7 +60,15 @@ export function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-export function montarEmail(e: EntradaEmail): { html: string; text: string } {
+/** Só http(s) ou o placeholder do GoTrue: `javascript:` e `data:` nunca viram link. */
+const hrefSeguro = (h: string) => /^(https?:\/\/|\{\{)/i.test(h.trim());
+
+export function montarEmail(entrada: EntradaEmail): { html: string; text: string } {
+  const e: EntradaEmail = {
+    ...entrada,
+    botao: entrada.botao && hrefSeguro(entrada.botao.href) ? entrada.botao : undefined,
+    rodapeLink: entrada.rodapeLink && hrefSeguro(entrada.rodapeLink.href) ? entrada.rodapeLink : undefined,
+  };
   const T = TOKENS_EMAIL;
   const nome = DEFAULT_APP_NAME;
   const base = (env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/\/+$/, "");

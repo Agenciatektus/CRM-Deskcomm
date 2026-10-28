@@ -65,4 +65,17 @@ describe("montarEmail", () => {
     expect(contraste(T.suave, T.cartao)).toBeGreaterThanOrEqual(4.5);
     expect(contraste(T.botaoTexto, T.botao)).toBeGreaterThanOrEqual(4.5);
   });
+
+  it("descarta botão e link do rodapé com esquema que não seja http(s)", () => {
+    const { html, text } = montarEmail({
+      assunto: "a",
+      titulo: "b",
+      paragrafos: ["c"],
+      botao: { rotulo: "Abrir", href: "javascript:alert(1)" },
+      rodapeLink: { rotulo: "Site", href: "data:text/html,x" },
+    });
+    expect(html).not.toContain("javascript:");
+    expect(html).not.toContain("data:text");
+    expect(text).not.toContain("javascript:");
+  });
 });
