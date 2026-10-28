@@ -97,6 +97,7 @@ describe("o sinal de presença (lib/atendimento/presenca)", () => {
       agenda: jornada,
       atualizadoEm: null,
       cargaAtual: 0,
+      atendimentosSimultaneos: 1,
     };
     const comSinalNovo = { ...base, ultimoSinalEm: sinalHa(5), presente: true };
     const comSinalVencido = { ...base, ultimoSinalEm: sinalHa(60 * 60), presente: false };

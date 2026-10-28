@@ -20,7 +20,7 @@ import { isAttendantEligible, OPEN_LOAD_STATUSES } from "@/lib/routing/eligibili
 import { availabilityScheduleSchema } from "@/lib/schemas/routing";
 
 const COLUNAS_DISPONIBILIDADE =
-  "user_id, is_available, capacity, schedule, updated_at, last_heartbeat_at";
+  "user_id, is_available, capacity, schedule, simultaneous_appointments, updated_at, last_heartbeat_at";
 
 export interface AtendenteDoRoster {
   userId: string;
@@ -29,6 +29,8 @@ export interface AtendenteDoRoster {
   /** null quando a pessoa nunca configurou disponibilidade. */
   capacidade: number | null;
   agenda: unknown;
+  /** Atendimentos simultâneos na agenda; 1 quando a pessoa nunca configurou. */
+  atendimentosSimultaneos: number;
   atualizadoEm: string | null;
   /** Conversas abertas atribuídas — mesma contagem que o worker de roteamento usa. */
   cargaAtual: number;
@@ -85,6 +87,7 @@ export async function carregarRosterDeAtendimento(
     is_available: boolean;
     capacity: number;
     schedule: unknown;
+    simultaneous_appointments: number;
     updated_at: string | null;
     last_heartbeat_at: string | null;
   };
@@ -117,6 +120,7 @@ export async function carregarRosterDeAtendimento(
       disponivel: a?.is_available ?? false,
       capacidade: a?.capacity ?? null,
       agenda: a?.schedule ?? { timezone: "America/Sao_Paulo", windows: [] },
+      atendimentosSimultaneos: a?.simultaneous_appointments ?? 1,
       atualizadoEm: a?.updated_at ?? null,
       cargaAtual: cargaPorUsuario.get(m.user_id) ?? 0,
       // Quem nunca emitiu sinal tem `last_heartbeat_at` null, e o roster diz
