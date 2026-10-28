@@ -255,6 +255,12 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
       throw err;
     }
 
+    // Migration 9082: o contato já tinha card aberto neste funil; nada nasceu,
+    // então nada vai para as timelines.
+    if (criado.reaproveitado) {
+      return { type: TYPE, status: "success", detail: { reason: "card_aberto_reaproveitado", lead_id: String(criado.id) } };
+    }
+
     await registraNasDuasTimelines(ctx, {
       novoId: String(criado.id),
       origem,

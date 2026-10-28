@@ -25,6 +25,7 @@ import { audit } from "@/lib/audit";
 import { emitLeadActivity } from "@/lib/leads/activity-emitter";
 import { registraFalhaDeAtividade } from "@/lib/leads/activity-write-failure";
 import { emiteEntradaNaEtapa } from "@/lib/leads/entrada-pela-troca";
+import { RECUSA_DO_LEAD_UNICO, ehViolacaoDoLeadUnico } from "@/lib/leads/negocio-aberto-duplicado";
 import {
   recusaDeCamposObrigatorios,
   settingsDoFunil,
@@ -73,8 +74,13 @@ export function razaoDaPassagem(entrada: {
   return `Saiu ${de} (${como}) e entrou ${para}`;
 }
 
-/** O erro do banco (RAISE da 9053) na recusa de negócio equivalente. */
-function recusaDoBanco(mensagem: string): ResultadoDaTroca | null {
+/** O erro do banco (RAISE da 9053, índice da 9082) na recusa de negócio equivalente. */
+function recusaDoBanco(erro: { code?: string; message: string }): ResultadoDaTroca | null {
+  const mensagem = erro.message;
+  // O contato já tem negócio aberto no funil de destino.
+  if (ehViolacaoDoLeadUnico(erro)) {
+    return { ok: false, status: 409, code: RECUSA_DO_LEAD_UNICO.codigo, texto: RECUSA_DO_LEAD_UNICO.mensagem };
+  }
   if (mensagem.includes("pipeline_unchanged")) {
     return { ok: false, status: 422, code: "pipeline_unchanged", texto: "O negócio já está neste funil. Para trocar de etapa use /api/v1/leads/[id]/move." };
   }
@@ -159,7 +165,7 @@ export async function moverNegocioDeFunil(
     p_ator: ator,
   } as never);
   if (error) {
-    return recusaDoBanco(error.message) ?? { ok: false, status: 500, code: "internal_error", texto: error.message };
+    return recusaDoBanco(error) ?? { ok: false, status: 500, code: "internal_error", texto: error.message };
   }
   const lead = movido as unknown as Record<string, unknown>;
 
