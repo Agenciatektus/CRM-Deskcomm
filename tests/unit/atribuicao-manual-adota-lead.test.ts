@@ -1,5 +1,6 @@
 /**
- * ASSUMIR E TRANSFERIR LEVAM O LEAD JUNTO — só o lead aberto e sem dono.
+ * ASSUMIR E TRANSFERIR LEVAM O LEAD JUNTO — o lead aberto do contato vira de quem assumiu
+ * (ou do destino), mesmo que já tivesse outro dono.
  *
  * ## O buraco que este arquivo fecha
  *
@@ -12,8 +13,8 @@
  *
  * Mockar `adotarLeadsDoContato` provaria que a rota "chamou algo". O que importa
  * é o que chega ao banco: service role bypassa RLS, então o filtro de org tem
- * que vir da SESSÃO, e as condições `owner_user_id is null` /
- * `owner_agent_id is null` são o que separa "acompanhar" de "roubar a carteira".
+ * que vir da SESSÃO, e o filtro `or` (sem dono OU dono diferente do destino) mais
+ * `owner_agent_id: null` nos valores é o que faz "assumir = vira dono".
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";

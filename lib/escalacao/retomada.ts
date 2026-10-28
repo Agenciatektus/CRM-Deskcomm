@@ -58,6 +58,7 @@ import { audit } from "@/lib/audit";
 import { emitLeadActivity } from "@/lib/leads/activity-emitter";
 import { resolveActiveLeadForContact, type LeadCandidate } from "@/lib/leads/active-lead";
 import { logger } from "@/lib/logger";
+import { resolverAgenteDaConversa, type CandidatoDeAgente } from "@/lib/ai/agents/agente-da-conversa";
 import { autorizarContatoParaIA } from "@/lib/ai/elegibilidade/autorizacao";
 
 import { lerContinuidadeHumana, type ContinuidadeHumana } from "./continuidade";
@@ -121,6 +122,69 @@ interface ConversaRow {
   assigned_to_user_id: string | null;
   assignee_kind: string | null;
   bot_silenced_until: string | null;
+  channel_session_id?: string | null;
+  active_ai_agent_id?: string | null;
+}
+
+/**
+ * "Devolver a IA = a IA vira dono e responsável": os leads ABERTOS do contato passam
+ * ao agente que atende esta conversa (o da stickiness, ou o publicado para o canal).
+ * Sem agente identificável pelo canal, não mexe no lead. Best-effort: a devolução já
+ * aconteceu, então falha só loga. Troca dono humano também (user XOR agent no CHECK).
+ */
+async function entregarLeadsAoAgente(
+  supabase: SupabaseClient,
+  organizationId: string,
+  conv: ConversaRow,
+): Promise<void> {
+  if (conv.contact_id === null) return;
+  const logCtx = { organization_id: organizationId, contact_id: conv.contact_id };
+  try {
+    let versoes: string[] | null = null;
+    if (conv.channel_session_id) {
+      const { data, error } = await supabase
+        .from("ai_agent_versions")
+        .select("id")
+        .eq("organization_id", organizationId)
+        .eq("channel_session_id", conv.channel_session_id)
+        .eq("status", "published");
+      if (error) throw new Error(error.message);
+      versoes = (data ?? []).map((v) => v.id as string);
+    }
+    const { data: candidatos, error: agErr } = await supabase
+      .from("ai_agents")
+      .select("id, kind, is_active, paused_at, published_version_id, archived_at, priority, created_at")
+      .eq("organization_id", organizationId)
+      .is("archived_at", null);
+    if (agErr) throw new Error(agErr.message);
+    const { agente, motivo } = resolverAgenteDaConversa(
+      (candidatos ?? []) as unknown as CandidatoDeAgente[],
+      { active_ai_agent_id: conv.active_ai_agent_id ?? null, versoesPublicadasNaSessao: versoes },
+    );
+    // "único da organização" é fallback de legado sem canal: aqui exige vínculo real.
+    if (!agente || motivo === "unico_da_organizacao") {
+      logger.warn("[escalacao.retomada] sem agente publicado para o canal; lead mantém o dono", logCtx);
+      return;
+    }
+    const { error } = await supabase
+      .from("crm_leads")
+      .update({
+        owner_agent_id: agente.id,
+        owner_kind: "ai",
+        owner_user_id: null,
+        assigned_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("organization_id", organizationId)
+      .eq("contact_id", conv.contact_id)
+      .eq("status", "open");
+    if (error) logger.warn("[escalacao.retomada] lead não foi entregue ao agente", { ...logCtx, error: error.message });
+  } catch (err) {
+    logger.warn("[escalacao.retomada] entrega do lead ao agente lançou", {
+      ...logCtx,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
 
 export async function devolverAtendimentoAoAgente(
@@ -131,7 +195,9 @@ export async function devolverAtendimentoAoAgente(
 
   const { data: convData, error: convErr } = await supabase
     .from("conversations")
-    .select("id, contact_id, status, assigned_to_user_id, assignee_kind, bot_silenced_until")
+    .select(
+      "id, contact_id, status, assigned_to_user_id, assignee_kind, bot_silenced_until, channel_session_id, active_ai_agent_id",
+    )
     .eq("id", input.conversationId)
     .eq("organization_id", organizationId)
     .maybeSingle();
@@ -245,6 +311,8 @@ export async function devolverAtendimentoAoAgente(
       ? { ok: false, erro: "assignment_conflict", detalhe: updErr.message }
       : { ok: false, erro: "assignment_conflict" };
   }
+
+  await entregarLeadsAoAgente(supabase, organizationId, conv);
 
   // (3b) ELEGIBILIDADE: devolver o atendimento à IA é uma decisão humana
   // explícita — no gate `allowlist`, é ela que RE-AUTORIZA o contato. Sem isto,
