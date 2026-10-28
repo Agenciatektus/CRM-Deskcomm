@@ -15,6 +15,8 @@ export interface TextoDoAviso {
   readonly titulo: string;
   readonly corpo: string;
   readonly severidade: "info" | "warn" | "critical";
+  /** Linha pequena acima do título no e-mail; ausente = "Cobrança". */
+  readonly eyebrow?: string;
 }
 
 const FUSO_PADRAO = "America/Sao_Paulo";
@@ -47,6 +49,7 @@ export function textoDoAviso(
         titulo: comData("Seu teste grátis termina em {data}"),
         corpo: t("Assine em Plano e cobrança para continuar usando sem interrupção."),
         severidade: "info",
+        eyebrow: t("Teste grátis"),
       };
     case "venceu":
       return o.origem === "teste"
@@ -54,11 +57,13 @@ export function textoDoAviso(
             titulo: comData("Seu teste grátis acabou em {data}"),
             corpo: t("Assine em Plano e cobrança para continuar usando. Sem a assinatura, a conta é suspensa em alguns dias."),
             severidade: "warn",
+            eyebrow: t("Teste grátis"),
           }
         : {
             titulo: comData("Não identificamos o pagamento de {data}"),
             corpo: t("Se você pagou por boleto, aguarde a compensação (até 1 dia útil). Se ainda não pagou, use o link de pagamento."),
             severidade: "warn",
+            eyebrow: t("Pagamento"),
           };
     case "suspende_em_breve":
       // Três destinos, três frases (#2753): quem nunca pagou nada recebe a
@@ -73,6 +78,7 @@ export function textoDoAviso(
               : "A suspensão acontece se o pagamento não for confirmado até lá. Pague pelo link para evitar.",
         ),
         severidade: "critical",
+        eyebrow: t("Suspensão"),
       };
     case "suspensa":
       return {
@@ -83,12 +89,14 @@ export function textoDoAviso(
             : "A empresa volta a funcionar sozinha, na hora, assim que o pagamento for confirmado.",
         ),
         severidade: "critical",
+        eyebrow: t("Suspensão"),
       };
     case "liberada":
       return {
         titulo: t("Sua conta foi liberada"),
         corpo: t("Recebemos o pagamento e tudo voltou a funcionar. As conversas que chegaram durante a suspensão estão na Central, para revisão."),
         severidade: "info",
+        eyebrow: t("Reativação"),
       };
   }
 }

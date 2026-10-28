@@ -106,6 +106,7 @@ export async function enviarAvisoAosAdmins(
     const email = buildEmailDaCobranca({
       titulo: texto.titulo,
       corpo: texto.corpo,
+      eyebrow: texto.eyebrow,
       marca,
       idioma: org.idioma,
       botao: linkDePagamento
@@ -122,7 +123,7 @@ export async function enviarAvisoAosAdmins(
 /** Aviso livre aos donos da instalação (platform admins de acesso total). Melhor esforço: nunca lança. */
 export async function avisarDonosDaInstalacao(
   admin: SupabaseClient,
-  o: { titulo: string; corpo: string; botao: { rotulo: string; href: string } | null },
+  o: { titulo: string; corpo: string; botao: { rotulo: string; href: string } | null; eyebrow?: string },
 ): Promise<void> {
   try {
     const { data, error } = await admin.from("platform_admins").select("user_id").eq("scope", "full").is("revoked_at", null);
@@ -155,6 +156,7 @@ export async function avisarTrocaDeChave(admin: SupabaseClient, o: { antigo: str
       : `A chave de cobrança da instalação foi conectada (…${o.novo})`;
     const email = buildEmailDaCobranca({
       titulo,
+      eyebrow: "Segurança da cobrança",
       corpo: "Se não foi você, entre em Admin › Cobrança › Conexão e conecte a chave certa agora.",
       marca,
       idioma: "pt-BR",

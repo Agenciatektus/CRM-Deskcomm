@@ -18117,6 +18117,12 @@ export const DICIONARIO: Traducoes = {
   "Desconectar a Meta?": { es: "¿Desconectar Meta?" },
   "Desconectar apaga o token guardado. A tela de Meta Ads volta a pedir uma conexão, e nenhum dado histórico é perdido, nada é armazenado aqui.": { es: "Desconectar borra el token guardado. La pantalla de Meta Ads vuelve a pedir una conexión y no se pierde ningún dato histórico, aquí no se almacena nada." },
   "O sistema lê o desempenho das campanhas e mostra em Análise, Meta Ads. Só leitura: nada é criado, pausado ou alterado na conta de anúncios.": { es: "El sistema lee el rendimiento de las campañas y lo muestra en Análisis, Meta Ads. Solo lectura: no se crea, pausa ni cambia nada en la cuenta de anuncios." },
+  "Suspensão": { es: "Suspensión" },
+  "Reativação": { es: "Reactivación" },
+  "Se o botão não abrir, copie este link no navegador:": { es: "Si el botón no abre, copia este enlace en el navegador:" },
+  "Ou use o código": { es: "O usa el código" },
+  "O que acontece agora": { es: "Qué pasa ahora" },
+  "Atendimento, funil e agentes de IA no WhatsApp": { es: "Atención, embudo y agentes de IA en WhatsApp" },
 };
 
 /**

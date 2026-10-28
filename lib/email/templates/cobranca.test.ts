@@ -9,7 +9,7 @@ const MARCA: MarcaDeSaida = {
 };
 
 describe("e-mail da cobrança", () => {
-  it("⭐ título no assunto, texto escapado e o botão que paga", () => {
+  it("⭐ título no assunto com 'no {marca}', texto escapado e o botão que paga", () => {
     const e = buildEmailDaCobranca({
       titulo: "Não identificamos o pagamento de 05/10",
       corpo: "Pague <já>",
@@ -18,15 +18,22 @@ describe("e-mail da cobrança", () => {
       rodape: "Você recebe este aviso porque administra esta empresa.",
       idioma: "pt-BR",
     });
-    expect(e.subject).toBe("Não identificamos o pagamento de 05/10 — Revenda <Teste>");
+    expect(e.subject).toBe("Não identificamos o pagamento de 05/10 no Revenda <Teste>");
     expect(e.html).toContain("Pague &lt;já&gt;");
     expect(e.html).toContain('href="https://invoice.stripe.com/i/abc"');
-    expect(e.html).not.toContain("<img");
+    expect(e.html).toContain(">Cobrança<");
     expect(e.text).toContain("https://invoice.stripe.com/i/abc");
+    expect(e.subject + e.html + e.text).not.toMatch(/[—–·]/);
   });
 
-  it("sem botão, só o texto", () => {
+  it("eyebrow própria e aviso entram quando informados", () => {
+    const e = buildEmailDaCobranca({ titulo: "t", corpo: "c", marca: MARCA, botao: null, rodape: "r", idioma: "pt-BR", eyebrow: "Suspensão", aviso: "Pague até sexta." });
+    expect(e.html).toContain(">Suspensão<");
+    expect(e.text).toContain("Atenção: Pague até sexta.");
+  });
+
+  it("sem botão, nenhum link no corpo", () => {
     const e = buildEmailDaCobranca({ titulo: "t", corpo: "c", marca: MARCA, botao: null, rodape: "r", idioma: "pt-BR" });
-    expect(e.html).not.toContain("<a ");
+    expect(e.html).not.toContain("Se o botão não abrir");
   });
 });
