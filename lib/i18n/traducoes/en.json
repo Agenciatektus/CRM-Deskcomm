@@ -9252,5 +9252,10 @@
   "Buscar por nome ou id": "Search by name or id",
   "marcadas": "selected",
   "Primeira conta ativa": "First active account",
-  "Para liberar outras contas, peça a quem conectou a Meta ou ao suporte": "To release other accounts, ask whoever connected Meta or support"
+  "Para liberar outras contas, peça a quem conectou a Meta ou ao suporte": "To release other accounts, ask whoever connected Meta or support",
+  "Também no público": "Also in the audience",
+  "contatos incluídos": "contacts included",
+  "excluídos à mão": "manually excluded",
+  "funis": "pipelines",
+  "etapas": "stages"
 }
