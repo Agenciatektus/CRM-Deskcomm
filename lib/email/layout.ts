@@ -109,7 +109,6 @@ export function montarEmail(e: EntradaEmail): { html: string; text: string } {
 <meta name="color-scheme" content="dark">
 <meta name="supported-color-schemes" content="dark">
 <title>${escapeHtml(e.assunto)}</title>
-<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
 body{margin:0;padding:0;background:${T.fundo}}
 .pre{display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;max-height:0;max-width:0;overflow:hidden;font-size:1px;line-height:1px;mso-hide:all}
