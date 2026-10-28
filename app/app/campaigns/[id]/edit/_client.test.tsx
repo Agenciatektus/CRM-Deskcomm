@@ -69,14 +69,21 @@ vi.mock("@/hooks/campanhas/useDestinoDaCampanha", () => ({
   useAgentesPublicados: () => ({ data: [], isLoading: false }),
 }));
 
+const FILTRO_PADRAO = { ...(CAMPANHA.audience_filter as Record<string, unknown>) };
+
+// Reset global: um teste que troca a campanha lida ou o filtro não vaza para os outros.
+beforeEach(() => {
+  salvar.mockClear();
+  lida.data = CAMPANHA;
+  CAMPANHA.audience_filter = { ...FILTRO_PADRAO };
+});
+
 const AVISO = /bateu o teto de 20\.000 negócios desta prévia/;
 
 describe("prévia da edição de campanha: o aviso do teto de 20.000", () => {
   beforeEach(() => {
     previa.data.truncado = false;
     previa.isPending = false;
-    salvar.mockClear();
-    lida.data = CAMPANHA;
   });
 
   it("recorte truncado: a edição mostra o aviso", async () => {
@@ -111,7 +118,6 @@ describe("prévia da edição de campanha: o aviso do teto de 20.000", () => {
     const tag = await screen.findByDisplayValue("vip");
     fireEvent.change(tag, { target: { value: "" } });
     // outro critério mantém o Salvar habilitado sem a tag
-    fireEvent.change(screen.getByLabelText("Sem falar com a gente há (dias)"), { target: { value: "30" } });
     fireEvent.change(screen.getByLabelText("Sem falar com a gente há (dias)"), { target: { value: "30" } });
     fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
     await waitFor(() => expect(salvar).toHaveBeenCalledTimes(1));
