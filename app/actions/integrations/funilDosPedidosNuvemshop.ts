@@ -15,10 +15,10 @@ export type FunilDosPedidosResult =
   | { ok: false; error: "auth_required" | "no_active_org" | "forbidden" | "invalid_pipeline" | "db_error" };
 
 async function executar(
+  user: Awaited<ReturnType<typeof loadAuthUser>>,
   escolher: (admin: ReturnType<typeof createAdminClient>, orgId: string) => Promise<string>,
   criaFunil = false,
 ): Promise<FunilDosPedidosResult> {
-  const user = await loadAuthUser();
   if (!user) return { ok: false, error: "auth_required" };
   if (supportWriteError(user.support)) return { ok: false, error: "forbidden" };
   const activeOrg = await resolveActiveOrg(user);
@@ -49,6 +49,12 @@ async function executar(
   return { ok: true };
 }
 
-export const escolherFunilDosPedidos = (pipelineId: string) => executar(async () => pipelineId);
+export async function escolherFunilDosPedidos(pipelineId: string): Promise<FunilDosPedidosResult> {
+  const user = await loadAuthUser();
+  return executar(user, async () => pipelineId);
+}
 
-export const criarFunilDosPedidos = () => executar((admin, orgId) => criarFunilPadrao(admin, orgId), true);
+export async function criarFunilDosPedidos(): Promise<FunilDosPedidosResult> {
+  const user = await loadAuthUser();
+  return executar(user, (admin, orgId) => criarFunilPadrao(admin, orgId), true);
+}
