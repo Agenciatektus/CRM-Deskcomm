@@ -25,6 +25,7 @@ import { canalDesativado } from '@/lib/channels/desativado';
 import { TIPOS_DERIVAVEIS, DERIVACAO_TERMINADA } from '@/lib/messaging/media/derivable';
 import { haQuemAtendaASessao } from '@/lib/ai/agents/quem-atende-a-sessao';
 import { decidirElegibilidadeDaConversa } from '@/lib/ai/elegibilidade/consulta-pg';
+import { conversaEmLacoComRobo } from '@/lib/ai/elegibilidade/consulta-laco';
 import { passarConversaDaCadenciaParaHumano } from '@/lib/cadencia/conducao/turno';
 import { deveCederTurnoAoRetorno } from '@/lib/followup/ceder-turno-ao-retorno';
 import { mensagemPedeResposta, SQL_MENSAGEM_PEDE_RESPOSTA } from '@/lib/ai/elegibilidade/mensagem-respondivel';
@@ -539,6 +540,18 @@ async function processEvent(
         conversation_id: p.conversation_id,
         motivo: elegib.motivo,
       });
+      return 'processado';
+    }
+    // Freio de laço com robô (URA/autoresposta): não enfileira e silencia a conversa.
+    if (
+      !canAssist &&
+      (elegib === null || elegib.permite) &&
+      (await conversaEmLacoComRobo(
+        pool,
+        { organizationId: event.organization_id, conversationId: p.conversation_id, agora: new Date() },
+        log,
+      ))
+    ) {
       return 'processado';
     }
   } catch (err) {
