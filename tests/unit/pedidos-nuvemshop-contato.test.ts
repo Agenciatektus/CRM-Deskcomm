@@ -28,6 +28,7 @@ function fakeAdmin() {
       const q = {
         select: () => q,
         limit: () => q,
+        order: () => q,
         match: (c: Record<string, string>) => ((chave = c), q),
         eq: (k: string, v: unknown) => (f.push((l) => l[k] === v), q),
         is: (k: string, v: unknown) => (f.push((l) => (l[k] ?? null) === v), q),

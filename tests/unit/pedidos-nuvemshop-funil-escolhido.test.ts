@@ -20,6 +20,8 @@ function fakeAdmin() {
       const lista = () => rows().filter((l) => f.every((p) => p(l)));
       const executa = () => {
         if (modo === "insert") {
+          // O PostgREST recusa objeto em coluna text[] (crm_pipelines.fontes): o dublê também.
+          if (tabela === "crm_pipelines" && !Array.isArray((valor as Linha).fontes)) return { data: null, error: { code: "22P02" } };
           if (tabela === "crm_stages" && falhaEtapas) return { data: null, error: { code: "x" } };
           const novos = ([] as Linha[]).concat(valor).map((v) => ({ id: `id${++n}`, is_archived: false, ...v }));
           rows().push(...novos);
@@ -35,6 +37,7 @@ function fakeAdmin() {
         update: (v: Linha) => ((modo = "update"), (valor = v), q),
         delete: () => ((modo = "delete"), q),
         limit: () => q,
+        order: () => q,
         eq: (k: string, v: unknown) => (f.push((l) => l[k] === v), q),
         in: (k: string, v: unknown[]) => (f.push((l) => v.includes(l[k])), q),
         maybeSingle: async () => ({ data: lista()[0] ?? null, error: null }),

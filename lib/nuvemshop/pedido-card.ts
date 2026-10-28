@@ -86,6 +86,8 @@ async function sincronizar(
       .select("id")
       .eq("organization_id", organizationId)
       .eq("name", FUNIL_DE_PEDIDOS)
+      .eq("is_archived", false)
+      .order("created_at", { ascending: true })
       .limit(1);
     funilId = (funis as Array<{ id: string }> | null)?.[0]?.id;
   }

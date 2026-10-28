@@ -59,7 +59,7 @@ export async function criarFunilPadrao(admin: SupabaseClient, organizationId: st
         won: "Pago", deal: "Pedido", lead: "Cliente", lost: "Cancelado", stage: "Etapa",
         deal_plural: "Pedidos", lead_plural: "Clientes", stage_plural: "Etapas",
       },
-      fontes: {},
+      fontes: [], // text[] NOT NULL: objeto vazio o PostgREST recusa; [] = sem canal de entrada
       is_default: false,
     })
     .select("id")
