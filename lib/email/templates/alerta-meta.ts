@@ -4,6 +4,7 @@
  */
 import { montarEmail } from "@/lib/email/layout";
 import type { MarcaDeSaida } from "@/lib/branding/saida";
+import type { Idioma } from "@/lib/i18n/idiomas";
 
 export interface EmailDoAlertaMeta {
   titulo: string;
@@ -11,6 +12,7 @@ export interface EmailDoAlertaMeta {
   marca: MarcaDeSaida;
   botao: { rotulo: string; href: string };
   rodape: string;
+  idioma?: Idioma;
 }
 
 export function buildEmailDoAlertaMeta(o: EmailDoAlertaMeta): { subject: string; html: string; text: string } {
@@ -22,6 +24,7 @@ export function buildEmailDoAlertaMeta(o: EmailDoAlertaMeta): { subject: string;
     paragrafos: [o.corpo],
     botao: o.botao,
     rodape: [o.rodape],
+    idioma: o.idioma,
   });
   return { subject, html, text };
 }
