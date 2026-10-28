@@ -34,7 +34,7 @@ import { Escolha } from "@/components/ui/escolha";
 import { useCampanha, useEditarCampanha, usePreviaDaAudiencia } from "@/hooks/campanhas/useCampanhas";
 import { channelLabel, useChannelSessions } from "@/hooks/channels/useChannelSessions";
 import { useT } from "@/hooks/i18n/useT";
-import { limparFiltroSalvo } from "@/lib/campanhas/audiencia";
+import { filtroDeAudienciaSchema, limparFiltroSalvo } from "@/lib/campanhas/audiencia";
 import {
   COMPRA_VAZIA,
   CamposDeCompraDoFiltro,
@@ -153,11 +153,19 @@ export function EditarCampanha({ id }: { id: string }) {
     [campanha.data?.audience_filter, editados],
   );
 
-  const temCriterio =
-    filtro.com_alguma_tag.length > 0 ||
-    filtro.sem_tags.length > 0 ||
-    filtro.sem_interacao_ha_dias !== null ||
-    temCriterioDeCompra(criteriosDeCompra(compra));
+  // Mesmo critério do servidor (o refine do schema): conta também funis, etapas e
+  // contatos incluídos do filtro salvo, que a tela não edita mas preserva.
+  const temCriterio = filtroDeAudienciaSchema.safeParse(filtro).success;
+  const salvo = limparFiltroSalvo(campanha.data?.audience_filter);
+  const preservados = [
+    [t("contatos incluídos"), listaDoSalvo(salvo.incluir_contatos)],
+    [t("funis"), listaDoSalvo(salvo.funis)],
+    [t("etapas"), listaDoSalvo(salvo.etapas)],
+    [t("excluídos à mão"), listaDoSalvo(salvo.excluir_contatos)],
+  ]
+    .filter(([, n]) => (n as number) > 0)
+    .map(([nome, n]) => `${nome as string}: ${n as number}`)
+    .join(", ");
 
   if (campanha.isLoading || !carregado) {
     return (
@@ -331,8 +339,13 @@ export function EditarCampanha({ id }: { id: string }) {
             />
           </div>
         </div>
+        {preservados !== "" && (
+          <p className="text-xs text-muted-foreground">
+            {t("Também no público")}: {preservados}
+          </p>
+        )}
         <div className="flex flex-wrap items-center gap-3">
-          <Button
+        <Button
             type="button"
             variant="outline"
             disabled={!temCriterio || previa.isPending}
@@ -505,4 +518,8 @@ function listar(bruto: string): string[] {
 
 function juntar(valor: unknown): string {
   return Array.isArray(valor) ? valor.filter((v) => typeof v === "string").join(", ") : "";
+}
+
+function listaDoSalvo(v: unknown): number {
+  return Array.isArray(v) ? v.length : 0;
 }

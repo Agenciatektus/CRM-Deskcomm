@@ -178,3 +178,29 @@ describe("edição: chave desconhecida no filtro salvo (#405)", () => {
     expect(enviado).toMatchObject({ com_alguma_tag: ["vip"] });
   });
 });
+
+describe("edição: público só com contatos incluídos ou funis (#403)", () => {
+  it("abre com os botões habilitados e lista o que preserva", async () => {
+    CAMPANHA.audience_filter = { limite: 100, incluir_contatos: [U(3), U(5)], funis: [U(1)], excluir_contatos: [U(4)] };
+    render(<EditarCampanha id="c1" />);
+    await screen.findByDisplayValue("Reativação de clientes parados");
+    expect(screen.getByRole("button", { name: "Salvar alterações" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Ver quantas pessoas" })).toBeEnabled();
+    expect(screen.getByText(/contatos incluídos: 2, funis: 1, excluídos à mão: 1/)).toBeInTheDocument();
+  });
+
+  it("só funil (sem contatos) também habilita", async () => {
+    CAMPANHA.audience_filter = { limite: 100, funis: [U(1)] };
+    render(<EditarCampanha id="c1" />);
+    await screen.findByDisplayValue("Reativação de clientes parados");
+    expect(screen.getByRole("button", { name: "Salvar alterações" })).toBeEnabled();
+  });
+
+  it("sem critério nenhum segue travado", async () => {
+    CAMPANHA.audience_filter = { limite: 100 };
+    render(<EditarCampanha id="c1" />);
+    await screen.findByDisplayValue("Reativação de clientes parados");
+    expect(screen.getByRole("button", { name: "Salvar alterações" })).toBeDisabled();
+  });
+});
+
