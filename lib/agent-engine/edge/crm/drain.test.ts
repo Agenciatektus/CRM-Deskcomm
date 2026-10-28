@@ -311,12 +311,30 @@ function poolElegibilidade(
     forceHuman?: boolean;
     assigneeKind?: string | null;
     orgStatus?: string | null;
+    laco?: boolean;
   } = {},
 ) {
   const inboundId = '44444444-4444-4444-8444-444444444444';
   const query = vi.fn().mockImplementation((sql: string) => {
     calls.push(sql);
     if (sql.includes('returning e.id')) return { rows: [{ ...event, created_at: new Date().toISOString() }] };
+    if (sql.includes('sent_via')) {
+      const now = Date.now();
+      const linha = (direction: string, body: string, i: number) => ({
+        direction,
+        body,
+        sent_at: new Date(now - i * 1000),
+        sent_via: direction === 'outbound' ? 'ai' : null,
+      });
+      return {
+        rows: opts.laco
+          ? [
+              ...Array.from({ length: 16 }, (_, i) => linha('outbound', `r${i}`, i)),
+              ...Array.from({ length: 12 }, (_, i) => linha('inbound', `c${i}`, i)),
+            ]
+          : [linha('inbound', 'oi', 0)],
+      };
+    }
     if (sql.includes('ai_dispatch_mode')) return { rows: [{ mode: null, status: 'active' }] };
     if (sql.includes('is_group')) return { rows: [{ is_group: false }] };
     if (sql.includes('tem_agente')) return { rows: [{ tem_agente: true, tem_roteador: false }] };
@@ -354,6 +372,18 @@ it('evento superado por inbound mais recente: turno pulado, sem job, sem gasto',
   expect(calls.some((s) => s.includes("direction = 'inbound'"))).toBe(true);
   expect(calls.some((s) => s.includes('job_queue'))).toBe(false);
   expect(calls.some((s) => s.includes("status = 'done'"))).toBe(true);
+});
+
+it('laço com robô: não enfileira e silencia a conversa; conversa normal enfileira', async () => {
+  const calls: string[] = [];
+  await drainTick(poolElegibilidade(calls, { laco: true }), knobs, log);
+  expect(calls.some((s) => s.includes('job_queue'))).toBe(false);
+  expect(calls.some((s) => s.includes("bot_silenced_until = 'infinity'"))).toBe(true);
+
+  const normal: string[] = [];
+  await drainTick(poolElegibilidade(normal), knobs, log);
+  expect(normal.some((s) => s.includes('job_queue'))).toBe(true);
+  expect(normal.some((s) => s.includes("bot_silenced_until = 'infinity'"))).toBe(false);
 });
 
 it('gate: organização não operante na leitura de elegibilidade → turno pulado, sem job', async () => {

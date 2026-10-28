@@ -237,6 +237,7 @@ import { perguntarUrgenciaAoJev, registrarUrgenciaDoJev } from '@/lib/ai/decisao
 import { fusoDaOrganizacao } from './fuso-da-org';
 import { renderAgora } from '@/lib/tempo/agora';
 import { decidirElegibilidadeDaConversa } from '@/lib/ai/elegibilidade/consulta-pg';
+import { conversaEmLacoComRobo } from '@/lib/ai/elegibilidade/consulta-laco';
 import { MAX_TURNOS_POR_CONDUCAO } from '@/lib/cadencia/conducao/settings';
 import { filtrarRawTools } from '@/lib/cadencia/conducao/presets';
 import { restringirAConducao } from '@/lib/cadencia/conducao/ferramentas';
@@ -2026,6 +2027,17 @@ async function executarTurnoDoAgente(
           kind: liveJob().kind,
           motivo: elegib.motivo,
         });
+        return;
+      }
+      // Freio de laço com robô (URA/autoresposta): não roda o turno e silencia a conversa.
+      if (
+        await conversaEmLacoComRobo(
+          pool,
+          { organizationId: tenantId, conversationId: input.conversationId, agora: clock() },
+          runLog,
+        )
+      ) {
+        runLog.info('turno pulado — laço com robô', { kind: liveJob().kind });
         return;
       }
       // KEEP-ALIVE: enquanto a conversa autorizada está viva, renova o carimbo —
