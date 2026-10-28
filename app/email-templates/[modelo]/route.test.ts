@@ -42,7 +42,7 @@ describe("GET /email-templates/[modelo]", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("text/html");
     const corpo = await res.text();
-    expect(corpo).toContain("{{ .RedirectTo }}&token_hash={{ .TokenHash }}");
+    expect(corpo).toContain("{{ .RedirectTo }}&amp;token_hash={{ .TokenHash }}");
     expect(corpo).toContain("Acme");
   });
 

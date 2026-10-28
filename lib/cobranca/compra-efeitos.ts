@@ -89,6 +89,7 @@ export function efeitosDaCompra(admin: SupabaseClient): Pick<DependenciasDaCompr
           inviterId: ator.id,
           inviterName: ator.nome,
           requestId: `compra-${compra.id}`,
+          origem: "compra",
         });
       }
 

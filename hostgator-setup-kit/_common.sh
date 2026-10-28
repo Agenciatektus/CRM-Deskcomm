@@ -564,9 +564,10 @@ gravar_modelos_do_gotrue() {  # gravar_modelos_do_gotrue <.env do Supabase> <htt
   [ -f "$env_sb" ] || return 0
   case "$base" in https://?*|"$BASE_INTERNA_DO_APP") base="${base%/}" ;; *) return 0 ;; esac
   site="$(valor_do_env "$env_sb" SITE_URL)"; site="${site%/}"
-  for chave in GOTRUE_MAILER_TEMPLATES_CONFIRMATION GOTRUE_MAILER_TEMPLATES_RECOVERY; do
+  for chave in GOTRUE_MAILER_TEMPLATES_CONFIRMATION GOTRUE_MAILER_TEMPLATES_RECOVERY GOTRUE_MAILER_TEMPLATES_EMAIL_CHANGE; do
     case "$chave" in
       *CONFIRMATION) caminho=/email-templates/confirmation ;;
+      *EMAIL_CHANGE) caminho=/email-templates/email_change ;;
       *) caminho=/email-templates/recovery ;;
     esac
     atual="$(valor_do_env "$env_sb" "$chave")"
