@@ -16,7 +16,7 @@ import {
   WebhooksLogo,
 } from "@/lib/ui/icons";
 
-import { ACTION_LABELS, type ActionType } from "../../../_components/labels";
+import { ACTION_LABELS, type ActionType } from "@/app/app/webhooks/_components/labels";
 
 /**
  * A cara de cada caixa do designer — o MESMO vocabulário visual do construtor
