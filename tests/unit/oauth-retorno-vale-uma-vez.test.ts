@@ -53,6 +53,8 @@ vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
     rpc: async () => ({ data: "\\x00", error: null }),
     from: (tabela: string) => ({
+      // leitura do store_metadata (preserva o funil dos pedidos na reconexão)
+      select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }),
       insert: async (linha: { nonce: string }) => {
         if (tabela !== "calendar_oauth_nonces") return { error: null };
         if (fake.nonces.has(linha.nonce)) return { error: { code: "23505", message: "duplicate key" } };
