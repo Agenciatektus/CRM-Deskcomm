@@ -13,11 +13,12 @@
  */
 import { registerAction } from "@/lib/automation/actions";
 import type { ActionCtx, ActionResultDetail } from "@/lib/automation/types";
+import { acompanharDonoNaConversa } from "@/lib/leads/acompanhar-dono-na-conversa";
 import { resolveOwnerPatch } from "@/lib/leads/owner-patch";
 
 async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise<ActionResultDetail> {
   const userId = typeof config.user_id === "string" ? config.user_id : null;
-  const lead = ctx.context.lead as { id: string } | undefined;
+  const lead = ctx.context.lead as { id: string; contact_id?: string | null } | undefined;
   if (!userId || !lead) return { type: "assign_owner", status: "skipped", detail: { reason: "missing_input" } };
 
   const { data: member, error: erroDaConsulta } = await ctx.admin
@@ -60,6 +61,12 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
     .eq("id", lead.id)
     .eq("organization_id", ctx.organizationId);
   if (error) return { type: "assign_owner", status: "failed", error: error.message };
+  const contactId = lead.contact_id;
+  await acompanharDonoNaConversa(ctx.admin, {
+    organizationId: ctx.organizationId,
+    contactIds: [contactId],
+    novoDonoUserId: userId,
+  });
   return { type: "assign_owner", status: "success", detail: { user_id: userId } };
 }
 

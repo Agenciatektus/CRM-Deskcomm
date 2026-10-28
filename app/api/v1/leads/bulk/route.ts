@@ -15,6 +15,7 @@ import { audit, isServiceRoleConfigured } from "@/lib/audit";
 import { ApiError } from "@/lib/api/types";
 import { ok, fail } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
+import { acompanharDonoNaConversa } from "@/lib/leads/acompanhar-dono-na-conversa";
 import { resolveOwnerPatch } from "@/lib/leads/owner-patch";
 import { emitLeadActivity, stageChangeReason } from "@/lib/leads/activity-emitter";
 import { registraFalhaDeAtividade } from "@/lib/leads/activity-write-failure";
@@ -502,6 +503,11 @@ export async function POST(req: NextRequest): Promise<Response> {
         .select("id");
       if (error) return fail("internal_error", error.message, 500, { requestId });
       updatedCount = data?.length ?? 0;
+      await acompanharDonoNaConversa(supabase, {
+        organizationId,
+        contactIds: visible.map((l) => l.contact_id),
+        novoDonoUserId: owner.patch.owner_user_id,
+      });
       break;
     }
     case "tag": {
