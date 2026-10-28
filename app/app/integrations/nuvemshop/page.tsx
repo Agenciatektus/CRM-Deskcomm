@@ -18,6 +18,8 @@ import { loadAuthUser, resolveActiveOrg } from "@/lib/auth/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isConfigured } from "@/lib/nuvemshop/config";
 import { ConnectButton, DisconnectButton } from "./_components/ConnectButton";
+import { FunilDosPedidos } from "./_components/FunilDosPedidos";
+import { funisCompativeis } from "@/lib/nuvemshop/funil-de-pedidos";
 import { StatusToast } from "./_components/StatusToast";
 import { Suspense } from "react";
 import { tagDeIdioma } from "@/lib/i18n/datas";
@@ -28,7 +30,7 @@ interface IntegrationRow {
   id: string;
   status: string;
   scopes: string[];
-  store_metadata: { store_id?: string } | null;
+  store_metadata: { store_id?: string; pedidos_pipeline_id?: string } | null;
   webhook_subscriptions: Record<string, { id: number | null; error?: string }> | null;
   last_sync_at: string | null;
 }
@@ -52,6 +54,10 @@ export default async function NuvemshopIntegrationPage() {
 
   const integration =
     activeOrg && configured ? await loadIntegration(activeOrg.orgId) : null;
+
+  const conectado = !!integration && integration.status !== "disconnected";
+  const funis = conectado && activeOrg ? await funisCompativeis(createAdminClient(), activeOrg.orgId) : [];
+  const funilEscolhido = funis.find((f) => f.id === integration?.store_metadata?.pedidos_pipeline_id) ?? null;
 
   const isAdmin = activeOrg?.role === "admin" || (user?.is_platform_admin === true && !user.support);
 
@@ -159,6 +165,22 @@ export default async function NuvemshopIntegrationPage() {
           </CardContent>
         </Card>
       )}
+
+      {conectado ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>{traduzir("Funil dos pedidos", idioma)}</CardTitle>
+            <CardDescription>
+              {funilEscolhido
+                ? `${traduzir("Os pedidos viram cards em", idioma)} ${funilEscolhido.name}.`
+                : traduzir("Pedidos ainda não viram cards. Escolha um funil com as 6 etapas de pedido ou crie o padrão.", idioma)}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <FunilDosPedidos funis={funis} escolhidoId={funilEscolhido?.id ?? null} disabled={!isAdmin} />
+          </CardContent>
+        </Card>
+      ) : null}
       </SecaoDaPagina>
     </Pagina>
   );

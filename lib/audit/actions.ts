@@ -41,6 +41,7 @@ export const AUDIT_ACTIONS = [
   "auth.recovery_code_used",
   "nuvemshop.connected",
   "nuvemshop.disconnected",
+  "nuvemshop.pedidos_pipeline_set",
   "nuvemshop.oauth_failed",
   "nuvemshop.webhook_received",
   "nuvemshop.webhook_invalid_signature",

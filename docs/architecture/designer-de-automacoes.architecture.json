@@ -35,7 +35,7 @@
       "lane": "humano",
       "col": 2,
       "type": "frontend",
-      "label": "/app/webhooks/automacoes/[id]",
+      "label": "/app/automacoes/[id]",
       "sublabel": "canvas do construtor de follow-up · manager+ · id ou nova"
     },
     {

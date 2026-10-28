@@ -6122,6 +6122,12 @@ export const DICIONARIO: Traducoes = {
   "Receber dados": { es: "Recibir datos" },
   "Leads recebidos": { es: "Leads recibidos" },
   Automações: { es: "Automatizaciones" },
+  "Regras que agem sozinhas quando algo acontece no CRM: lead que muda de etapa, tag, mensagem, tempo parado.": {
+    es: "Reglas que actúan solas cuando algo pasa en el CRM: lead que cambia de etapa, etiqueta, mensaje, tiempo detenido.",
+  },
+  "Regras que agem sozinhas quando algo acontece: lead que muda de etapa, tag, mensagem, tempo parado.": {
+    es: "Reglas que actúan solas cuando algo pasa: lead que cambia de etapa, etiqueta, mensaje, tiempo detenido.",
+  },
   Atividade: { es: "Actividad" },
   Funil: { es: "Embudo" },
   "Escolha o funil": { es: "Elige el embudo" },
@@ -6273,7 +6279,7 @@ export const DICIONARIO: Traducoes = {
   },
   "Salvar alterações": { es: "Guardar cambios" },
   "Criar automação": { es: "Crear automatización" },
-  // Designer de automações (fase 1): app/app/webhooks/automacoes/[id].
+  // Designer de automações (fase 1): app/app/automacoes/[id].
   "Escolha o funil e a etapa": { es: "Elige el embudo y la etapa" },
   "Escolha o fluxo de follow-up": { es: "Elige el flujo de seguimiento" },
   "Escolha o plano de tarefas": { es: "Elige el plan de tareas" },
@@ -6804,6 +6810,17 @@ export const DICIONARIO: Traducoes = {
   "Sincroniza pedidos, produtos e clientes via OAuth + webhooks.": {
     es: "Sincroniza pedidos, productos y clientes vía OAuth + webhooks.",
   },
+  "Funil dos pedidos": { es: "Embudo de pedidos" },
+  "Funil dos pedidos salvo.": { es: "Embudo de pedidos guardado." },
+  "Escolha um funil": { es: "Elige un embudo" },
+  "Criar funil padrão": { es: "Crear embudo estándar" },
+  "Os pedidos viram cards em": { es: "Los pedidos se vuelven tarjetas en" },
+  "Pedidos ainda não viram cards. Escolha um funil com as 6 etapas de pedido ou crie o padrão.": {
+    es: "Los pedidos aún no se vuelven tarjetas. Elige un embudo con las 6 etapas de pedido o crea el estándar.",
+  },
+  "Apenas admins podem mudar o funil dos pedidos.": { es: "Solo los administradores pueden cambiar el embudo de pedidos." },
+  "Esse funil não tem as 6 etapas de pedido.": { es: "Ese embudo no tiene las 6 etapas de pedido." },
+  "Falha de banco ao salvar o funil.": { es: "Error de base de datos al guardar el embudo." },
   "Integração não configurada": { es: "Integración no configurada" },
   Configure: { es: "Configura" },
   e: { es: "y" },
@@ -15650,6 +15667,11 @@ export const DICIONARIO: Traducoes = {
     es: "personas? El envío sigue el ritmo del número y puede llevar horas.",
   },
   "podem receber": { es: "pueden recibir" },
+  "Também no público": { es: "También en el público" },
+  "contatos incluídos": { es: "contactos incluidos" },
+  "excluídos à mão": { es: "excluidos a mano" },
+  "funis": { es: "embudos" },
+  "etapas": { es: "etapas" },
   "O recorte bateu o teto de 20.000 negócios desta prévia — a lista pode estar incompleta. Refine o filtro para ver o todo.": { es: "El recorte alcanzó el techo de 20.000 negocios de esta vista previa — la lista puede estar incompleta. Ajusta el filtro para ver el total." },
   "Preparar lista": { es: "Preparar lista" },
   "Progresso do envio": { es: "Progreso del envío" },
