@@ -55,7 +55,9 @@ function bancoFalso() {
     idempotency_keys: Linha[];
     user_organizations: Linha[];
     api_tokens: Linha[];
+    organizations: Linha[];
   } = {
+    organizations: [],
     idempotency_keys: [],
     user_organizations: [
       { user_id: PESSOA, organization_id: ORG_ID, role: "agent", revoked_at: null },
@@ -397,5 +399,40 @@ describe("POST /api/v1/messages — ritmo por token", () => {
       codigo_plataforma: "131047",
     });
     expect(mockedRegistrar).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/v1/messages — responder sem assumir", () => {
+  // Regra do Peterson: responder sem assumir não vira dono nem responsável. A conversa
+  // só é assumida com a flag da org ligada.
+  for (const [nome, settings] of [
+    ["flag false", { routing: { conversation_stays_with_attendant: false } }],
+    ["flag ausente", {}],
+  ] as const) {
+    it(`pela sessão, com ${nome}, NÃO chama fn_conversation_assign nem mexe no lead`, async () => {
+      autenticado("session");
+      banco.tabelas.organizations.push({ id: ORG_ID, settings });
+      const rpc = vi.fn(async () => ({ data: [{}], error: null }));
+      (banco.supabase as unknown as { rpc: unknown }).rpc = rpc;
+      mockedSend.mockResolvedValue({ id: "m1", status: "sent", conversation_id: CONVERSATION_ID } as never);
+
+      const res = await POST(pedido());
+
+      expect(res.status).toBeLessThan(300);
+      expect(mockedSend).toHaveBeenCalledTimes(1);
+      expect(rpc).not.toHaveBeenCalled();
+    });
+  }
+
+  it("controle: com a flag ligada a mesma resposta assume (o teste enxerga a chamada)", async () => {
+    autenticado("session");
+    banco.tabelas.organizations.push({ id: ORG_ID, settings: { routing: { conversation_stays_with_attendant: true } } });
+    const rpc = vi.fn(async () => ({ data: [], error: null }));
+    (banco.supabase as unknown as { rpc: unknown }).rpc = rpc;
+    mockedSend.mockResolvedValue({ id: "m1", status: "sent", conversation_id: CONVERSATION_ID } as never);
+
+    await POST(pedido());
+
+    expect(rpc).toHaveBeenCalledWith("fn_conversation_assign", expect.objectContaining({ p_reason: "claim" }));
   });
 });

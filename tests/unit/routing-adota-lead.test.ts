@@ -46,6 +46,10 @@ function clientDuble(atualizadas: Array<{ id: string }>, erro: { message: string
           filtros[`is:${col}`] = val;
           return cadeia;
         },
+        or(expr: string) {
+          filtros["or"] = expr;
+          return cadeia;
+        },
         select() {
           chamadas.push({ tabela, filtros, valores });
           return Promise.resolve({ data: erro ? null : atualizadas, error: erro });
@@ -84,6 +88,23 @@ describe("rodízio adota o lead do contato", () => {
       c.filtros["is:owner_agent_id"],
       "sem esta condição o rodízio arranca o lead que a IA está tocando",
     ).toBe(null);
+  });
+
+  it("com substituir (claim/transfer à mão) troca o dono e limpa o agente; sem a opção não", async () => {
+    const { client, chamadas } = clientDuble([{ id: "lead-1" }]);
+    await adotarLeadsDoContato(client as never, ORG, CONTATO, ATENDENTE, { substituir: true });
+    const c = chamadas[0]!;
+    expect(c.filtros["is:owner_user_id"]).toBeUndefined();
+    expect(c.filtros["or"]).toBe(`owner_user_id.is.null,owner_user_id.neq.${ATENDENTE}`);
+    expect(c.valores).toMatchObject({ owner_user_id: ATENDENTE, owner_kind: "user", owner_agent_id: null });
+    expect(c.valores).toHaveProperty("assigned_at");
+
+    // Controle negativo: o rodízio (sem a opção) continua só adotando lead sem dono.
+    const r = clientDuble([{ id: "lead-1" }]);
+    await adotarLeadsDoContato(r.client as never, ORG, CONTATO, ATENDENTE);
+    expect(r.chamadas[0]!.filtros["is:owner_user_id"]).toBe(null);
+    expect(r.chamadas[0]!.filtros["or"]).toBeUndefined();
+    expect(r.chamadas[0]!.valores).not.toHaveProperty("owner_agent_id");
   });
 
   it("grava owner_kind junto com owner_user_id", async () => {

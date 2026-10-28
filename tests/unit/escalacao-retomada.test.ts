@@ -37,6 +37,8 @@ interface Captura {
   updates: Escrita[];
   inserts: Escrita[];
   rpc: Array<{ fn: string; args: Record<string, unknown> }>;
+  /** Filtros do UPDATE em crm_leads (org e contato têm de estar neles). */
+  filtrosDoLead: Array<[string, unknown]>;
 }
 
 interface CenarioBanco {
@@ -67,6 +69,10 @@ interface CenarioBanco {
    * como o Postgres faria.
    */
   marcaNaEscrita?: boolean;
+  /** Versões publicadas no canal da conversa e agentes da org (devolver a IA = IA vira dona do lead). */
+  versoesPublicadas?: Array<Record<string, unknown>>;
+  agentes?: Array<Record<string, unknown>>;
+  erroAoEntregarLead?: { message: string } | null;
 }
 
 /**
@@ -129,7 +135,13 @@ function fazerSupabase(cenario: CenarioBanco, cap: Captura) {
         return Promise.resolve({ data: null, error: null });
       },
       then: (res: (v: unknown) => unknown) => {
+        if (ehUpdate && tabela === "crm_leads") {
+          cap.filtrosDoLead = filtros;
+          return Promise.resolve({ data: null, error: cenario.erroAoEntregarLead ?? null }).then(res);
+        }
         const listas: Record<string, unknown[]> = {
+          ai_agent_versions: cenario.versoesPublicadas ?? [],
+          ai_agents: cenario.agentes ?? [],
           agent_cases: cenario.chamados ?? [],
           agent_case_events: cenario.eventosDeChamado ?? [],
           conversation_notes: cenario.notas ?? [],
@@ -201,7 +213,7 @@ function cenarioComAtendimentoHumano(over: Partial<CenarioBanco> = {}): CenarioB
 }
 
 function novaCaptura(): Captura {
-  return { updates: [], inserts: [], rpc: [] };
+  return { updates: [], inserts: [], rpc: [], filtrosDoLead: [] };
 }
 
 async function retomar(
@@ -593,5 +605,54 @@ describe("devolver o atendimento ao agente", () => {
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.erro).toBe("contact_state_unreadable");
     expect(cap.updates).toEqual([]);
+  });
+});
+
+describe("devolver a IA = a IA vira dona do lead", () => {
+  const AGENTE = "77777777-7777-4777-8777-777777777777";
+  const VERSAO = "88888888-8888-4888-8888-888888888888";
+  const noCanal = {
+    versoesPublicadas: [{ id: VERSAO }],
+    agentes: [{ id: AGENTE, kind: "mcp_agent", paused_at: null, published_version_id: VERSAO, archived_at: null }],
+  };
+  const conversaDoCanal = conversaPassadaAHumano({ channel_session_id: "sessao-1" });
+  const donoDoLead = (cap: Captura) => cap.updates.find((u) => u.tabela === "crm_leads");
+
+  it("devolução manual dá os leads abertos do contato ao agente do canal", async () => {
+    const cap = novaCaptura();
+    const res = await retomar(cenarioComAtendimentoHumano({ conversa: conversaDoCanal, ...noCanal }), cap);
+    expect(res.ok).toBe(true);
+    expect(donoDoLead(cap)?.valores).toMatchObject({
+      owner_agent_id: AGENTE, owner_kind: "ai", owner_user_id: null,
+    });
+    expect(donoDoLead(cap)?.valores).toHaveProperty("assigned_at");
+    // só os leads ABERTOS do contato desta conversa, na org dela
+    expect(cap.filtrosDoLead).toEqual(
+      expect.arrayContaining([["organization_id", ORG], ["contact_id", CONTATO], ["status", "open"]]),
+    );
+  });
+
+  it("a devolução automática por prazo faz o mesmo", async () => {
+    const cap = novaCaptura();
+    await retomar(cenarioComAtendimentoHumano({ conversa: conversaDoCanal, ...noCanal }), cap, USUARIO, {
+      automatica: { minutos: 30 },
+    });
+    expect(donoDoLead(cap)?.valores).toMatchObject({ owner_agent_id: AGENTE, owner_kind: "ai" });
+  });
+
+  it("sem agente publicado para o canal, o lead não é tocado", async () => {
+    const cap = novaCaptura();
+    const res = await retomar(cenarioComAtendimentoHumano({ conversa: conversaDoCanal }), cap);
+    expect(res.ok).toBe(true);
+    expect(donoDoLead(cap)).toBeUndefined();
+  });
+
+  it("falha do UPDATE do lead não derruba a devolução", async () => {
+    const cap = novaCaptura();
+    const res = await retomar(
+      cenarioComAtendimentoHumano({ conversa: conversaDoCanal, ...noCanal, erroAoEntregarLead: { message: "boom" } }),
+      cap,
+    );
+    expect(res.ok).toBe(true);
   });
 });

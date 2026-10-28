@@ -14,6 +14,7 @@ import { ApiError } from "@/lib/api/types";
 import type { Actor, HandlerCtx } from "@/lib/api/handlers/types";
 import { audit } from "@/lib/audit";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { acompanharDonoNaConversa } from "@/lib/leads/acompanhar-dono-na-conversa";
 import { resolveOwnerPatch, type OwnerPatch, type OwnerPatchInput } from "@/lib/leads/owner-patch";
 import { emitLeadActivity, stageChangeReason } from "@/lib/leads/activity-emitter";
 import { listaLegivel } from "@/lib/leads/activity-vocabulary";
@@ -754,6 +755,14 @@ export async function createLeadHandler(
     );
   }
 
+  if (ownerPatch.owner_user_id) {
+    await acompanharDonoNaConversa(supabase, {
+      organizationId: ctx.organization_id,
+      contactIds: [input.contact_id],
+      novoDonoUserId: ownerPatch.owner_user_id,
+    });
+  }
+
   if (donoHerdadoDescartado) {
     const leadId = (lead as { id: string }).id;
     const atividade = await emitLeadActivity(supabase, {
@@ -968,6 +977,18 @@ export async function updateLeadHandler(
     // concorrência as duas coisas diferem, e é a do banco que vale.
     (updated as Record<string, unknown>).custom_fields =
       (mesclados as Record<string, unknown> | null) ?? {};
+  }
+
+  // Dono humano NOVO => a conversa do contato vai junto (falha só loga). Fica depois
+  // do último ponto que pode lançar. Contato com vários negócios: trocar o dono de um
+  // card secundário também move a conversa (aceito).
+  if (ownerPatch?.owner_user_id && ownerPatch.owner_user_id !== (existing.owner_user_id ?? null)) {
+    await acompanharDonoNaConversa(supabase, {
+      organizationId: ctx.organization_id,
+      contactIds: [(updated as { contact_id?: string | null }).contact_id],
+      novoDonoUserId: ownerPatch.owner_user_id,
+      leadId,
+    });
   }
 
   const a = actorAuditPayload(ctx.actor);
