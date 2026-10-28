@@ -92,6 +92,8 @@ interface Mensagem {
 }
 
 export async function sendExportEmail(args: SendArgs): Promise<{ messageId: string }> {
+  // O layout descarta href sem http(s) em silêncio; sem o link o e-mail do Art. 18 sairia sem o arquivo.
+  if (!/^https?:\/\//i.test(args.signedUrl)) throw new EmailSendFailed("signed_url_invalida");
   const shortId = args.requestId.slice(0, 8);
   const { subject, html, text } =
     args.perfil.codigo === PAIS_PADRAO

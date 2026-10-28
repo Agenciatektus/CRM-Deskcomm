@@ -251,9 +251,11 @@ export async function triggerSlaAlarm(
         paragrafos: [
           t("Olá,"),
           fraseTexto,
-          notaDoPrazoHtml,
+          ...(daysOverdue > 0 ? [] : [notaDoPrazoHtml]),
           `${t("Status atual:")} ${request.request_type} / ${request.status}`,
         ],
+        // Atraso é a informação do e-mail: sai em destaque, não no cinza do corpo.
+        aviso: daysOverdue > 0 ? notaDoPrazoHtml : undefined,
         botao: { rotulo: t("Ver solicitação no painel"), href: requestUrl },
         rodape: [rodapeHtml],
         idioma: idioma as Idioma,

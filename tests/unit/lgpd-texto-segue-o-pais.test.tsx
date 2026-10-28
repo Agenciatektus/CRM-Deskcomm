@@ -291,7 +291,10 @@ describe("os neutros do fixture (sexta exceção)", () => {
 
 describe("e-mail ao titular", () => {
   it("Brasil: o de antes do doc 88, byte a byte, mais o link do arquivo de dados (doc 103, A)", async () => {
-    igualAoGravado(await emailPara(perfilDoPais("BR")), "email.json");
+    const obtido = await emailPara(perfilDoPais("BR"));
+    igualAoGravado(obtido, "email.json");
+    // O botão leva o relatório (signedUrl), não a cópia dos dados.
+    expect((obtido as { html: string }).html).toContain('href="https://storage.test/report.pdf?token=abc"');
   });
 
   it("Portugal: pt-PT, sem LGPD, citando o RGPD como direito exercido", async () => {
