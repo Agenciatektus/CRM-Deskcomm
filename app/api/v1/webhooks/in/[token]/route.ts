@@ -963,7 +963,8 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<NextRespons
     ...dadosDaCaptacao,
     leadId: String(lead.id),
     contactId: contactId ?? null,
-    outcome: "criado",
+    // 9082: o contato já tinha negócio aberto neste funil e ele foi reaproveitado.
+    outcome: lead.reaproveitado ? "duplicado" : "criado",
   });
 
   // ELEGIBILIDADE DA IA (caso 1): uma submissão do Respondi é uma origem

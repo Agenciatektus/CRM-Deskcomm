@@ -5055,6 +5055,8 @@
   "Escolher o arquivo CSV": "选择 CSV 文件",
   "leads criados": "已创建的销售线索",
   "contatos novos": "新联系人",
+  "contatos já tinham negócio aberto neste funil (reaproveitados)": "个联系人在此销售漏斗中已有未结商机（已复用）",
+  "Este contato já tem um negócio aberto neste funil.": "该联系人在此销售漏斗中已有未结商机。",
   "Colunas que não reconheci:": "无法识别的列：",
   "A planilha precisa de uma coluna com o nome do negócio ou do contato. Encontrei: ": "表格需要包含商机名称或联系人名称的列。我找到的是： ",
   "sem nome do negócio nem do contato": "没有商机名称或联系人名称",

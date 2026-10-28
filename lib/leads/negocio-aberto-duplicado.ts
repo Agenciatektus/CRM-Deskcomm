@@ -35,6 +35,31 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  */
 export const AVISO_NEGOCIO_ABERTO_EXISTENTE = "negocio_aberto_existente";
 
+/**
+ * A 9082 (28/10/2026) trava no BANCO o que chega sozinho: índice único parcial
+ * `(organization_id, contact_id, pipeline_id) where status = 'open'` para toda
+ * origem fora desta lista. `manual` continua só AVISANDO (o texto acima vale
+ * para ele); `nuvemshop` é um card por PEDIDO. `createLeadHandler` devolve o
+ * aberto com `reaproveitado: true` em vez de criar. A lista é a MESMA do
+ * predicado da migration; o invariante 9082 confere as duas.
+ */
+export const INDICE_DO_LEAD_ABERTO_UNICO = "crm_leads_um_aberto_por_contato_no_funil";
+export const ORIGENS_FORA_DO_LEAD_UNICO: readonly string[] = ["manual", "nuvemshop"];
+
+export function entraNoLeadUnico(source: string | null | undefined): boolean {
+  return !ORIGENS_FORA_DO_LEAD_UNICO.includes(source ?? "manual");
+}
+
+/** O 23505 DESTE índice (o nome é o sinal), em qualquer campo que o PostgREST preencha. */
+export function ehViolacaoDoLeadUnico(
+  erro: { code?: string; message?: string; details?: string } | null | undefined,
+): boolean {
+  if (!erro || erro.code !== "23505") return false;
+  return [erro.message, erro.details].some(
+    (campo) => typeof campo === "string" && campo.includes(INDICE_DO_LEAD_ABERTO_UNICO),
+  );
+}
+
 /** O que a tela linka: id para a URL, título para o texto do link. */
 export interface NegocioAbertoExistente {
   id: string;

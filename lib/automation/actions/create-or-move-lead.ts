@@ -158,6 +158,10 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
         ...viaHerdada(ctx.event.metadata),
       } as Parameters<typeof createLeadHandler>[2]);
       publicaNoContexto(ctx, created, contact.id);
+      // Corrida com outro escritor (9082): o card aberto já existia.
+      if (created.reaproveitado) {
+        return { type: "create_or_move_lead", status: "success", detail: { reaproveitado: String(created.id) } };
+      }
       return { type: "create_or_move_lead", status: "success", detail: { created: String(created.id) } };
     }
     return { type: "create_or_move_lead", status: "skipped", detail: { reason: "no_lead_or_contact" } };

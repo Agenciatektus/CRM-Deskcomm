@@ -45,6 +45,7 @@ import {
 import { motivosDaCategoria } from "@/lib/leads/motivos-de-perda-do-funil";
 import type { CreateLeadInput, UpdateLeadInput } from "@/lib/schemas";
 import { ehCorrecaoDeMovimentoDaIa } from "@/lib/leads/correcao-humana";
+import { ehViolacaoDoLeadUnico, entraNoLeadUnico } from "@/lib/leads/negocio-aberto-duplicado";
 
 type SB = SupabaseClient;
 
@@ -597,6 +598,28 @@ export async function createLeadHandler(
     );
   }
 
+  // ── UM ABERTO POR CONTATO NO FUNIL (migration 9082) ───────────────────────
+  // Origem automática ou lote com negócio aberto do contato neste funil:
+  // devolve o que existe (`reaproveitado: true`), sem INSERT e sem
+  // `lead.created`. Antes da régua de campos: reaproveitar não cria nada.
+  const leadUnico = !!input.contact_id && entraNoLeadUnico(input.source);
+  const abertoDoContato = async () => {
+    const { data } = await supabase
+      .from("crm_leads")
+      .select(LEAD_COLS)
+      .eq("organization_id", ctx.organization_id)
+      .eq("contact_id", input.contact_id as string)
+      .eq("pipeline_id", input.pipeline_id)
+      .eq("status", "open")
+      .limit(1)
+      .maybeSingle();
+    return data ? { ...(data as Record<string, unknown>), reaproveitado: true } : null;
+  };
+  if (leadUnico) {
+    const aberto = await abertoDoContato();
+    if (aberto) return aberto;
+  }
+
   // ── A ETAPA EM QUE O NEGÓCIO NASCE TAMBÉM É UMA ENTRADA (issue #1710) ──────
   //
   // Criar direto numa etapa exigente é o MESMO gatilho do arrasto: o funil que
@@ -715,6 +738,20 @@ export async function createLeadHandler(
     })
     .select(LEAD_COLS)
     .single();
+
+  // Corrida com outro escritor do mesmo contato: o índice 9082 recusou este.
+  // Quem a RLS não deixa ler o vencedor recebe 409, nunca a linha.
+  if (leadUnico && ehViolacaoDoLeadUnico(insErr)) {
+    const aberto = await abertoDoContato();
+    if (aberto) return aberto;
+    throw new ApiError(
+      409,
+      "lead_aberto_existente",
+      undefined,
+      ctx.requestId,
+      traduzir("Este contato já tem um negócio aberto neste funil.", ctx.idioma ?? "pt-BR"),
+    );
+  }
 
   const recusaNoInsert = recusaDaGuardaDoBanco(ctx, insErr);
   if (recusaNoInsert) throw recusaNoInsert;

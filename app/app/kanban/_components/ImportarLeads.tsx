@@ -28,6 +28,8 @@ export interface ResumoDaImportacao {
   contatos_criados: number;
   erros: { linha: number; motivo: string }[];
   colunas_ignoradas: string[];
+  /** Opcional: resposta de servidor anterior à 9082 não traz. */
+  reaproveitados?: number;
 }
 
 /**
@@ -167,6 +169,12 @@ export function ImportarLeads({ funis }: { funis: FunilDaLista[] }) {
                   {resumo.criados} {t("leads criados")} · {resumo.contatos_criados}{" "}
                   {t("contatos novos")} · {resumo.total_linhas} {t("linhas na planilha")}
                 </p>
+                {resumo.reaproveitados ? (
+                  <p className="mt-2 text-xs text-muted-foreground" data-testid="reaproveitados-da-importacao">
+                    {resumo.reaproveitados}{" "}
+                    {t("contatos já tinham negócio aberto neste funil (reaproveitados)")}
+                  </p>
+                ) : null}
                 {resumo.colunas_ignoradas.length > 0 ? (
                   <p className="mt-2 text-xs text-muted-foreground">
                     {t("Colunas que não reconheci:")} {resumo.colunas_ignoradas.join(", ")}

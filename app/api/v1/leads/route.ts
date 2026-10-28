@@ -186,7 +186,8 @@ export async function POST(req: NextRequest): Promise<Response> {
     );
     return ok(lead, {
       requestId,
-      status: 201,
+      // 9082: origem não manual com negócio aberto no funil devolve o existente.
+      status: lead.reaproveitado ? 200 : 201,
       // `meta` só quando há aviso: uma resposta sem `meta` continua sem
       // `meta`, e o que muda é acrescentar, nunca esconder.
       ...(negocioExistente

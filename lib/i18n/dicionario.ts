@@ -12775,6 +12775,7 @@ export const DICIONARIO: Traducoes = {
   "Escolher o arquivo CSV": { es: "Elegir el archivo CSV" },
   "leads criados": { es: "leads creados" },
   "contatos novos": { es: "contactos nuevos" },
+  "contatos já tinham negócio aberto neste funil (reaproveitados)": { es: "contactos ya tenían un negocio abierto en este embudo (reutilizados)" },
   "Colunas que não reconheci:": { es: "Columnas que no reconocí:" },
   // Mensagens de erro de lib/leads/planilha.ts e app/api/v1/leads/import/route.ts
   "A planilha precisa de uma coluna com o nome do negócio ou do contato. Encontrei: ": {
