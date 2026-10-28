@@ -142,6 +142,10 @@ describe("sidebarGroups", () => {
       "/app/kanban",
       "/app/contacts",
       "/app/tasks",
+      // Automações entra no sidebar (Peterson, 28/10/2026): o teto de itens era
+      // do menu de uma coluna; a trava de hoje é a coluna de cada grupo caber em
+      // 900px, medida no e2e `navegacao.spec.ts`.
+      "/app/automacoes",
       // "/app/calls" (telefonia por SIP) NÃO entra aqui, e a ausência é a
       // decisão: o módulo é OPCIONAL e nasce desligado (doc 27), então a porta
       // no sidebar custaria um item a TODA instalação — e o vigésimo item é o
@@ -204,7 +208,7 @@ describe("hubSections", () => {
       "/app/products",
       "/app/imports",
       "/app/settings/tenant/pipelines",
-      // O motor de regras do CRM inteiro: montagem, então hub e ⌘K, sem sidebar.
+      // O motor de regras do CRM inteiro: no hub e também no sidebar.
       "/app/automacoes",
       "/app/proposals",
     ]);

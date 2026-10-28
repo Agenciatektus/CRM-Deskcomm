@@ -563,12 +563,10 @@ export const NAV_CATALOG = [
     // de Canais › Webhooks, onde quem procura "automação" não olha. A aba lá
     // continua; esta é a porta do módulo.
     //
-    // SEM `sidebar`: o menu do CRM está no limite medido (o e2e
-    // `navegacao.spec.ts` reprova por scroll em 900px a partir do 20º item), e
-    // o teste de `navegacao-registry` fixa a lista. A porta é "Ver tudo em
-    // CRM", na seção de montagem, e o ⌘K. Quem usa todo dia pode pô-la no menu
-    // da empresa. Para subir ao sidebar padrão, abrir vaga antes (mover outro
-    // item para o hub) e atualizar o teste.
+    // `sidebar: true` por decisão do Peterson (28/10/2026). O teto de "20 itens
+    // por causa do scroll em 900px" era do sidebar de UMA coluna; hoje cada
+    // grupo tem a sua coluna e o e2e `navegacao.spec.ts` mede se ELA cabe, que é
+    // o invariante que importa. Quem aperta o menu é a coluna, não a contagem.
     href: "/app/automacoes",
     label: "Automações",
     description: "Regras que agem sozinhas quando algo acontece: lead que muda de etapa, tag, mensagem, tempo parado.",
@@ -576,6 +574,7 @@ export const NAV_CATALOG = [
     group: "crm",
     section: "Preparar a venda",
     minRole: "manager",
+    sidebar: true,
   },
 
   // ---- Agente de IA — montar, ensinar, acompanhar ----
