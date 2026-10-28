@@ -961,15 +961,6 @@ export async function updateLeadHandler(
     );
   }
 
-  // Dono humano novo => a conversa do contato vai junto (falha só loga).
-  if (ownerPatch?.owner_user_id) {
-    await acompanharDonoNaConversa(supabase, {
-      organizationId: ctx.organization_id,
-      contactIds: [(updated as { contact_id?: string | null }).contact_id],
-      novoDonoUserId: ownerPatch.owner_user_id,
-    });
-  }
-
   // O MERGE ATÔMICO. `updated` já provou que o lead existe e é da organização,
   // e `ctx.organization_id` vem de fonte confiável — nunca do body. A função
   // roda com a chave de serviço (é a única a ter EXECUTE), então o filtro de
@@ -986,6 +977,18 @@ export async function updateLeadHandler(
     // concorrência as duas coisas diferem, e é a do banco que vale.
     (updated as Record<string, unknown>).custom_fields =
       (mesclados as Record<string, unknown> | null) ?? {};
+  }
+
+  // Dono humano NOVO => a conversa do contato vai junto (falha só loga). Fica depois
+  // do último ponto que pode lançar. Contato com vários negócios: trocar o dono de um
+  // card secundário também move a conversa (aceito).
+  if (ownerPatch?.owner_user_id && ownerPatch.owner_user_id !== (existing.owner_user_id ?? null)) {
+    await acompanharDonoNaConversa(supabase, {
+      organizationId: ctx.organization_id,
+      contactIds: [(updated as { contact_id?: string | null }).contact_id],
+      novoDonoUserId: ownerPatch.owner_user_id,
+      leadId,
+    });
   }
 
   const a = actorAuditPayload(ctx.actor);

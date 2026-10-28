@@ -5,56 +5,84 @@ import { acompanharDonoNaConversa } from "./acompanhar-dono-na-conversa";
 const ORG = "o1";
 const NOVO = "u-novo";
 
-function cliente(conversas: Array<{ id: string; assigned_to_user_id: string | null }>, rpcErro?: string) {
-  const filtros: string[] = [];
+type Conv = {
+  id: string;
+  contact_id: string;
+  status: string;
+  assignee_kind: string | null;
+  assigned_to_user_id: string | null;
+};
+
+/** Dublê que EXECUTA eq/in sobre as linhas: mudar o filtro do helper muda o resultado. */
+function cliente(conversas: Conv[], rpcErro?: string) {
   const rpc = vi.fn(async () => ({ data: rpcErro ? null : [{}], error: rpcErro ? { message: rpcErro } : null }));
-  const q: Record<string, unknown> = {};
-  for (const m of ["eq", "in", "or"]) {
-    q[m] = (...a: unknown[]) => {
-      filtros.push(`${m}:${a.join(",")}`);
+  const consultas = vi.fn();
+  const from = vi.fn(() => ({
+    select: () => {
+      consultas();
+      let rows: Array<Record<string, unknown>> = conversas.map((c) => ({ organization_id: ORG, ...c }));
+      const q: Record<string, unknown> = {
+        eq: (col: string, v: unknown) => ((rows = rows.filter((r) => r[col] === v)), q),
+        in: (col: string, vs: unknown[]) => ((rows = rows.filter((r) => vs.includes(r[col]))), q),
+        then: (r: (v: unknown) => unknown) => r({ data: rows, error: null }),
+      };
       return q;
-    };
-  }
-  q.then = (r: (v: unknown) => unknown) => r({ data: conversas, error: null });
-  const c = { from: vi.fn(() => ({ select: () => q })), rpc };
-  return { c: c as never, rpc, filtros };
+    },
+  }));
+  return { c: { from, rpc } as never, rpc, from, consultas };
 }
 
+const base = { contact_id: "k1", status: "claimed", assignee_kind: "user", assigned_to_user_id: "u-velho" };
+const rodar = (c: never, over: Partial<{ contactIds: string[]; novoDonoUserId: string | null }> = {}) =>
+  acompanharDonoNaConversa(c, { organizationId: ORG, contactIds: ["k1"], novoDonoUserId: NOVO, ...over });
+
 describe("acompanharDonoNaConversa", () => {
-  it("move a conversa de outro atendente", async () => {
-    const { c, rpc, filtros } = cliente([{ id: "c1", assigned_to_user_id: "u-velho" }]);
-    expect(await acompanharDonoNaConversa(c, { organizationId: ORG, contactIds: ["k1"], novoDonoUserId: NOVO })).toBe(1);
+  it("move a conversa reivindicada de outro atendente", async () => {
+    const { c, rpc } = cliente([{ id: "c1", ...base }]);
+    expect(await rodar(c)).toBe(1);
     expect(rpc).toHaveBeenCalledWith("fn_conversation_assign", expect.objectContaining({
       p_conversation_id: "c1", p_to_user_id: NOVO, p_reason: "transfer", p_expected_assignee: "u-velho", p_enforce_expected: true,
     }));
-    // conversa fechada e conversa com IA ficam de fora na consulta
-    expect(filtros).toContain("in:status,open,claimed");
-    expect(filtros).toContain("or:assignee_kind.is.null,assignee_kind.eq.user");
   });
 
-  it("atribui a conversa sem responsável", async () => {
-    const { c, rpc } = cliente([{ id: "c1", assigned_to_user_id: null }]);
-    await acompanharDonoNaConversa(c, { organizationId: ORG, contactIds: ["k1"], novoDonoUserId: NOVO });
-    expect(rpc).toHaveBeenCalledWith("fn_conversation_assign", expect.objectContaining({ p_expected_assignee: undefined }));
+  it("NÃO move conversa aberta sem responsável (a IA atende; a RPC silenciaria o bot)", async () => {
+    const { c, rpc } = cliente([{ id: "c1", ...base, status: "open", assignee_kind: null, assigned_to_user_id: null }]);
+    expect(await rodar(c)).toBe(0);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("NÃO move conversa com IA, nem fechada, nem de outro contato", async () => {
+    const { c, rpc } = cliente([
+      { id: "c1", ...base, assignee_kind: "ai" },
+      { id: "c2", ...base, status: "closed" },
+      { id: "c3", ...base, contact_id: "outro" },
+    ]);
+    expect(await rodar(c)).toBe(0);
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("dono null (removido ou agente de IA) não consulta nem move", async () => {
-    const { c, rpc } = cliente([{ id: "c1", assigned_to_user_id: "u-velho" }]);
-    await acompanharDonoNaConversa(c, { organizationId: ORG, contactIds: ["k1"], novoDonoUserId: null });
-    expect((c as { from: ReturnType<typeof vi.fn> }).from).not.toHaveBeenCalled();
+    const { c, rpc, from } = cliente([{ id: "c1", ...base }]);
+    await rodar(c, { novoDonoUserId: null });
+    expect(from).not.toHaveBeenCalled();
     expect(rpc).not.toHaveBeenCalled();
   });
 
   it("já é do mesmo dono: zero chamadas", async () => {
-    const { c, rpc } = cliente([{ id: "c1", assigned_to_user_id: NOVO }]);
-    expect(await acompanharDonoNaConversa(c, { organizationId: ORG, contactIds: ["k1"], novoDonoUserId: NOVO })).toBe(0);
+    const { c, rpc } = cliente([{ id: "c1", ...base, assigned_to_user_id: NOVO }]);
+    expect(await rodar(c)).toBe(0);
     expect(rpc).not.toHaveBeenCalled();
   });
 
+  it("lote com 2 leads do mesmo contato: 1 consulta e 1 chamada por conversa", async () => {
+    const { c, rpc, consultas } = cliente([{ id: "c1", ...base }]);
+    await rodar(c, { contactIds: ["k1", "k1"] });
+    expect(consultas).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
   it("falha da RPC não lança", async () => {
-    const { c } = cliente([{ id: "c1", assigned_to_user_id: "u-velho" }], "boom");
-    await expect(
-      acompanharDonoNaConversa(c, { organizationId: ORG, contactIds: ["k1"], novoDonoUserId: NOVO }),
-    ).resolves.toBe(0);
+    const { c } = cliente([{ id: "c1", ...base }], "boom");
+    await expect(rodar(c)).resolves.toBe(0);
   });
 });

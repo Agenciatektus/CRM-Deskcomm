@@ -3,8 +3,10 @@
  *
  * O Inbox "Minhas" lê `conversations.assigned_to_user_id`; sem isto o atendente
  * novo não via o lead como dele. Só humano propaga (dono null ou agente de IA
- * não mexe), e só conversa aberta/reivindicada sem IA: passar a conversa da IA
- * é decisão humana e mover silenciaria o bot. Quem grava é `fn_conversation_assign`
+ * não mexe), e só conversa reivindicada que JÁ tem humano (`assignee_kind='user'`).
+ * Conversa aberta sem responsável (assignee_kind nulo) é a que a IA atende: a RPC
+ * a silenciaria (`bot_silenced_until=infinity`), então NÃO se move. Conversa com IA
+ * idem: passar da IA é decisão humana. Quem grava é `fn_conversation_assign`
  * (nome denormalizado, evento, bot silenciado) — nunca UPDATE direto.
  *
  * Falha NÃO desfaz a troca do dono do lead: loga e segue. Conversa fora da
@@ -16,7 +18,7 @@ import { logger } from "@/lib/logger";
 
 export async function acompanharDonoNaConversa(
   client: SupabaseClient,
-  args: { organizationId: string; contactIds: Array<string | null | undefined>; novoDonoUserId: string | null | undefined },
+  args: { organizationId: string; leadId?: string; contactIds: Array<string | null | undefined>; novoDonoUserId: string | null | undefined },
 ): Promise<number> {
   const { organizationId, novoDonoUserId } = args;
   const contactIds = Array.from(new Set(args.contactIds.filter((c): c is string => !!c)));
@@ -30,7 +32,7 @@ export async function acompanharDonoNaConversa(
       .eq("organization_id", organizationId)
       .in("contact_id", contactIds)
       .in("status", ["open", "claimed"])
-      .or("assignee_kind.is.null,assignee_kind.eq.user");
+      .eq("assignee_kind", "user");
     if (error) throw new Error(error.message);
 
     for (const conversa of data ?? []) {
@@ -47,11 +49,16 @@ export async function acompanharDonoNaConversa(
       });
       if (rpcErr) {
         logger.warn("leads.dono: conversa não acompanhou o novo dono", {
+          organizationId,
+          leadId: args.leadId,
+          contactIds,
           conversationId: conversa.id,
           erro: rpcErr.message,
         });
         continue;
       }
+      // shortcut: não emite `conversation.transferred` nem audit como a rota de transfer;
+      // atualizar se o histórico da conversa precisar mostrar quem trocou o dono do lead.
       if (Array.isArray(linhas) && linhas.length > 0) movidas += 1;
     }
   } catch (erro) {
