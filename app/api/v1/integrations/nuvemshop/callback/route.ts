@@ -125,6 +125,16 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const webhookPathToken = randomBytes(24).toString("hex");
   const scopes = scope ? scope.split(/[\s,]+/).filter(Boolean) : [];
 
+  // Reconectar não pode apagar o funil de pedidos já escolhido.
+  const { data: previa } = await admin
+    .from("tenant_integrations")
+    .select("store_metadata")
+    .eq("organization_id", state.orgId)
+    .eq("provider", "nuvemshop")
+    .maybeSingle();
+  const funilEscolhido = (previa as { store_metadata?: { pedidos_pipeline_id?: string } | null } | null)
+    ?.store_metadata?.pedidos_pipeline_id;
+
   // Upsert tenant_integrations row.
   const { data: integration, error: upsertErr } = await admin
     .from("tenant_integrations")
@@ -135,7 +145,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         oauth_access_token_encrypted: encrypted.data,
         scopes,
         status: "healthy",
-        store_metadata: { store_id: storeId },
+        store_metadata: { store_id: storeId, ...(funilEscolhido ? { pedidos_pipeline_id: funilEscolhido } : {}) },
         webhook_path_token: webhookPathToken,
         webhook_secret_encrypted: webhookSecretEnc.data,
         webhook_subscriptions: {},

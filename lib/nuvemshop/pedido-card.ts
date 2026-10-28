@@ -16,8 +16,9 @@ import { createLeadHandler, moveLeadHandler } from "@/app/api/v1/leads/_handler"
 import type { HandlerCtx } from "@/lib/api/handlers/types";
 import { ORIGEM_PEDIDO_DA_LOJA } from "@/lib/leads/criacao-em-lote";
 import type { PedidoRow } from "./pedido-mapper";
+import { FUNIL_DE_PEDIDOS, SLUGS, funisCompativeis } from "./funil-de-pedidos";
 
-export const FUNIL_DE_PEDIDOS = "Pedidos do Site";
+export { FUNIL_DE_PEDIDOS };
 
 const ETAPA_DO_STATUS: Record<PedidoRow["status"], string> = {
   pending: "aguardando-pagamento",
@@ -28,14 +29,6 @@ const ETAPA_DO_STATUS: Record<PedidoRow["status"], string> = {
   cancelled: "cancelado-ou-com-problema",
   refunded: "cancelado-ou-com-problema",
 };
-const SLUGS = [
-  "pedido-novo",
-  "aguardando-pagamento",
-  "pago-separando",
-  "enviado-ou-pronto-para-retirar",
-  "entregue",
-  "cancelado-ou-com-problema",
-];
 
 /** Texto da timeline: só o número do pedido e o rastreio da transportadora, nunca dado do comprador. */
 function motivoDoEvento(p: { status: PedidoRow["status"]; numero: string | null; externalId: string; rastreio: string | null }): string {
@@ -75,13 +68,27 @@ async function sincronizar(
     contactId: string | null;
   },
 ): Promise<ResultadoDoCard> {
-  const { data: funis } = await admin
-    .from("crm_pipelines")
-    .select("id")
+  // Funil escolhido na integração (se ainda vale); senão o padrão pelo nome (a Fiorotto depende disso).
+  const { data: integ } = await admin
+    .from("tenant_integrations")
+    .select("store_metadata")
     .eq("organization_id", organizationId)
-    .eq("name", FUNIL_DE_PEDIDOS)
-    .limit(1);
-  const funilId = (funis as Array<{ id: string }> | null)?.[0]?.id;
+    .eq("provider", "nuvemshop")
+    .maybeSingle();
+  const escolhido = (integ as { store_metadata?: { pedidos_pipeline_id?: string } | null } | null)?.store_metadata
+    ?.pedidos_pipeline_id;
+  let funilId: string | undefined;
+  if (escolhido && (await funisCompativeis(admin, organizationId)).some((f) => f.id === escolhido)) {
+    funilId = escolhido;
+  } else {
+    const { data: funis } = await admin
+      .from("crm_pipelines")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("name", FUNIL_DE_PEDIDOS)
+      .limit(1);
+    funilId = (funis as Array<{ id: string }> | null)?.[0]?.id;
+  }
   if (!funilId) return { status: "skipped", detail: "funil_ausente" };
 
   const { data: etapasRaw } = await admin
