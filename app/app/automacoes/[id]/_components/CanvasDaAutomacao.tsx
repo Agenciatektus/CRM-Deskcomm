@@ -81,7 +81,7 @@ import {
 // Fora do componente: o React Flow remonta os nós se `nodeTypes` muda a cada render.
 const nodeTypes: NodeTypes = { gatilho: CaixaDaAutomacao, condicoes: CaixaDaAutomacao, acao: CaixaDaAutomacao };
 
-const VOLTAR = "/app/webhooks?aba=automacoes";
+const VOLTAR = "/app/automacoes";
 
 function paraNos(desenho: Desenho): NoDaAutomacao[] {
   return desenho.caixas.map((c) => ({ id: c.id, type: c.type, position: c.position, data: c.data }));
@@ -304,7 +304,7 @@ export function CanvasDaAutomacao({ regra }: Props) {
         qc.setQueryData<{ data: AutomationRuleRow[] }>(["automation-rules"], (velho) =>
           velho ? { data: [...velho.data.filter((r) => r.id !== criada.data.id), criada.data] } : { data: [criada.data] },
         );
-        router.replace(`/app/webhooks/automacoes/${criada.data.id}`);
+        router.replace(`/app/automacoes/${criada.data.id}`);
       }
     } catch {
       /* showApiError já mostrou o toast */

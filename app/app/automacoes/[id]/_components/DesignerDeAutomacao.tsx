@@ -50,7 +50,7 @@ export function DesignerDeAutomacao({ id }: { id: string }) {
             : t("Esta automação não existe mais, ou não é desta organização.")}
         </p>
         <Button asChild variant="secondary">
-          <Link href="/app/webhooks?aba=automacoes">{t("Voltar para as automações")}</Link>
+          <Link href="/app/automacoes">{t("Voltar para as automações")}</Link>
         </Button>
       </div>
     );

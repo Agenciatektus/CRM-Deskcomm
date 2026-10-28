@@ -557,6 +557,26 @@ export const NAV_CATALOG = [
     // uma divergência a menos justamente no arquivo que o upstream reescreveu
     // na v1.41.0.
   },
+  {
+    // O motor de regras (`automation_rules`) serve ao CRM inteiro — gatilhos de
+    // funil, tag, WhatsApp, agenda e tempo parado —, mas só tinha porta dentro
+    // de Canais › Webhooks, onde quem procura "automação" não olha. A aba lá
+    // continua; esta é a porta do módulo.
+    //
+    // SEM `sidebar`: o menu do CRM está no limite medido (o e2e
+    // `navegacao.spec.ts` reprova por scroll em 900px a partir do 20º item), e
+    // o teste de `navegacao-registry` fixa a lista. A porta é "Ver tudo em
+    // CRM", na seção de montagem, e o ⌘K. Quem usa todo dia pode pô-la no menu
+    // da empresa. Para subir ao sidebar padrão, abrir vaga antes (mover outro
+    // item para o hub) e atualizar o teste.
+    href: "/app/automacoes",
+    label: "Automações",
+    description: "Regras que agem sozinhas quando algo acontece: lead que muda de etapa, tag, mensagem, tempo parado.",
+    icon: "FlowArrow",
+    group: "crm",
+    section: "Preparar a venda",
+    minRole: "manager",
+  },
 
   // ---- Agente de IA — montar, ensinar, acompanhar ----
   {

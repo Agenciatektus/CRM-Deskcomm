@@ -50,6 +50,7 @@ const PROIBIDAS = [
   "/app/ai/credentials",
   "/app/ai/providers",
   "/app/webhooks",
+  "/app/automacoes",
   "/admin",
 ];
 

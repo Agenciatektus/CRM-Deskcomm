@@ -1,7 +1,7 @@
 /**
  * O DESIGNER DE AUTOMAÇÕES grava a MESMA regra que o editor em lista.
  *
- * Fase 1 do designer (`app/app/webhooks/automacoes/[id]`): o canvas é outra
+ * Fase 1 do designer (`app/app/automacoes/[id]`): o canvas é outra
  * forma de montar a automação, não outra automação. A prova é pela tela, do
  * jeito que um gerente usaria, e mede três coisas:
  *
@@ -120,7 +120,7 @@ test.describe("designer de automações", () => {
       const resposta = await criacao.response();
       expect(resposta?.ok()).toBeTruthy();
       ruleId = ((await resposta!.json()) as { data: { id: string } }).data.id;
-      await page.waitForURL(new RegExp(`/app/webhooks/automacoes/${ruleId}$`));
+      await page.waitForURL(new RegExp(`/app/automacoes/${ruleId}$`));
       await expect(page.getByText("Pausada").first()).toBeVisible();
 
       // ── O editor em lista abre a MESMA regra, na mesma ordem ─────────────
@@ -139,7 +139,7 @@ test.describe("designer de automações", () => {
 
       // ── Abrir no designer e salvar sem mexer: o mesmo corpo volta ────────
       await cartao.getByRole("link", { name: "Abrir no designer" }).click();
-      await page.waitForURL(new RegExp(`/app/webhooks/automacoes/${ruleId}$`));
+      await page.waitForURL(new RegExp(`/app/automacoes/${ruleId}$`));
       await expect(page.getByTestId("caixa-acao-2")).toBeVisible();
       await expect(page.getByTestId("designer-alteracoes")).toHaveCount(0);
       const [semMexer] = await Promise.all([
