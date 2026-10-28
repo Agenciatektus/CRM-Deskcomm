@@ -6122,6 +6122,12 @@ export const DICIONARIO: Traducoes = {
   "Receber dados": { es: "Recibir datos" },
   "Leads recebidos": { es: "Leads recibidos" },
   Automações: { es: "Automatizaciones" },
+  "Regras que agem sozinhas quando algo acontece no CRM: lead que muda de etapa, tag, mensagem, tempo parado.": {
+    es: "Reglas que actúan solas cuando algo pasa en el CRM: lead que cambia de etapa, etiqueta, mensaje, tiempo detenido.",
+  },
+  "Regras que agem sozinhas quando algo acontece: lead que muda de etapa, tag, mensagem, tempo parado.": {
+    es: "Reglas que actúan solas cuando algo pasa: lead que cambia de etapa, etiqueta, mensaje, tiempo detenido.",
+  },
   Atividade: { es: "Actividad" },
   Funil: { es: "Embudo" },
   "Escolha o funil": { es: "Elige el embudo" },
@@ -6273,7 +6279,7 @@ export const DICIONARIO: Traducoes = {
   },
   "Salvar alterações": { es: "Guardar cambios" },
   "Criar automação": { es: "Crear automatización" },
-  // Designer de automações (fase 1): app/app/webhooks/automacoes/[id].
+  // Designer de automações (fase 1): app/app/automacoes/[id].
   "Escolha o funil e a etapa": { es: "Elige el embudo y la etapa" },
   "Escolha o fluxo de follow-up": { es: "Elige el flujo de seguimiento" },
   "Escolha o plano de tarefas": { es: "Elige el plan de tareas" },
