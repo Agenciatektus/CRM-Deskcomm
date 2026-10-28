@@ -34,6 +34,7 @@ import { Escolha } from "@/components/ui/escolha";
 import { useCampanha, useEditarCampanha, usePreviaDaAudiencia } from "@/hooks/campanhas/useCampanhas";
 import { channelLabel, useChannelSessions } from "@/hooks/channels/useChannelSessions";
 import { useT } from "@/hooks/i18n/useT";
+import { limparFiltroSalvo } from "@/lib/campanhas/audiencia";
 import {
   COMPRA_VAZIA,
   CamposDeCompraDoFiltro,
@@ -103,7 +104,7 @@ export function EditarCampanha({ id }: { id: string }) {
   useEffect(() => {
     const c = campanha.data;
     if (!c || carregado) return;
-    const f = (c.audience_filter ?? {}) as Record<string, unknown>;
+    const f = limparFiltroSalvo(c.audience_filter);
     setNome(c.name);
     setCanal(c.channel_session_id);
     setBaseLegal(c.base_legal === "legitimate_interest" ? "legitimate_interest" : "consent");
@@ -137,7 +138,7 @@ export function EditarCampanha({ id }: { id: string }) {
     () => ({
       // Parte do filtro salvo: o PATCH grava o objeto inteiro e a tela não edita
       // funis, etapas, incluir/excluir_contatos (apagá-los reinclui excluídos).
-      ...((campanha.data?.audience_filter ?? {}) as Record<string, unknown>),
+      ...limparFiltroSalvo(campanha.data?.audience_filter),
       com_alguma_tag: listar(comAlgumaTag),
       sem_tags: listar(semTags),
       sem_interacao_ha_dias: semInteracao ? Number(semInteracao) : null,

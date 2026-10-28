@@ -168,3 +168,17 @@ describe("edição: hidratação dos critérios de compra", () => {
     expect(screen.getAllByLabelText("Pelo menos N compras")[1]).toHaveValue(2);
   });
 });
+
+describe("edição: chave desconhecida no filtro salvo (#405)", () => {
+  it("a prévia não leva a chave que o schema não conhece", async () => {
+    previa.mutate.mockClear();
+    CAMPANHA.audience_filter = { ...FILTRO_PADRAO, chave_removida: true };
+    render(<EditarCampanha id="c1" />);
+    await screen.findByDisplayValue("Reativação de clientes parados");
+    fireEvent.click(screen.getByRole("button", { name: "Ver quantas pessoas" }));
+    await waitFor(() => expect(previa.mutate).toHaveBeenCalled());
+    const enviado = previa.mutate.mock.calls[0]?.[0].audience_filter;
+    expect(enviado).not.toHaveProperty("chave_removida");
+    expect(enviado).toMatchObject({ com_alguma_tag: ["vip"] });
+  });
+});
