@@ -83,11 +83,14 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<Response> {
 
   const conv = row as unknown as Conversation;
 
-  // O lead acompanha a conversa com a MESMA regra do rodízio: só lead aberto e
-  // sem dono. Sem isto, assumir à mão deixava o funil inteiro sem responsável
-  // (medido no Dr. Paulo em 30/09: 0 de 200 leads com dono em 10 dias).
+  // Assumir vira dono: os leads abertos do contato passam a quem assumiu, mesmo com
+  // outro dono (o rodízio, ao contrário, só adota lead sem dono). Sem isto, assumir
+  // à mão deixava o funil sem responsável (medido no Dr. Paulo em 30/09: 0 de 200
+  // leads com dono em 10 dias).
   if (isServiceRoleConfigured()) {
-    await adotarLeadsDoContato(createAdminClient(), authz.org.orgId, conv.contact_id, user.id);
+    await adotarLeadsDoContato(createAdminClient(), authz.org.orgId, conv.contact_id, user.id, {
+      substituir: true,
+    });
   }
 
   await audit({
