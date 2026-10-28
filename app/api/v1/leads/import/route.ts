@@ -46,7 +46,7 @@ interface ResumoDaImportacao {
   contatos_criados: number;
   erros: ErroDaLinha[];
   colunas_ignoradas: string[];
-  /** Contatos que já tinham negócio aberto neste funil (migration 9082). */
+  /** LINHAS cujo contato já tinha negócio aberto neste funil (migration 9082). Por linha: nenhuma some do relatório. */
   reaproveitados: number;
 }
 
@@ -187,7 +187,6 @@ export async function POST(req: NextRequest): Promise<Response> {
     colunas_ignoradas: lido.colunasIgnoradas,
     reaproveitados: 0,
   };
-  const reaproveitados = new Set<string>();
 
   // O mesmo telefone repetido na planilha vira UM contato, não N. Sem isto, uma
   // lista com três negócios do mesmo cliente criaria três contatos idênticos —
@@ -262,7 +261,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         },
       );
       // 9082: contato com negócio aberto neste funil não ganha um segundo.
-      if (lead?.reaproveitado && contactId) reaproveitados.add(contactId);
+      if (lead?.reaproveitado) resumo.reaproveitados += 1;
       else resumo.criados += 1;
     } catch (err) {
       // A ETAPA ERRADA DERRUBA A IMPORTAÇÃO INTEIRA, e de propósito: se a etapa
@@ -285,8 +284,6 @@ export async function POST(req: NextRequest): Promise<Response> {
       });
     }
   }
-
-  resumo.reaproveitados = reaproveitados.size;
 
   await audit({
     organizationId: orgId,

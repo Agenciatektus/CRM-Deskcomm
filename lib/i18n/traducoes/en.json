@@ -6987,7 +6987,7 @@
   "Escolher o arquivo CSV": "Choose the CSV file",
   "leads criados": "leads created",
   "contatos novos": "new contacts",
-  "contatos já tinham negócio aberto neste funil (reaproveitados)": "contacts already had an open deal in this pipeline (reused)",
+  "linhas de contatos que já tinham negócio aberto neste funil (reaproveitadas)": "rows for contacts that already had an open deal in this pipeline (reused)",
   "Colunas que não reconheci:": "Columns I didn't recognize:",
   "A planilha precisa de uma coluna com o nome do negócio ou do contato. Encontrei: ": "The spreadsheet needs a column with the deal's or contact's name. Found: ",
   "sem nome do negócio nem do contato": "no deal name and no contact name",

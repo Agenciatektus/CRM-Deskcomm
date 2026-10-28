@@ -172,7 +172,7 @@ export function ImportarLeads({ funis }: { funis: FunilDaLista[] }) {
                 {resumo.reaproveitados ? (
                   <p className="mt-2 text-xs text-muted-foreground" data-testid="reaproveitados-da-importacao">
                     {resumo.reaproveitados}{" "}
-                    {t("contatos já tinham negócio aberto neste funil (reaproveitados)")}
+                    {t("linhas de contatos que já tinham negócio aberto neste funil (reaproveitadas)")}
                   </p>
                 ) : null}
                 {resumo.colunas_ignoradas.length > 0 ? (
