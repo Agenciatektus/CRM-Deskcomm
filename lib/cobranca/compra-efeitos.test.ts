@@ -18,6 +18,8 @@ function montar({ donos = [{ user_id: "dono-antigo" }], convites = [] as Array<{
   const banco = bancoFalso((c: Cadeia): Resposta => {
     if (c.tabela === "platform_admins") return { data: donos };
     if (c.tabela === "team_invites") return { data: convites };
+    if (c.tabela === "cobranca_assinaturas") return { data: { plano_id: "pl-1" } };
+    if (c.tabela === "cobranca_planos") return { data: { nome: "Com IA", preco_cents: 39700, intervalo: "mes" } };
     if (c.tabela === "cobranca_compras" && c.passos.some((p) => p.metodo === "select")) return { data: trava };
     return {};
   });
@@ -46,6 +48,7 @@ describe("efeitosDaCompra.aoCriar", () => {
       inviterId: "dono-antigo",
       inviterName: "Marca da Instalação",
       requestId: "compra-compra-9",
+      origem: "compra",
     });
     const donos = banco.cadeias.find((c) => c.tabela === "platform_admins")!;
     expect(valorDoFiltro(donos, "eq", "scope")).toBe("full");
@@ -71,8 +74,10 @@ describe("efeitosDaCompra.aoCriar", () => {
     const { efeitos } = montar();
     await efeitos.aoCriar!(ORG, compra);
     const [, aviso] = h.avisar.mock.calls[0]!;
-    expect(aviso.titulo).toContain("Clínica Aurora");
-    expect(aviso.corpo).toContain("plano-x");
+    expect(aviso.titulo).toBe("Nova empresa por compra direta: Clínica Aurora");
+    expect(aviso.corpo).toMatch(/plano Com IA, R\$\s397,00 por mês/);
+    expect(aviso.corpo).not.toContain("plano-x");
+    expect(JSON.stringify(aviso)).not.toMatch(/[—–·]/);
     expect(aviso.corpo).toContain("p***@exemplo.com");
     expect(aviso.botao).toEqual({ rotulo: "Abrir a empresa", href: `https://crm.exemplo.com/admin/tenants/${ORG}` });
     expect(JSON.stringify(aviso)).not.toContain(EMAIL);

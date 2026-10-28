@@ -12,7 +12,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { marcaDaSaida } from "@/lib/branding/saida";
 import { sendEmail } from "@/lib/email/roteador";
-import { buildEmailDaCobranca } from "@/lib/email/templates/cobranca";
+import { buildEmailDoAlertaMeta } from "@/lib/email/templates/alerta-meta";
 import { env } from "@/lib/env";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { normalizarIdioma, type Idioma } from "@/lib/i18n/idiomas";
@@ -164,13 +164,13 @@ export async function alertarVencimentoDaMeta(
 
       const marca = await marcaDaSaida(org);
       const base = (env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
-      const email = buildEmailDaCobranca({
+      const email = buildEmailDoAlertaMeta({
         titulo: texto.titulo,
         corpo: texto.corpo,
         marca,
-        idioma,
         botao: { rotulo: traduzir("Reconectar com Meta", idioma), href: `${base}${LINK}` },
         rodape: traduzir("Você recebe este aviso porque administra esta empresa.", idioma),
+        idioma,
       });
       // O WhatsApp da equipe é independente: falha dele não toca sino, push nem e-mail.
       if (enviarWhatsApp) {

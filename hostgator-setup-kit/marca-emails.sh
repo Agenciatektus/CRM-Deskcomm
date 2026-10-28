@@ -300,9 +300,11 @@ if [ -n "$RENDER_EM" ]; then
   if [ "${SINGLE_SERVER:-0}" = "1" ]; then
     c_dim "    GOTRUE_MAILER_TEMPLATES_CONFIRMATION=${BASE_INTERNA_DO_APP:-http://app:3000}/email-templates/confirmation"
     c_dim "    GOTRUE_MAILER_TEMPLATES_RECOVERY=${BASE_INTERNA_DO_APP:-http://app:3000}/email-templates/recovery"
+    c_dim "    GOTRUE_MAILER_TEMPLATES_EMAIL_CHANGE=${BASE_INTERNA_DO_APP:-http://app:3000}/email-templates/email_change"
   else
     c_dim "    GOTRUE_MAILER_TEMPLATES_CONFIRMATION=${NEXT_PUBLIC_APP_URL:-https://SEU_DOMINIO}/email-templates/confirmation"
     c_dim "    GOTRUE_MAILER_TEMPLATES_RECOVERY=${NEXT_PUBLIC_APP_URL:-https://SEU_DOMINIO}/email-templates/recovery"
+    c_dim "    GOTRUE_MAILER_TEMPLATES_EMAIL_CHANGE=${NEXT_PUBLIC_APP_URL:-https://SEU_DOMINIO}/email-templates/email_change"
   fi
   exit 0
 fi
@@ -353,6 +355,10 @@ esac
     para a rota do app, que serve o modelo já com a marca do banco:
       GOTRUE_MAILER_TEMPLATES_CONFIRMATION=${NEXT_PUBLIC_APP_URL:-https://SEU_DOMINIO}/email-templates/confirmation
       GOTRUE_MAILER_TEMPLATES_RECOVERY=${NEXT_PUBLIC_APP_URL:-https://SEU_DOMINIO}/email-templates/recovery
+      GOTRUE_MAILER_TEMPLATES_EMAIL_CHANGE=${NEXT_PUBLIC_APP_URL:-https://SEU_DOMINIO}/email-templates/email_change
+      GOTRUE_MAILER_SUBJECTS_CONFIRMATION="Confirme seu e-mail no $APP_NOME"
+      GOTRUE_MAILER_SUBJECTS_RECOVERY="Redefina sua senha no $APP_NOME"
+      GOTRUE_MAILER_SUBJECTS_EMAIL_CHANGE="Confirme a troca de e-mail no $APP_NOME"
     Tem de ser URL http(s): caminho de arquivo o GoTrue cola no fim do SITE_URL
     e busca, e o cliente recebe a tela de login dentro do e-mail."
 

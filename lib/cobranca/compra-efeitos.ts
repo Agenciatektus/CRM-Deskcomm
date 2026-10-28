@@ -58,6 +58,22 @@ async function atorDoConvite(admin: SupabaseClient): Promise<{ id: string; nome:
   return { id, nome };
 }
 
+/** "Profissional, R$ 397,00 por mês". Melhor esforço: plano ilegível vira "plano contratado". */
+async function descricaoDoPlano(admin: SupabaseClient, org: string): Promise<string> {
+  try {
+    const { data: ass } = await admin.from("cobranca_assinaturas").select("plano_id").eq("organization_id", org).maybeSingle();
+    const planoId = (ass as { plano_id: string } | null)?.plano_id;
+    if (!planoId) return "plano contratado";
+    const { data } = await admin.from("cobranca_planos").select("nome, preco_cents, intervalo").eq("id", planoId).maybeSingle();
+    const p = data as { nome: string; preco_cents: number | string; intervalo: string } | null;
+    if (!p) return "plano contratado";
+    const valor = (Number(p.preco_cents) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    return `${p.nome}, ${valor} por ${p.intervalo === "ano" ? "ano" : "mês"}`;
+  } catch {
+    return "plano contratado";
+  }
+}
+
 export function efeitosDaCompra(admin: SupabaseClient): Pick<DependenciasDaCompra, "aoCriar" | "aoDuplicar"> {
   return {
     async aoCriar(org, compra) {
@@ -89,12 +105,14 @@ export function efeitosDaCompra(admin: SupabaseClient): Pick<DependenciasDaCompr
           inviterId: ator.id,
           inviterName: ator.nome,
           requestId: `compra-${compra.id}`,
+          origem: "compra",
         });
       }
 
       await avisarDonosDaInstalacao(admin, {
-        titulo: `Nova empresa criada por compra direta: ${empresa}`,
-        corpo: `${empresa} comprou o plano ${compra.plano_chave ?? "(sem plano)"} e a empresa já está criada. O convite de administrador foi enviado ao e-mail do pagador (${mascararEmail(compra.email)}).`,
+        eyebrow: "Compra direta",
+        titulo: `Nova empresa por compra direta: ${empresa}`,
+        corpo: `${empresa} contratou o plano ${await descricaoDoPlano(admin, org)}. A empresa já está criada. O convite de administrador foi enviado ao e-mail do pagador (${mascararEmail(compra.email)}).`,
         botao: { rotulo: "Abrir a empresa", href: `${base()}/admin/tenants/${org}` },
       });
 

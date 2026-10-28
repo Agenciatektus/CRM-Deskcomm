@@ -2187,6 +2187,10 @@ $(sed 's/^/    /' "$PENDENCIA_EMAIL")
        GOTRUE_URI_ALLOW_LIST=https://${DOMAIN}/auth/confirm
        GOTRUE_MAILER_TEMPLATES_CONFIRMATION=https://${DOMAIN}/email-templates/confirmation
        GOTRUE_MAILER_TEMPLATES_RECOVERY=https://${DOMAIN}/email-templates/recovery
+       GOTRUE_MAILER_TEMPLATES_EMAIL_CHANGE=https://${DOMAIN}/email-templates/email_change
+       GOTRUE_MAILER_SUBJECTS_CONFIRMATION="Confirme seu e-mail no ${APP_NAME:-Verdash CRM}"
+       GOTRUE_MAILER_SUBJECTS_RECOVERY="Redefina sua senha no ${APP_NAME:-Verdash CRM}"
+       GOTRUE_MAILER_SUBJECTS_EMAIL_CHANGE="Confirme a troca de e-mail no ${APP_NAME:-Verdash CRM}"
 
   $(c_ylw "$(t "Tem de ser URL http(s).")") $(t "O GoTrue cola no fim do SITE_URL tudo o que não")
   $(t "começa com \`http\` e busca por HTTP — um caminho de arquivo faz o cliente")

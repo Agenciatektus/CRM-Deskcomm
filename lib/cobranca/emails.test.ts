@@ -50,7 +50,7 @@ describe("enviarAvisoAosAdmins", () => {
     expect(h.enviar).toHaveBeenCalledTimes(2);
     expect(h.enviar.mock.calls.map((c) => c[0].to)).toEqual(["ana@exemplo.com", "bia@exemplo.com"]);
     expect(h.enviar.mock.calls[0]?.[0].html).toContain('href="https://invoice.stripe.com/i/x"');
-    expect(h.enviar.mock.calls[0]?.[0].subject).toBe("Não identificamos o pagamento de 05/10 — Revenda");
+    expect(h.enviar.mock.calls[0]?.[0].subject).toBe("Não identificamos o pagamento de 05/10 no Revenda");
   });
 
   it("sem link de pagamento, o botão abre Plano e cobrança", async () => {
