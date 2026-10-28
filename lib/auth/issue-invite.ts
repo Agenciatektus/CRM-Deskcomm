@@ -7,7 +7,7 @@ import {
 import { randomUUID } from "node:crypto";
 import { env } from "@/lib/env";
 import { audit } from "@/lib/audit";
-import { signInviteToken, INVITE_TTL_SECONDS } from "@/lib/auth/invite-token";
+import { signInviteToken, INVITE_TTL_SECONDS, INVITE_TTL_COMPRA_SECONDS } from "@/lib/auth/invite-token";
 import { buildInviteEmail } from "@/lib/email/templates/invite";
 import { sendEmail, type EmailDeliveryError, type TransporteDeEmail } from "@/lib/email/roteador";
 import { marcaDaSaida } from "@/lib/branding/saida";
@@ -25,6 +25,8 @@ export async function issueInvite(input: {
   inviteId?: string;
   issuedAt?: number;
   dispatch?: boolean;
+  /** "compra" = e-mail de compra confirmada e prazo de 7 dias. */
+  origem?: "equipe" | "compra";
 }) {
   const interfaceSettings = interfaceSettingsSchema.parse(
     input.interfaceSettings ?? INTERFACE_COMPLETA,
@@ -34,7 +36,7 @@ export async function issueInvite(input: {
   const email = input.email.trim().toLowerCase();
   const inviteId = input.inviteId ?? randomUUID();
   const iat = input.issuedAt ?? Math.floor(Date.now() / 1000);
-  const exp = iat + INVITE_TTL_SECONDS;
+  const exp = iat + (input.origem === "compra" ? INVITE_TTL_COMPRA_SECONDS : INVITE_TTL_SECONDS);
   const token = signInviteToken({
     invite_id: inviteId,
     email,
@@ -70,6 +72,7 @@ export async function issueInvite(input: {
         role: input.role,
         expiresAt: new Date(exp * 1000),
         marca,
+        origem: input.origem,
       });
       const result = await sendEmail({
         to: email,

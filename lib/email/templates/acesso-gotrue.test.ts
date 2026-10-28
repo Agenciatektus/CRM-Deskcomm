@@ -40,8 +40,10 @@ describe("moldes de acesso do GoTrue", () => {
       it("usa `&`, nunca `?` — `.RedirectTo` já traz `?type=`", () => {
         // Com `?` o separador duplica (`...?type=signup?token_hash=...`) e o
         // parser de URL do browser para de reconhecer `token_hash`.
-        expect(html).toContain("{{ .RedirectTo }}&token_hash={{ .TokenHash }}");
+        // `&` vira `&amp;` no atributo, e o cliente de e-mail o lê como `&`.
+        expect(html).toContain("{{ .RedirectTo }}&amp;token_hash={{ .TokenHash }}");
         expect(html).not.toContain("{{ .RedirectTo }}?token_hash");
+        expect(html).not.toContain("—");
       });
 
       it("não sobrou placeholder de renderização por script", () => {
@@ -66,11 +68,6 @@ describe("moldes de acesso do GoTrue", () => {
     expect(montarTemplateDeAcesso("email_change", MARCA)).toContain("{{ .NewEmail }}");
     // Controle: os outros modelos não têm endereço novo para mostrar.
     expect(montarTemplateDeAcesso("recovery", MARCA)).not.toContain("{{ .NewEmail }}");
-  });
-
-  it("sem logo configurado, nada é desenhado no lugar", () => {
-    const html = montarTemplateDeAcesso("confirmation", { ...MARCA, logoUrl: null });
-    expect(html).not.toContain("<img");
   });
 
   it("a rota dos moldes é PÚBLICA — senão o GoTrue recebe a tela de login", () => {

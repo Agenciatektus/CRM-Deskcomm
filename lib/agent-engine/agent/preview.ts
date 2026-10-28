@@ -184,6 +184,9 @@ export const SCENARIO_READS = new Set([
   // em "vou confirmar e te retorno". Dado de contato/lead continua fora daqui.
   'crm_search_products',
   'crm_search_knowledge',
+  // Estoque e preço da loja conectada: dado da ORGANIZAÇÃO (a ferramenta só usa
+  // `organizationId`). Sem isto o Testar devolvia `scenario_contact_unavailable`.
+  'crm_check_store_stock',
 ]);
 /**
  * A cadeia do Testar (sandbox): a de produção, com DOIS vetos rebaixados a aviso.

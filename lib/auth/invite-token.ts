@@ -82,3 +82,5 @@ export function verifyInviteToken(token: string): InvitePayload | null {
 }
 
 export const INVITE_TTL_SECONDS = 60 * 60 * 24; // 24h
+/** Convite pós-compra: o dono ainda vai ler o e-mail com calma. */
+export const INVITE_TTL_COMPRA_SECONDS = 60 * 60 * 24 * 7; // 7 dias

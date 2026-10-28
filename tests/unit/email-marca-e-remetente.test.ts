@@ -9,7 +9,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { NEUTROS_DE_SAIDA, type MarcaDeSaida } from "@/lib/branding/saida";
+import { type MarcaDeSaida } from "@/lib/branding/saida";
 import type { SmtpConfig } from "@/lib/email/config";
 import { buildInviteEmail } from "@/lib/email/templates/invite";
 
@@ -41,69 +41,20 @@ describe("convite de time", () => {
     expect(`${subject} ${html} ${text}`).not.toMatch(/deskcomm/i);
   });
 
-  it("o botão usa o accent E a frente calculada — não um azul fixo", () => {
-    const { html } = convite();
-
-    expect(html).toContain(`background:${MARCA.accent}`);
-    expect(html).toContain(`color:${MARCA.accentFg}`);
-    // `#0ea5e9` era o azul que ninguém escolheu: não pertence à rampa do produto
-    // e não tinha relação com marca nenhuma.
-    expect(html).not.toContain("#0ea5e9");
-  });
-
-  it("o resto do corpo vem dos neutros da régua, não de cinzas inventados", () => {
-    const { html } = convite();
-
-    expect(html).toContain(NEUTROS_DE_SAIDA.texto);
-    expect(html).toContain(NEUTROS_DE_SAIDA.suave);
-    // Os cinzas de dois design systems diferentes que conviviam no arquivo.
-    for (const orfao of ["#1c1917", "#57534e", "#78716c", "#f5f5f4", "#0c0a09"]) {
-      expect(html).not.toContain(orfao);
-    }
-  });
-
-  it("o logo de quem convidou vai no topo, com dimensão em ATRIBUTO", () => {
-    // POR QUE: `MarcaDeSaida.logoUrl` era resolvido, entregue a este template e
-    // renderizado por ninguém — meia marca no e-mail que a pessoa abre ANTES de
-    // ter visto qualquer tela. A dimensão vai também no atributo porque Outlook
-    // desktop descarta `height` de style e desenharia a arte no tamanho original.
-    const { html } = buildInviteEmail({
-      inviterName: "Ana",
-      orgName: "Clínica Bem Viver",
-      acceptUrl: "https://crm.exemplo.com.br/team/accept-invite/tok",
-      role: "agent",
-      expiresAt: new Date("2026-08-20T12:00:00.000Z"),
-      marca: { ...MARCA, logoUrl: "https://cdn.exemplo.test/revendedor.png" },
-    });
-
-    expect(html).toContain('src="https://cdn.exemplo.test/revendedor.png"');
-    expect(html).toContain('height="40"');
-    // Legendado com a marca, não com "logo": num leitor de tela (e num cliente
-    // que bloqueia imagem) é o `alt` que diz de quem é o e-mail.
-    expect(html).toContain('alt="Vendas Turbo"');
-  });
-
-  it("sem logo configurado o corpo não tem `<img>` nenhum", () => {
-    // Guarda de vacuidade do caso acima e defeito real evitado: um `<img>` com
-    // `src` vazio faz o cliente de e-mail desenhar o ícone de imagem quebrada no
-    // topo — pior que ausência, e é o estado de fábrica de toda instalação.
-    expect(convite().html).not.toContain("<img");
-  });
-
-  it("URL de logo com aspas não escapa do atributo", () => {
-    // `platform_branding.logo_url` é `text` livre no banco e a tela de marca
-    // ainda não o edita — o valor pode ter vindo de SQL ou de um `.env` colado.
+  it("o visual é o do layout fixo: sem cor de marca nem logo por organização", () => {
+    // O layout dos e-mails é a identidade do produto (sem white-label); a marca
+    // da instalação entra só no assunto e no texto.
     const { html } = buildInviteEmail({
       inviterName: "Ana",
       orgName: "Acme",
       acceptUrl: "https://x/y",
       role: "agent",
       expiresAt: new Date("2026-08-20T12:00:00.000Z"),
-      marca: { ...MARCA, logoUrl: 'https://x/y.png" onerror="alert(1)' },
+      marca: { ...MARCA, logoUrl: "https://cdn.exemplo.test/revendedor.png" },
     });
 
-    expect(html).not.toContain('onerror="alert(1)"');
-    expect(html).toContain("&quot; onerror=&quot;alert(1)");
+    expect(html).not.toContain("revendedor.png");
+    expect(html).not.toContain(MARCA.accent);
   });
 
   it("marca com HTML dentro é escapada no corpo", () => {
