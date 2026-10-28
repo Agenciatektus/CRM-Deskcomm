@@ -6579,6 +6579,7 @@ export const DICIONARIO: Traducoes = {
   "Card criado em outro funil": { es: "Tarjeta creada en otro embudo" },
   "Esta automação já tinha criado o card no funil de destino para este negócio — não foi criado outro.": { es: "Esta automatización ya había creado la tarjeta en el embudo de destino para este negocio — no se creó otra." },
   "O contato já tem um card aberto no funil de destino, então não foi criado outro.": { es: "El contacto ya tiene una tarjeta abierta en el embudo de destino, así que no se creó otra." },
+  "O contato já tinha um card aberto no funil de destino (criado no mesmo instante por outro caminho), então esse foi reaproveitado e não foi criado outro.": { es: "El contacto ya tenía una tarjeta abierta en el embudo de destino (creada al mismo tiempo por otro camino), así que se reutilizó esa y no se creó otra." },
   "O card que disparou a regra não foi encontrado nesta organização (pode ter sido apagado).": { es: "La tarjeta que disparó la regla no se encontró en esta organización (puede haber sido borrada)." },
   "O funil de destino é o mesmo do card que disparou a regra. Escolha outro funil na automação.": { es: "El embudo de destino es el mismo de la tarjeta que disparó la regla. Elige otro embudo en la automatización." },
   "O funil de destino não existe mais ou foi arquivado. Abra a automação e escolha outro funil.": { es: "El embudo de destino ya no existe o fue archivado. Abre la automatización y elige otro embudo." },
