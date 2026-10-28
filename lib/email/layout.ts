@@ -3,7 +3,8 @@
  * (sem white-label por organização). Tabelas e estilo inline com `bgcolor`
  * (clientes com modo escuro forçado ignoram CSS); o `<style>` só acrescenta
  * o que degrada bem sem ele: a moldura da página (brilhos de canto do CRM), o
- * fundo e a trama de pontos da coluna de conversa do Inbox, o degradê do
+ * o fundo e o ruído de 3 px dos cards do CRM (`pele-ruido` sobre `--color-surface`,
+ * medidos em produção na página de Conexões), o degradê do
  * botão e o ajuste de celular.
  */
 import { env } from "@/lib/env";
@@ -11,9 +12,9 @@ import { DEFAULT_APP_NAME } from "@/lib/branding";
 
 export const TOKENS_EMAIL = {
   fundo: "#0d0e11",
-  cartao: "#111315",
+  cartao: "#181a1c",
   caixa: "#202327",
-  borda: "#26292d",
+  borda: "#292c2f",
   texto: "#f0f2f4",
   suave: "#9aa0a8",
   botao: "#2a52d8",
@@ -107,7 +108,7 @@ export function montarEmail(e: EntradaEmail): { html: string; text: string } {
 body{margin:0;padding:0;background:${T.fundo}}
 .pre{display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;max-height:0;max-width:0;overflow:hidden;font-size:1px;line-height:1px;mso-hide:all}
 .grade{background-color:${T.fundo};background-image:radial-gradient(672px 352px at -96px -96px,rgba(42,82,216,0.16),transparent 70%),radial-gradient(576px 288px at 100% -128px,rgba(43,140,173,0.10),transparent 70%);background-repeat:no-repeat}
-.cartao{background-color:${T.cartao};background-image:radial-gradient(ellipse 80% 42% at 50% -12%,rgba(43,140,173,0.13),transparent 62%),radial-gradient(circle at 1px 1px,rgba(255,255,255,0.07) 1px,transparent 0);background-size:auto,18px 18px;background-repeat:no-repeat,repeat}
+.cartao{background-color:${T.cartao};background-image:radial-gradient(circle,rgba(255,255,255,0.035) 0.6px,transparent 0.8px);background-size:3px 3px}
 .cta{background-image:linear-gradient(90deg,${T.botao} 0%,${T.botaoFim} 100%);box-shadow:0 14px 36px -10px rgba(42,82,216,0.55)}
 @media (max-width:600px){.cont{width:100%!important}.px{padding-left:24px!important;padding-right:24px!important}.h1{font-size:26px!important}}
 </style>
@@ -115,7 +116,7 @@ body{margin:0;padding:0;background:${T.fundo}}
 <body bgcolor="${T.fundo}" style="margin:0;padding:0;background:${T.fundo};color:${T.texto}">
 <div class="pre">${escapeHtml(pre)}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${T.fundo}" class="grade" style="background-color:${T.fundo}"><tr><td align="center" style="padding:44px 16px">
-<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="${T.cartao}" class="cont cartao" style="width:100%;max-width:600px;background-color:${T.cartao};border:1px solid ${T.borda};border-radius:26px">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="${T.cartao}" class="cont cartao" style="width:100%;max-width:600px;background-color:${T.cartao};border:1px solid ${T.borda};border-radius:16px">
 <tr><td align="center" class="px" style="padding:48px 44px 4px">${logo}<div style="font-family:${FONTE};font-size:28px;font-weight:700;letter-spacing:-0.02em;line-height:1;color:#ffffff">${escapeHtml(nome)}</div><div style="margin-top:12px;font-family:${FONTE};font-size:12px;line-height:1.5;color:${T.suave}">${escapeHtml(TAGLINE)}</div></td></tr>
 ${linha}
 <tr><td class="px" style="padding:32px 44px 6px">${e.eyebrow ? `<p style="margin:0 0 14px;font-family:${FONTE};font-size:11px;font-weight:600;line-height:1;letter-spacing:0.26em;text-transform:uppercase;color:${T.destaque}">${escapeHtml(e.eyebrow)}</p>` : ""}<h1 class="h1" style="margin:0 0 12px;font-family:${FONTE};font-size:30px;font-weight:700;line-height:1.15;letter-spacing:-0.02em;color:#ffffff">${escapeHtml(e.titulo)}</h1>${e.subtitulo ? p(e.subtitulo, T.suave, 16, 0) : ""}</td></tr>
