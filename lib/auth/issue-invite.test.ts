@@ -34,3 +34,8 @@ it("replay usa identidade/prazo estáveis e não reenvia", async () => {
   expect(h.send).not.toHaveBeenCalled();
   expect(h.audit).not.toHaveBeenCalled();
 });
+it("origem compra vale 7 dias; o padrão segue em 24 h", async () => {
+  const args = { ...input, dispatch: false, issuedAt: 1_800_000_000 };
+  expect(Date.parse((await issueInvite(args)).expires_at) / 1000).toBe(1_800_000_000 + 86400);
+  expect(Date.parse((await issueInvite({ ...args, origem: "compra" })).expires_at) / 1000).toBe(1_800_000_000 + 7 * 86400);
+});

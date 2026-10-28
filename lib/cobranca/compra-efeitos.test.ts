@@ -46,6 +46,7 @@ describe("efeitosDaCompra.aoCriar", () => {
       inviterId: "dono-antigo",
       inviterName: "Marca da Instalação",
       requestId: "compra-compra-9",
+      origem: "compra",
     });
     const donos = banco.cadeias.find((c) => c.tabela === "platform_admins")!;
     expect(valorDoFiltro(donos, "eq", "scope")).toBe("full");
