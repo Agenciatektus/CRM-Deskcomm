@@ -201,6 +201,8 @@ begin
     if result?'apply_remote' then
      if a.status not in ('pending','confirmed') then raise exception 'google_outcome_protected' using errcode='PT409';end if;
      -- 9083: a sobreposição só é conflito quando estoura os atendimentos simultâneos do dono (capacidade 1 = qualquer sobreposição, como antes).
+     -- O mesmo lock do gatilho: sem ele uma reserva da rota comita entre esta conta e o UPDATE, e o 23P01 sai como erro em vez de overlap.
+     perform pg_advisory_xact_lock(hashtextextended('agenda:'||p_org||':'||a.owner_user_id,0));
      if not coalesce((remote->>'cancelled')::boolean,false) and public.fn_agenda_lotada(p_org,a.owner_user_id,a.id,(remote->>'starts_at')::timestamptz,(remote->>'ends_at')::timestamptz) then
       return jsonb_build_object('overlap',true);end if;
      changed:=row(a.starts_at,a.ends_at,a.time_zone,a.status='cancelled') is distinct from row((remote->>'starts_at')::timestamptz,(remote->>'ends_at')::timestamptz,remote->>'time_zone',(remote->>'cancelled')::boolean);
