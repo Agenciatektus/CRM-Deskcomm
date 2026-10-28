@@ -104,7 +104,7 @@ export function ocupadosDoDono(
   for (const linha of agendamentos) {
     if (LIBERAM_O_HORARIO.has(linha.status)) continue;
     const intervalo = intervaloValido(linha.starts_at, linha.ends_at);
-    if (intervalo) ocupados.push(intervalo);
+    if (intervalo) ocupados.push({ ...intervalo, doCrm: true });
   }
 
   for (const linha of externos) {

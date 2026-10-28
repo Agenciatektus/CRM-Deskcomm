@@ -16,6 +16,8 @@ export interface AttendantAvailability {
   /** null = atendente ainda sem linha de availability (nunca configurado). */
   capacity: number | null;
   schedule: AvailabilitySchedule;
+  /** Atendimentos da agenda ao mesmo tempo (1 = um cliente por vez). */
+  simultaneous_appointments: number;
   updated_at: string | null;
   /** Conversas abertas atribuídas (G5-04): a mesma carga que o router usa. */
   current_load: number;
@@ -80,6 +82,7 @@ export interface AvailabilityUpdate {
   is_available?: boolean;
   capacity?: number;
   schedule?: AvailabilitySchedule;
+  simultaneous_appointments?: number;
 }
 
 /** PATCH disponibilidade de um atendente (próprio OU manager+; a API enforça). */

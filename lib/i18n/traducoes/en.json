@@ -1077,6 +1077,8 @@
   "Nome completo": "Full name",
   "Trocar email — em breve.": "Change email — coming soon.",
   "Fuso horário": "Time zone",
+  "Atendimentos simultâneos na agenda": "Simultaneous appointments in the calendar",
+  "Quantos clientes esta pessoa atende ao mesmo tempo. Use 1 para um cliente por vez; num salão, a química age enquanto ela atende outra cliente.": "How many clients this person serves at the same time. Use 1 for one client at a time; in a salon, the chemical treatment works while she serves another client.",
   "Avatar URL": "Avatar URL",
   "Upload de arquivo — em breve. Cole uma URL pública.": "File upload coming soon. Paste a public URL.",
   "Nome de exibição": "Display name",

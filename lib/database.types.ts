@@ -3054,6 +3054,7 @@ export type Database = {
           last_heartbeat_at: string | null
           organization_id: string
           schedule: Json
+          simultaneous_appointments: number
           updated_at: string
           user_id: string
         }
@@ -3064,6 +3065,7 @@ export type Database = {
           last_heartbeat_at?: string | null
           organization_id: string
           schedule?: Json
+          simultaneous_appointments?: number
           updated_at?: string
           user_id: string
         }
@@ -3074,6 +3076,7 @@ export type Database = {
           last_heartbeat_at?: string | null
           organization_id?: string
           schedule?: Json
+          simultaneous_appointments?: number
           updated_at?: string
           user_id?: string
         }

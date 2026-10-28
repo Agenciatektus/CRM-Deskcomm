@@ -44,6 +44,7 @@ function disponibilidade(windows: ScheduleWindow[]): AttendantAvailability {
     schedule: { timezone: NA_TELA, windows },
     updated_at: "2026-10-01T12:00:00.000Z",
     current_load: 0,
+    simultaneous_appointments: 1,
     last_heartbeat_at: null,
     present: false,
   };
