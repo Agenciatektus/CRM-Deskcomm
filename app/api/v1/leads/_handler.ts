@@ -14,6 +14,7 @@ import { ApiError } from "@/lib/api/types";
 import type { Actor, HandlerCtx } from "@/lib/api/handlers/types";
 import { audit } from "@/lib/audit";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { acompanharDonoNaConversa } from "@/lib/leads/acompanhar-dono-na-conversa";
 import { resolveOwnerPatch, type OwnerPatch, type OwnerPatchInput } from "@/lib/leads/owner-patch";
 import { emitLeadActivity, stageChangeReason } from "@/lib/leads/activity-emitter";
 import { listaLegivel } from "@/lib/leads/activity-vocabulary";
@@ -754,6 +755,14 @@ export async function createLeadHandler(
     );
   }
 
+  if (ownerPatch.owner_user_id) {
+    await acompanharDonoNaConversa(supabase, {
+      organizationId: ctx.organization_id,
+      contactIds: [input.contact_id],
+      novoDonoUserId: ownerPatch.owner_user_id,
+    });
+  }
+
   if (donoHerdadoDescartado) {
     const leadId = (lead as { id: string }).id;
     const atividade = await emitLeadActivity(supabase, {
@@ -950,6 +959,15 @@ export async function updateLeadHandler(
       ctx.requestId,
       traduzir("Lead não encontrado.", ctx.idioma ?? "pt-BR"),
     );
+  }
+
+  // Dono humano novo => a conversa do contato vai junto (falha só loga).
+  if (ownerPatch?.owner_user_id) {
+    await acompanharDonoNaConversa(supabase, {
+      organizationId: ctx.organization_id,
+      contactIds: [(updated as { contact_id?: string | null }).contact_id],
+      novoDonoUserId: ownerPatch.owner_user_id,
+    });
   }
 
   // O MERGE ATÔMICO. `updated` já provou que o lead existe e é da organização,
