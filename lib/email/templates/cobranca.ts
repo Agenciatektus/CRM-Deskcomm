@@ -24,6 +24,7 @@ export interface EmailDaCobranca {
 export function buildEmailDaCobranca(o: EmailDaCobranca): { subject: string; html: string; text: string } {
   const subject = `${o.titulo} no ${o.marca.nome}`;
   const { html, text } = montarEmail({
+    idioma: o.idioma,
     assunto: subject,
     eyebrow: o.eyebrow ?? "Cobrança",
     titulo: o.titulo,

@@ -36,6 +36,7 @@ export function buildAvisoDeTrocaDeEmail(opts: AvisoDeTrocaDeEmailOpcoes): {
   const deAgoraEmDiante = t("Este endereço deixa de receber os e-mails de acesso desta conta.");
 
   const { html, text } = montarEmail({
+    idioma: opts.idioma,
     assunto: subject,
     eyebrow: t("Segurança"),
     titulo: subject,
