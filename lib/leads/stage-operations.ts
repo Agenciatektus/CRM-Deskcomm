@@ -619,7 +619,7 @@ export async function arquivarEtapa(
     // Etapa encerrada indo para uma aberta reabre os cards; um contato com outro
     // aberto no funil barra no índice 9082.
     if (error && ehViolacaoDoLeadUnico(error)) {
-      throw new ApiError(409, RECUSA_DO_LEAD_UNICO.codigo, { erro: error.message }, deps.requestId, RECUSA_DO_LEAD_UNICO.mensagem);
+      throw new ApiError(409, RECUSA_DO_LEAD_UNICO.codigo, undefined, deps.requestId, RECUSA_DO_LEAD_UNICO.mensagem);
     }
     if (error) {
       // O texto do Postgres vai em `details`, não colado na frase: a mensagem é
