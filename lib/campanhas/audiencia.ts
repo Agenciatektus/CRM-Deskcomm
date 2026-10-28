@@ -146,6 +146,18 @@ export const filtroDeAudienciaSchema = z
 
 export type FiltroDeAudiencia = z.infer<typeof filtroDeAudienciaSchema>;
 
+const CHAVES_DO_FILTRO = new Set(Object.keys(filtroDeAudienciaSchema.shape));
+
+/**
+ * Lê o filtro SALVO descartando chave que o schema atual não conhece: o schema é
+ * `strictObject`, e uma chave removida no futuro daria 422 em todo Salvar das
+ * campanhas antigas. Só o nível de cima; o bloco `excluir` segue estrito.
+ */
+export function limparFiltroSalvo(bruto: unknown): Record<string, unknown> {
+  if (!bruto || typeof bruto !== "object" || Array.isArray(bruto)) return {};
+  return Object.fromEntries(Object.entries(bruto).filter(([k]) => CHAVES_DO_FILTRO.has(k)));
+}
+
 /** Um filtro vazio, para campanha recém-criada. Não passa no `refine` — e é o ponto. */
 export const FILTRO_VAZIO = {
   com_todas_tags: [],
