@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { criarFunilDosPedidos, escolherFunilDosPedidos } from "@/app/actions/integrations/funilDosPedidosNuvemshop";
 import { useT } from "@/hooks/i18n/useT";
 
@@ -31,20 +32,22 @@ export function FunilDosPedidos({
     });
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <select
-        className="h-9 rounded-md border bg-background px-2 text-sm"
+      <Select
         value={escolhidoId ?? ""}
         disabled={disabled || pending || funis.length === 0}
-        onChange={(e) => e.target.value && rodar(() => escolherFunilDosPedidos(e.target.value))}
-        aria-label={t("Funil dos pedidos")}
+        onValueChange={(id) => id && rodar(() => escolherFunilDosPedidos(id))}
       >
-        <option value="">{t("Escolha um funil")}</option>
-        {funis.map((f) => (
-          <option key={f.id} value={f.id}>
-            {f.name}
-          </option>
-        ))}
-      </select>
+        <SelectTrigger className="h-9 w-[240px]" aria-label={t("Funil dos pedidos")}>
+          <SelectValue placeholder={t("Escolha um funil")} />
+        </SelectTrigger>
+        <SelectContent>
+          {funis.map((f) => (
+            <SelectItem key={f.id} value={f.id}>
+              {f.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
       <Button variant="outline" disabled={disabled || pending} onClick={() => rodar(criarFunilDosPedidos)}>
         {t("Criar funil padrão")}
       </Button>
