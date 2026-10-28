@@ -49,7 +49,7 @@ describe("efeitosDaCompra.aoCriar", () => {
     });
     const donos = banco.cadeias.find((c) => c.tabela === "platform_admins")!;
     expect(valorDoFiltro(donos, "eq", "scope")).toBe("full");
-    expect(donos.passos.find((p) => p.metodo === "order")?.args).toEqual(["created_at", { ascending: true }]);
+    expect(donos.passos.find((p) => p.metodo === "order")?.args).toEqual(["granted_at", { ascending: true }]);
     const convites = banco.cadeias.find((c) => c.tabela === "team_invites")!;
     expect(filtros(convites)).toEqual([["eq", "organization_id", ORG], ["eq", "email", EMAIL]]);
   });
