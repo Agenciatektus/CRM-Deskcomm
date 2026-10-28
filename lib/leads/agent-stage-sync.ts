@@ -6,6 +6,7 @@ import {
   validaCamposExigidos,
 } from "@/lib/leads/campos-exigidos";
 import { decideMotivoDaPerda, recusaDeMotivoDaPerdaPeloBanco } from "@/lib/leads/motivo-da-perda";
+import { RECUSA_DO_LEAD_UNICO, ehViolacaoDoLeadUnico } from "@/lib/leads/negocio-aberto-duplicado";
 
 /**
  * O funil do AGENTE movendo o card no funil do TENANT (wave 8, cenários 25/26).
@@ -383,7 +384,10 @@ export async function sincronizaEstagioDoAgente(
     if (recusa) {
       return { moveu: false, motivo: "perda_sem_motivo", leadId: lead.id, detalhe: recusa.mensagem };
     }
-    return { moveu: false, motivo: "falha_de_escrita", leadId: lead.id, detalhe: error.message };
+    // 9082: reabrir com outro aberto do contato no funil. Rótulo do vocabulário
+    // existente; o detalhe é a frase de negócio, não o texto do Postgres.
+    const detalhe = ehViolacaoDoLeadUnico(error) ? RECUSA_DO_LEAD_UNICO.mensagem : error.message;
+    return { moveu: false, motivo: "falha_de_escrita", leadId: lead.id, detalhe };
   }
   if ((atualizadas ?? []).length === 0) {
     // A trava atuou: um humano moveu o card no meio da operação. Não é erro (a

@@ -45,7 +45,11 @@ import {
 import { motivosDaCategoria } from "@/lib/leads/motivos-de-perda-do-funil";
 import type { CreateLeadInput, UpdateLeadInput } from "@/lib/schemas";
 import { ehCorrecaoDeMovimentoDaIa } from "@/lib/leads/correcao-humana";
-import { ehViolacaoDoLeadUnico, entraNoLeadUnico } from "@/lib/leads/negocio-aberto-duplicado";
+import {
+  RECUSA_DO_LEAD_UNICO,
+  ehViolacaoDoLeadUnico,
+  entraNoLeadUnico,
+} from "@/lib/leads/negocio-aberto-duplicado";
 
 type SB = SupabaseClient;
 
@@ -228,6 +232,18 @@ async function recusaPessoalNaEscrita(
       traduzir("Contato marcado como pessoal.", ctx.idioma ?? "pt-BR"),
     );
   }
+}
+
+/** O 23505 do índice 9082 como recusa de negócio (409), nunca o texto do Postgres. */
+function recusaDoLeadUnico(ctx: HandlerCtx, erro: { code?: string; message?: string } | null): ApiError | null {
+  if (!ehViolacaoDoLeadUnico(erro)) return null;
+  return new ApiError(
+    409,
+    RECUSA_DO_LEAD_UNICO.codigo,
+    undefined,
+    ctx.requestId,
+    traduzir(RECUSA_DO_LEAD_UNICO.mensagem, ctx.idioma ?? "pt-BR"),
+  );
 }
 
 /**
@@ -744,13 +760,7 @@ export async function createLeadHandler(
   if (leadUnico && ehViolacaoDoLeadUnico(insErr)) {
     const aberto = await abertoDoContato();
     if (aberto) return aberto;
-    throw new ApiError(
-      409,
-      "lead_aberto_existente",
-      undefined,
-      ctx.requestId,
-      traduzir("Este contato já tem um negócio aberto neste funil.", ctx.idioma ?? "pt-BR"),
-    );
+    throw recusaDoLeadUnico(ctx, insErr)!;
   }
 
   const recusaNoInsert = recusaDaGuardaDoBanco(ctx, insErr);
@@ -985,6 +995,9 @@ export async function updateLeadHandler(
 
   const recusaNoUpdate = recusaDaGuardaDoBanco(ctx, updErr);
   if (recusaNoUpdate) throw recusaNoUpdate;
+  // Trocar o contato para quem já tem negócio aberto neste funil (9082).
+  const leadUnicoNoUpdate = recusaDoLeadUnico(ctx, updErr);
+  if (leadUnicoNoUpdate) throw leadUnicoNoUpdate;
   if (updErr) {
     throw new ApiError(500, "internal_error", undefined, ctx.requestId, updErr.message);
   }
@@ -1424,7 +1437,9 @@ export async function moveLeadHandler(
     if (recusa) {
       throw new ApiError(422, recusa.codigo, undefined, ctx.requestId, recusa.mensagem);
     }
-    throw new ApiError(500, "internal_error", undefined, ctx.requestId, updErr.message);
+    // Reabrir (etapa ganha/perdida → aberta) com outro aberto no funil (9082).
+    throw recusaDoLeadUnico(ctx, updErr) ??
+      new ApiError(500, "internal_error", undefined, ctx.requestId, updErr.message);
   }
   if (!updated) {
     throw new ApiError(

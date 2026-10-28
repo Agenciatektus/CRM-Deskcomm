@@ -44,7 +44,18 @@ export const AVISO_NEGOCIO_ABERTO_EXISTENTE = "negocio_aberto_existente";
  * predicado da migration; o invariante 9082 confere as duas.
  */
 export const INDICE_DO_LEAD_ABERTO_UNICO = "crm_leads_um_aberto_por_contato_no_funil";
-export const ORIGENS_FORA_DO_LEAD_UNICO: readonly string[] = ["manual", "nuvemshop"];
+// `retomada` fora: retomar abre card NOVO apontando para o perdido (`retomado_de_lead_id`).
+export const ORIGENS_FORA_DO_LEAD_UNICO: readonly string[] = ["manual", "nuvemshop", "retomada"];
+
+/**
+ * A recusa de negócio para o 23505 do índice em qualquer ESCRITA (criar,
+ * mover de etapa ou de funil, reabrir, trocar o contato): 409, frase pt-BR que
+ * quem chama passa no `traduzir`. Nunca o texto cru do Postgres.
+ */
+export const RECUSA_DO_LEAD_UNICO = {
+  codigo: "lead_aberto_existente",
+  mensagem: "Este contato já tem um negócio aberto neste funil.",
+} as const;
 
 export function entraNoLeadUnico(source: string | null | undefined): boolean {
   return !ORIGENS_FORA_DO_LEAD_UNICO.includes(source ?? "manual");
