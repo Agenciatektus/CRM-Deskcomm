@@ -1998,6 +1998,10 @@ export const DICIONARIO: Traducoes = {
   "Nome completo": { es: "Nombre completo" },
   "Trocar email — em breve.": { es: "Cambiar email — próximamente." },
   "Fuso horário": { es: "Zona horaria" },
+  "Atendimentos simultâneos na agenda": { es: "Atenciones simultáneas en la agenda" },
+  "Quantos clientes esta pessoa atende ao mesmo tempo. Use 1 para um cliente por vez; num salão, a química age enquanto ela atende outra cliente.": {
+    es: "Cuántos clientes atiende esta persona al mismo tiempo. Use 1 para un cliente a la vez; en un salón, la química actúa mientras ella atiende a otra clienta.",
+  },
   // ─── Perfil e Organização: foto e troca de e-mail (migration 9061) ───
   "Foto de perfil": { es: "Foto de perfil" },
   "Foto da organização": { es: "Foto de la organización" },

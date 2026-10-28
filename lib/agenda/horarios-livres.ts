@@ -98,6 +98,11 @@ export interface ExcecaoDeData {
 export interface Ocupado {
   inicio: Date;
   fim: Date;
+  /**
+   * Compromisso do CRM: divide o horário até a `capacidade` do dono. Sem a marca
+   * (evento do Google), ocupa inteiro — a agenda de fora não diz quantos cabem.
+   */
+  doCrm?: boolean;
 }
 
 /** As regras do molde (`calendar_event_types`) que o motor precisa conhecer. */
@@ -128,6 +133,11 @@ export interface EntradaDeHorariosLivres {
   ate: Date;
   /** INJETADO. Nunca `new Date()` aqui dentro. */
   agora: Date;
+  /**
+   * Atendimentos simultâneos do dono (`attendant_availability.simultaneous_appointments`).
+   * Ausente ⇒ 1, e com 1 qualquer compromisso esconde o horário, como sempre foi.
+   */
+  capacidade?: number;
 }
 
 const MINUTO = 60_000;
@@ -298,8 +308,23 @@ export function colide(inicio: number, fim: number, faixa: FaixaEmInstantes): bo
   return inicio < faixa.fim && fim > faixa.inicio;
 }
 
+/**
+ * Quantos compromissos estão de pé AO MESMO TEMPO, no pior instante da faixa.
+ *
+ * É o pico, não "quantos cruzam": 13h-14h, 14h-15h e 15h-16h cruzam os três uma faixa
+ * 13h-16h e nunca há dois juntos. O pico de intervalos semiabertos só muda num início,
+ * então basta medir no começo da faixa e em cada início que cai dentro dela. A MESMA
+ * conta mora no banco (`fn_agenda_lotada`, migration 9083), que é quem segura a corrida.
+ */
+export function simultaneosNoPico(faixa: FaixaEmInstantes, ocupados: FaixaEmInstantes[]): number {
+  const cruzam = ocupados.filter((o) => colide(o.inicio, o.fim, faixa));
+  const pontos = [faixa.inicio, ...cruzam.map((o) => o.inicio).filter((t) => t > faixa.inicio)];
+  return Math.max(0, ...pontos.map((t) => cruzam.filter((o) => o.inicio <= t && o.fim > t).length));
+}
+
 export function horariosLivres(entrada: EntradaDeHorariosLivres): Slot[] {
   const { jornada, excecoes, ocupados, tipo, de, ate, agora } = entrada;
+  const capacidade = entrada.capacidade ?? 1;
   const fuso = jornada.timezone;
   const passo = tipo.intervaloMin ?? tipo.duracaoMin;
   if (passo <= 0 || tipo.duracaoMin <= 0) return [];
@@ -313,10 +338,10 @@ export function horariosLivres(entrada: EntradaDeHorariosLivres): Slot[] {
 
   // Os compromissos, em instantes. Os bloqueios por exceção entram por dia, no
   // laço — eles nascem em minutos de parede e só viram instante lá dentro.
-  const compromissos: FaixaEmInstantes[] = ocupados.map((o) => ({
-    inicio: o.inicio.getTime(),
-    fim: o.fim.getTime(),
-  }));
+  // Os do CRM dividem o horário até a capacidade; o resto (Google) bloqueia inteiro.
+  const emInstantesDe = (o: Ocupado): FaixaEmInstantes => ({ inicio: o.inicio.getTime(), fim: o.fim.getTime() });
+  const doCrm = ocupados.filter((o) => o.doCrm).map(emInstantesDe);
+  const compromissos: FaixaEmInstantes[] = ocupados.filter((o) => !o.doCrm).map(emInstantesDe);
 
   const excecoesPorData = new Map<string, ExcecaoDeData[]>();
   for (const e of excecoes) {
@@ -395,6 +420,8 @@ export function horariosLivres(entrada: EntradaDeHorariosLivres): Slot[] {
 
         const comFolga = slotInflado(inicio, fim, tipo);
         if (bloqueiosDoDia.some((b) => colide(comFolga.inicio, comFolga.fim, b))) continue;
+        // Capacidade 1: pico ≥ 1 é "algum compromisso cruza" — o mesmo desfecho de antes.
+        if (simultaneosNoPico(comFolga, doCrm) >= capacidade) continue;
 
         slots.push({ inicio: new Date(inicio), fim: new Date(fim) });
       }

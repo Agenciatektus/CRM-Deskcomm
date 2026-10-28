@@ -153,6 +153,7 @@ describe("GET /api/v1/attendants/availability", () => {
         "present",
         "role",
         "schedule",
+        "simultaneous_appointments",
         "updated_at",
         "user_id",
       ].sort(),

@@ -30,7 +30,7 @@ import {
   type TipoDoAtendimento,
 } from "@/lib/agenda/aviso-do-compromisso";
 import { coletaOQueOcupa, horariosLivresDaOrg } from "@/lib/agenda/consulta";
-import { colide } from "@/lib/agenda/horarios-livres";
+import { colide, simultaneosNoPico, type Ocupado } from "@/lib/agenda/horarios-livres";
 import {
   atividadeDaTransicao,
   autorParaTimeline,
@@ -435,6 +435,9 @@ async function executarCriacaoDeAgendamento(
     .select("id, starts_at, ends_at, status, time_zone, revision, meeting_state, meeting_url")
     .single();
   if (erroInsert) {
+    // A corrida perdida: outra reserva da mesma pessoa comitou entre a consulta e
+    // este INSERT, e o gatilho da 9083 recusou (23505 mesmo instante, 23P01 lotado).
+    if (erroInsert.code === "23505" || erroInsert.code === "23P01") throw horarioAcabouDeLotar(ctx);
     throw new ApiError(500, "internal_error", undefined, ctx.requestId, erroInsert.message);
   }
 
@@ -868,7 +871,7 @@ async function exigeHorarioLivre(
   const foraDaGrade = podeMarcarForaDaGrade(ctx.actor);
   if (foraDaGrade) {
     exigeDentroDoHorizonte(ctx, args.inicio, new Date());
-    await exigeSemSobreposicao(supabase, ctx, args);
+    await exigeSemSobreposicao(supabase, ctx, { ...args, capacidade: consulta.capacidade });
   } else if (!consulta.slots.some((s) => s.inicio.getTime() === args.inicio.getTime())) {
     throw new ApiError(
       422,
@@ -934,7 +937,7 @@ export function exigeDentroDoHorizonte(ctx: Pick<HandlerCtx, "requestId">, inici
 async function exigeSemSobreposicao(
   supabase: SB,
   ctx: HandlerCtx,
-  args: { donoId: string; inicio: Date; fim: Date; ignorarAgendamentoId?: string },
+  args: { donoId: string; inicio: Date; fim: Date; ignorarAgendamentoId?: string; capacidade: number },
 ): Promise<void> {
   const oQueOcupa = await coletaOQueOcupa(supabase, ctx.organization_id, {
     donoId: args.donoId,
@@ -946,7 +949,11 @@ async function exigeSemSobreposicao(
     throw new ApiError(500, "internal_error", undefined, ctx.requestId, "Não foi possível conferir a agenda.");
   }
   const pedido = { inicio: args.inicio.getTime(), fim: args.fim.getTime() };
-  const cruza = oQueOcupa.ocupados.some((o) => colide(o.inicio.getTime(), o.fim.getTime(), pedido));
+  // Google ocupa inteiro; compromisso do CRM divide até a capacidade (a mesma régua da grade).
+  const emInstantes = (o: Ocupado) => ({ inicio: o.inicio.getTime(), fim: o.fim.getTime() });
+  const cruza =
+    oQueOcupa.ocupados.some((o) => !o.doCrm && colide(o.inicio.getTime(), o.fim.getTime(), pedido)) ||
+    simultaneosNoPico(pedido, oQueOcupa.ocupados.filter((o) => o.doCrm).map(emInstantes)) >= args.capacidade;
   if (cruza) {
     throw new ApiError(
       422,
@@ -956,6 +963,16 @@ async function exigeSemSobreposicao(
       "Este horário já está ocupado na agenda de quem atende — por outro compromisso ou pelo Google Agenda.",
     );
   }
+}
+
+function horarioAcabouDeLotar(ctx: Pick<HandlerCtx, "requestId">): ApiError {
+  return new ApiError(
+    409,
+    "agenda_horario_indisponivel",
+    undefined,
+    ctx.requestId,
+    "Este horário acabou de ser preenchido na agenda de quem atende. Consulte os horários livres e escolha outro.",
+  );
 }
 
 /**
@@ -1259,6 +1276,7 @@ async function alteraComRevisao(supabase:SB,ctx:HandlerCtx,id:string,revision:nu
   const {data,error}=await supabase.rpc("fn_appointment_change",{p_org:ctx.organization_id,p_id:id,p_revision:revision,p_patch:patch});
   // PT409: compromisso obsoleto (migration 0654). 40001: banco anterior à 0654.
   const conflito=error?.code === "PT409" || error?.code === "40001";
+  if(error?.code === "23505" || error?.code === "23P01") throw horarioAcabouDeLotar(ctx);
   if(error) throw new ApiError(conflito ? 409 : error.code === "42501" ? 403 : error.code === "P0002" ? 404 : 422,
     conflito ? "conflict" : error.code === "42501" ? "forbidden" : error.code === "P0002" ? "not_found" : "validation_failed",undefined,ctx.requestId,
     conflito ? "Este compromisso mudou. Atualize os dados antes de confirmar novamente." : "Não foi possível alterar este compromisso. Confira a presença, o horário e a mensagem vinculada.");

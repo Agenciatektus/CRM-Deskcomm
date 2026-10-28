@@ -247,6 +247,7 @@ function horariosRespondem(slots: { inicio: Date; fim: Date }[]): void {
     ok: true,
     slots,
     fusoDaRegra: "America/Sao_Paulo",
+    capacidade: 1,
     publicouHorarios: true,
     fusoSuposto: false,
     fontesDefasadas: [],

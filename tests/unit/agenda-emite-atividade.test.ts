@@ -140,6 +140,7 @@ function coletaOk(): ResultadoDaConsulta {
     ok: true,
     slots: [{ inicio, fim: new Date(inicio.getTime() + 30 * 60_000) }],
     fusoDaRegra: "America/Sao_Paulo",
+    capacidade: 1,
     publicouHorarios: true,
     fusoSuposto: false,
     fontesDefasadas: [],
