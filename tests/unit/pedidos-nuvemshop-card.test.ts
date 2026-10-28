@@ -40,6 +40,7 @@ function fakeAdmin() {
       const q = {
         select: () => q,
         limit: () => q,
+        order: () => q,
         match: (c: Record<string, string>) => ((chave = c), q),
         eq: (k: string, v: unknown) => (f.push((l) => l[k] === v), q),
         is: (k: string, v: unknown) => (f.push((l) => (l[k] ?? null) === v), q),
@@ -72,7 +73,7 @@ const SLUGS = [
   "cancelado-ou-com-problema",
 ];
 const montaFunil = (org: string) => {
-  funis.push({ id: `f-${org}`, organization_id: org, name: "Pedidos do Site" });
+  funis.push({ id: `f-${org}`, organization_id: org, name: "Pedidos do Site", is_archived: false });
   SLUGS.forEach((slug, i) =>
     etapas.push({
       id: `${org}-${slug}`,

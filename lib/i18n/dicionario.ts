@@ -6804,6 +6804,17 @@ export const DICIONARIO: Traducoes = {
   "Sincroniza pedidos, produtos e clientes via OAuth + webhooks.": {
     es: "Sincroniza pedidos, productos y clientes vía OAuth + webhooks.",
   },
+  "Funil dos pedidos": { es: "Embudo de pedidos" },
+  "Funil dos pedidos salvo.": { es: "Embudo de pedidos guardado." },
+  "Escolha um funil": { es: "Elige un embudo" },
+  "Criar funil padrão": { es: "Crear embudo estándar" },
+  "Os pedidos viram cards em": { es: "Los pedidos se vuelven tarjetas en" },
+  "Pedidos ainda não viram cards. Escolha um funil com as 6 etapas de pedido ou crie o padrão.": {
+    es: "Los pedidos aún no se vuelven tarjetas. Elige un embudo con las 6 etapas de pedido o crea el estándar.",
+  },
+  "Apenas admins podem mudar o funil dos pedidos.": { es: "Solo los administradores pueden cambiar el embudo de pedidos." },
+  "Esse funil não tem as 6 etapas de pedido.": { es: "Ese embudo no tiene las 6 etapas de pedido." },
+  "Falha de banco ao salvar o funil.": { es: "Error de base de datos al guardar el embudo." },
   "Integração não configurada": { es: "Integración no configurada" },
   Configure: { es: "Configura" },
   e: { es: "y" },
