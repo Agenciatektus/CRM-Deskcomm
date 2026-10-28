@@ -16,14 +16,16 @@ import { sql } from "./gov-helpers";
  *    origens fora dele é a de `ORIGENS_FORA_DO_LEAD_UNICO`;
  *  - no banco: whatsapp + importacao_planilha no mesmo contato/funil é 23505;
  *  - whatsapp + manual NÃO é barrado (par legítimo em produção);
- *  - nuvemshop x2 não é barrado (um card por pedido);
+ *  - nuvemshop x2 e retomada + whatsapp não são barrados (card por pedido;
+ *    retomada abre card novo apontando para o perdido);
+ *  - índice INVALID dá WARNING no texto da migration e do baseline;
  *  - aberto + perdido, e aberto em outro funil, passam.
  *
  * Zero PII: nomes sintéticos.
  */
 
 const INDICE = "crm_leads_um_aberto_por_contato_no_funil";
-const PREDICADO = "where status = 'open' and contact_id is not null and source not in ('manual', 'nuvemshop')";
+const PREDICADO = "where status = 'open' and contact_id is not null and source not in ('manual', 'nuvemshop', 'retomada')";
 
 const raiz = join(__dirname, "..", "..");
 const migration = readdirSync(join(raiz, "supabase", "migrations")).find((f) => /^\d{14}_9082_/.test(f));
@@ -77,6 +79,14 @@ describe("9082: texto da migration e do baseline", () => {
     expect(bloco).toContain(PREDICADO);
   });
 
+  it("índice INVALID (concurrently que falhou) dá WARNING, na migration e no baseline", () => {
+    const bloco = baseline.slice(baseline.indexOf("(migration 9082) ----"));
+    for (const texto of [textoDaMigration, bloco]) {
+      expect(texto).toContain("select i.indisvalid from pg_index i");
+      expect(texto).toMatch(/raise warning .9082: indice crm_leads_um_aberto_por_contato_no_funil existe mas esta INVALID/);
+    }
+  });
+
   it("a lista do TypeScript é a do predicado", () => {
     const lista = ORIGENS_FORA_DO_LEAD_UNICO.map((s) => `'${s}'`).join(", ");
     expect(PREDICADO).toContain(`source not in (${lista})`);
@@ -101,6 +111,11 @@ describe("9082: no banco", () => {
 
   it("nuvemshop x2 não é barrado (um card por pedido)", () => {
     expect(prova(`${lead(1, "nuvemshop")}\n${lead(2, "nuvemshop")}`)).toContain("provado");
+  });
+
+  it("retomada + whatsapp não é barrado (card novo apontando para o perdido)", () => {
+    expect(prova(`${lead(1, "whatsapp")}
+${lead(2, "retomada")}`)).toContain("provado");
   });
 
   it("outro funil e negócio encerrado não contam", () => {

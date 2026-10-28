@@ -1,4 +1,4 @@
--- manifest: 9082 — indice unico parcial crm_leads_um_aberto_por_contato_no_funil em crm_leads (organization_id, contact_id, pipeline_id) where status='open' and contact_id is not null and source not in ('manual','nuvemshop'): um contato tem no maximo UM negocio aberto por funil vindo de origem automatica ou lote. Manual segue livre (duplicidade de proposito); nuvemshop e um card por PEDIDO (chave propria source+external_id). createLeadHandler reaproveita o aberto em vez de criar. Sem duplicata existente, cria; com duplicata, avisa e nao cria (nao funde negocio de ninguem). Apendice igual no baseline.sql.
+-- manifest: 9082 — indice unico parcial crm_leads_um_aberto_por_contato_no_funil em crm_leads (organization_id, contact_id, pipeline_id) where status='open' and contact_id is not null and source not in ('manual','nuvemshop','retomada'): um contato tem no maximo UM negocio aberto por funil vindo de origem automatica ou lote. Manual segue livre (duplicidade de proposito); nuvemshop e um card por PEDIDO (chave propria source+external_id); retomada abre card novo apontando para o perdido (retomado_de_lead_id). Indice INVALID (concurrently que falhou) da WARNING. createLeadHandler reaproveita o aberto em vez de criar. Sem duplicata existente, cria; com duplicata, avisa e nao cria (nao funde negocio de ninguem). Apendice igual no baseline.sql.
 --
 -- 9082: UM NEGÓCIO ABERTO POR CONTATO NO FUNIL, para o que chega sozinho.
 --
@@ -20,6 +20,8 @@
 -- `source = 'nuvemshop'` também fica de fora: no funil de pedidos o card é o
 -- PEDIDO, um por pedido, e quem compra duas vezes antes da entrega tem dois.
 -- A identidade dele já é `uniq_crm_leads_org_source_external`.
+-- `source = 'retomada'` também: retomar um perdido abre card NOVO que aponta
+-- para ele (`retomado_de_lead_id`), mesmo com outro aberto no funil.
 -- `source` é NOT NULL (default 'manual'), então não há NULL a tratar.
 -- A lista mora também em `lib/leads/negocio-aberto-duplicado.ts`
 -- (`ORIGENS_FORA_DO_LEAD_UNICO`); o invariante confere que as duas não divergem.
@@ -35,7 +37,7 @@
 -- Em produção, com tráfego, crie ANTES do deploy, fora de transação:
 --   create unique index concurrently if not exists crm_leads_um_aberto_por_contato_no_funil
 --     on public.crm_leads (organization_id, contact_id, pipeline_id)
---     where status = 'open' and contact_id is not null and source not in ('manual', 'nuvemshop');
+--     where status = 'open' and contact_id is not null and source not in ('manual', 'nuvemshop', 'retomada');
 -- Aí esta migration fica inerte (`if not exists`). Aditiva e idempotente.
 -- Reverter: drop index if exists public.crm_leads_um_aberto_por_contato_no_funil;
 set lock_timeout = '3s';
@@ -45,12 +47,16 @@ declare
   v_grupos bigint;
 begin
   if to_regclass('public.crm_leads_um_aberto_por_contato_no_funil') is not null then
+    -- INVALID = um create concurrently que falhou no meio: existe, mas nao garante nada.
+    if not (select i.indisvalid from pg_index i where i.indexrelid = 'public.crm_leads_um_aberto_por_contato_no_funil'::regclass) then
+      raise warning '9082: indice crm_leads_um_aberto_por_contato_no_funil existe mas esta INVALID (create concurrently que falhou); drop index e crie de novo';
+    end if;
     return;
   end if;
   select count(*) into v_grupos from (
     select 1
       from public.crm_leads
-     where status = 'open' and contact_id is not null and source not in ('manual', 'nuvemshop')
+     where status = 'open' and contact_id is not null and source not in ('manual', 'nuvemshop', 'retomada')
      group by organization_id, contact_id, pipeline_id
     having count(*) > 1
   ) d;
@@ -60,5 +66,5 @@ begin
   end if;
   create unique index crm_leads_um_aberto_por_contato_no_funil
     on public.crm_leads (organization_id, contact_id, pipeline_id)
-    where status = 'open' and contact_id is not null and source not in ('manual', 'nuvemshop');
+    where status = 'open' and contact_id is not null and source not in ('manual', 'nuvemshop', 'retomada');
 end $$;

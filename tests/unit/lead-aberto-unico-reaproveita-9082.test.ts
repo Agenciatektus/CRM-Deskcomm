@@ -85,9 +85,10 @@ const leadCreated = () =>
 beforeEach(() => vi.clearAllMocks());
 
 describe("9082: regra das origens", () => {
-  it("manual e nuvemshop ficam de fora; o resto entra", () => {
+  it("manual, nuvemshop e retomada ficam de fora; o resto entra", () => {
     expect(entraNoLeadUnico("manual")).toBe(false);
     expect(entraNoLeadUnico("nuvemshop")).toBe(false);
+    expect(entraNoLeadUnico("retomada")).toBe(false);
     expect(entraNoLeadUnico(undefined)).toBe(false);
     for (const s of ["whatsapp", "importacao_planilha", "automation", "webhook", "campanha", "ai_agent"]) {
       expect(entraNoLeadUnico(s)).toBe(true);

@@ -66707,7 +66707,7 @@ comment on column public.ad_insights_connections.connected_by is
   'Usuario que conectou (OAuth) ou colou o token. So ele (ou platform admin) amplia as contas permitidas. Nulo = conexao antiga: so platform admin amplia. Migration 9074.';
 
 
--- ---- um negocio aberto por contato no funil, fora manual e nuvemshop (migration 9082) ----
+-- ---- um negocio aberto por contato no funil, fora manual, nuvemshop e retomada (migration 9082) ----
 -- Mesmo bloco da migration 9082. Nao cria funcao: pode ficar depois da VARREDURA anon.
 -- Banco com duplicata: WARNING e o indice nao nasce (nao funde negocio de ninguem).
 do $$
@@ -66715,12 +66715,16 @@ declare
   v_grupos bigint;
 begin
   if to_regclass('public.crm_leads_um_aberto_por_contato_no_funil') is not null then
+    -- INVALID = um create concurrently que falhou no meio: existe, mas nao garante nada.
+    if not (select i.indisvalid from pg_index i where i.indexrelid = 'public.crm_leads_um_aberto_por_contato_no_funil'::regclass) then
+      raise warning '9082: indice crm_leads_um_aberto_por_contato_no_funil existe mas esta INVALID (create concurrently que falhou); drop index e crie de novo';
+    end if;
     return;
   end if;
   select count(*) into v_grupos from (
     select 1
       from public.crm_leads
-     where status = 'open' and contact_id is not null and source not in ('manual', 'nuvemshop')
+     where status = 'open' and contact_id is not null and source not in ('manual', 'nuvemshop', 'retomada')
      group by organization_id, contact_id, pipeline_id
     having count(*) > 1
   ) d;
@@ -66730,7 +66734,7 @@ begin
   end if;
   create unique index crm_leads_um_aberto_por_contato_no_funil
     on public.crm_leads (organization_id, contact_id, pipeline_id)
-    where status = 'open' and contact_id is not null and source not in ('manual', 'nuvemshop');
+    where status = 'open' and contact_id is not null and source not in ('manual', 'nuvemshop', 'retomada');
 end $$;
 
 notify pgrst, 'reload schema';
