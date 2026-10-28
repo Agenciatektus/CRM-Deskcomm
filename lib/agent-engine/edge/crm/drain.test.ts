@@ -318,19 +318,19 @@ function poolElegibilidade(
   const query = vi.fn().mockImplementation((sql: string) => {
     calls.push(sql);
     if (sql.includes('returning e.id')) return { rows: [{ ...event, created_at: new Date().toISOString() }] };
-    if (sql.includes('sent_by_user_id')) {
+    if (sql.includes('sent_via')) {
       const now = Date.now();
       const linha = (direction: string, body: string, i: number) => ({
         direction,
         body,
         sent_at: new Date(now - i * 1000),
-        sent_by_user_id: null,
+        sent_via: direction === 'outbound' ? 'ai' : null,
       });
       return {
         rows: opts.laco
           ? [
-              ...Array.from({ length: 12 }, (_, i) => linha('outbound', `r${i}`, i)),
-              ...Array.from({ length: 6 }, (_, i) => linha('inbound', `c${i}`, i)),
+              ...Array.from({ length: 16 }, (_, i) => linha('outbound', `r${i}`, i)),
+              ...Array.from({ length: 12 }, (_, i) => linha('inbound', `c${i}`, i)),
             ]
           : [linha('inbound', 'oi', 0)],
       };

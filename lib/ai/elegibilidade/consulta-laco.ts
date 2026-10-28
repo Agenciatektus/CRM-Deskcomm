@@ -24,9 +24,9 @@ export async function conversaEmLacoComRobo(
       direction: "inbound" | "outbound";
       body: string | null;
       sent_at: Date | string;
-      sent_by_user_id: string | null;
+      sent_via: string | null;
     }>(
-      `select direction, body, sent_at, sent_by_user_id
+      `select direction, body, sent_at, sent_via
          from messages
         where organization_id = $1 and conversation_id = $2
           and sent_at >= $3::timestamptz
@@ -38,8 +38,8 @@ export async function conversaEmLacoComRobo(
       direcao: r.direction,
       texto: r.body,
       enviadoEm: new Date(r.sent_at),
-      // outbound sem atendente = IA (ou automação)
-      enviadaPelaIa: r.direction === "outbound" && r.sent_by_user_id === null,
+      // 'automation', 'system' e 'external_device' não são a IA
+      enviadaPelaIa: r.direction === "outbound" && r.sent_via === "ai",
     }));
   } catch (err) {
     log.warn("[laco-com-robo] leitura das mensagens falhou — seguindo", {
@@ -58,9 +58,10 @@ export async function conversaEmLacoComRobo(
   });
   try {
     await pool.query(
-      `update conversations set bot_silenced_until = 'infinity'
+      // Sem last_handoff_at de propósito: o cron de devolução automática devolveria a conversa e o laço recomeçaria.
+      `update conversations set bot_silenced_until = 'infinity', last_handoff_reason = $3
         where organization_id = $1 and id = $2`,
-      [input.organizationId, input.conversationId],
+      [input.organizationId, input.conversationId, `Automático pausado: laço com robô (${motivo === "volume" ? "volume" : "repetição"})`],
     );
   } catch (err) {
     log.warn("[laco-com-robo] silenciar falhou", {
