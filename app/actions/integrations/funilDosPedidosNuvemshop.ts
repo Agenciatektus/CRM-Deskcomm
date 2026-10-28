@@ -49,6 +49,10 @@ async function executar(
   return { ok: true };
 }
 
-export const escolherFunilDosPedidos = (pipelineId: string) => executar(async () => pipelineId);
+export async function escolherFunilDosPedidos(pipelineId: string): Promise<FunilDosPedidosResult> {
+  return executar(async () => pipelineId);
+}
 
-export const criarFunilDosPedidos = () => executar((admin, orgId) => criarFunilPadrao(admin, orgId), true);
+export async function criarFunilDosPedidos(): Promise<FunilDosPedidosResult> {
+  return executar((admin, orgId) => criarFunilPadrao(admin, orgId), true);
+}
