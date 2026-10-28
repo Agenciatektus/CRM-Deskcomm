@@ -66706,4 +66706,31 @@ comment on column public.ad_insights_connections.allowed_ad_account_ids is
 comment on column public.ad_insights_connections.connected_by is
   'Usuario que conectou (OAuth) ou colou o token. So ele (ou platform admin) amplia as contas permitidas. Nulo = conexao antiga: so platform admin amplia. Migration 9074.';
 
+
+-- ---- um negocio aberto por contato no funil, fora manual e nuvemshop (migration 9082) ----
+-- Mesmo bloco da migration 9082. Nao cria funcao: pode ficar depois da VARREDURA anon.
+-- Banco com duplicata: WARNING e o indice nao nasce (nao funde negocio de ninguem).
+do $$
+declare
+  v_grupos bigint;
+begin
+  if to_regclass('public.crm_leads_um_aberto_por_contato_no_funil') is not null then
+    return;
+  end if;
+  select count(*) into v_grupos from (
+    select 1
+      from public.crm_leads
+     where status = 'open' and contact_id is not null and source not in ('manual', 'nuvemshop')
+     group by organization_id, contact_id, pipeline_id
+    having count(*) > 1
+  ) d;
+  if v_grupos > 0 then
+    raise warning '9082: % contato(s) com mais de um negocio aberto no mesmo funil; indice crm_leads_um_aberto_por_contato_no_funil NAO criado', v_grupos;
+    return;
+  end if;
+  create unique index crm_leads_um_aberto_por_contato_no_funil
+    on public.crm_leads (organization_id, contact_id, pipeline_id)
+    where status = 'open' and contact_id is not null and source not in ('manual', 'nuvemshop');
+end $$;
+
 notify pgrst, 'reload schema';
