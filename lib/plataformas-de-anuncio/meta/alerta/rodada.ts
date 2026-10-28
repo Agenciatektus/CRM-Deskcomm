@@ -170,6 +170,7 @@ export async function alertarVencimentoDaMeta(
         marca,
         botao: { rotulo: traduzir("Reconectar com Meta", idioma), href: `${base}${LINK}` },
         rodape: traduzir("Você recebe este aviso porque administra esta empresa.", idioma),
+        idioma,
       });
       // O WhatsApp da equipe é independente: falha dele não toca sino, push nem e-mail.
       if (enviarWhatsApp) {
