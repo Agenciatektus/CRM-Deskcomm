@@ -1,4 +1,5 @@
-import { NEUTROS_DE_SAIDA, type MarcaDeSaida } from "@/lib/branding/saida";
+import { type MarcaDeSaida } from "@/lib/branding/saida";
+import { montarEmail } from "@/lib/email/layout";
 
 /**
  * Os dois e-mails de ACESSO — confirmar conta e redefinir senha — no formato
@@ -39,9 +40,10 @@ export type ModeloDeAcesso = "confirmation" | "recovery" | "email_change";
 export const MODELOS_DE_ACESSO: readonly ModeloDeAcesso[] = ["confirmation", "recovery", "email_change"];
 
 /** O texto de cada modelo. Assunto entra no `GOTRUE_MAILER_SUBJECTS_*`. */
-const COPIA: Record<ModeloDeAcesso, { assunto: (marca: string) => string; titulo: string; corpo: (marca: string) => string; botao: string; rodape: string; detalhe?: string }> = {
+const COPIA: Record<ModeloDeAcesso, { assunto: (marca: string) => string; titulo: string; corpo: (marca: string) => string; botao: string; rodape: string; detalhe?: string; eyebrow: string }> = {
   confirmation: {
-    assunto: (marca) => `Confirme seu e-mail · ${marca}`,
+    assunto: (marca) => `Confirme seu e-mail no ${marca}`,
+    eyebrow: "Confirmação",
     titulo: "Confirme seu e-mail",
     corpo: (marca) =>
       `Sua conta no ${marca} está quase pronta. Clique no botão abaixo para confirmar seu e-mail e ativar sua conta.`,
@@ -49,20 +51,22 @@ const COPIA: Record<ModeloDeAcesso, { assunto: (marca: string) => string; titulo
     rodape: "Se você não criou esta conta, ignore este e-mail.",
   },
   recovery: {
-    assunto: (marca) => `Redefinir sua senha · ${marca}`,
+    assunto: (marca) => `Redefina sua senha no ${marca}`,
+    eyebrow: "Senha",
     titulo: "Redefinir sua senha",
     corpo: (marca) =>
       `Recebemos um pedido para redefinir a senha da sua conta no ${marca}. Clique no botão abaixo para escolher uma nova.`,
     botao: "Definir nova senha",
     rodape:
-      "Se não foi você quem pediu, ignore este e-mail — sua senha continua a mesma.",
+      "Se não foi você quem pediu, ignore este e-mail. Sua senha continua a mesma.",
   },
   // A troca de e-mail da tela de Perfil (`trocarEmail`). Com a troca segura do
   // GoTrue o MESMO modelo vai para o endereço atual e para o novo, cada um com o
   // seu `TokenHash` — por isso o texto serve aos dois. `.RedirectTo` chega com
   // `?type=email_change` (o `emailRedirectTo` da action).
   email_change: {
-    assunto: (marca) => `Confirme a troca de e-mail · ${marca}`,
+    assunto: (marca) => `Confirme a troca de e-mail no ${marca}`,
+    eyebrow: "Troca de e-mail",
     titulo: "Confirme a troca de e-mail",
     corpo: (marca) =>
       `Recebemos um pedido para trocar o e-mail de acesso da sua conta no ${marca}. Clique no botão abaixo para confirmar. A troca só vale depois da confirmação.`,
@@ -71,7 +75,7 @@ const COPIA: Record<ModeloDeAcesso, { assunto: (marca: string) => string; titulo
     // endereço ATUAL precisa ver para onde a conta está indo, e é assim que o
     // dono legítimo reconhece um sequestro de sessão. `{{ .NewEmail }}` fica cru
     // de propósito — é o GoTrue quem o substitui (e escapa, no template HTML).
-    detalhe: "Novo endereço: <b>{{ .NewEmail }}</b>",
+    detalhe: "Novo endereço: {{ .NewEmail }}",
     rodape:
       "Se não foi você quem pediu, ignore este e-mail e avise quem administra a sua empresa. O e-mail da conta continua o mesmo.",
   },
@@ -90,49 +94,17 @@ export function assuntoDoModelo(modelo: ModeloDeAcesso, marca: MarcaDeSaida): st
  */
 export function montarTemplateDeAcesso(modelo: ModeloDeAcesso, marca: MarcaDeSaida): string {
   const t = COPIA[modelo];
-  const nome = escapeHtml(marca.nome);
-
-  const logo = marca.logoUrl
-    ? `<p style="margin:0 0 24px"><img src="${escapeHtml(marca.logoUrl)}" alt="${nome}" height="40" style="height:40px;width:auto;max-width:200px;border:0;display:block"></p>`
-    : "";
-
-  // As chaves duplas ficam CRUAS de propósito: o GoTrue as substitui.
+  // As chaves duplas ficam CRUAS de propósito: o GoTrue as substitui. O
+  // `montarEmail` só escapa `& < > " '`, e nenhum aparece nos placeholders; o
+  // `&` do href sai como `&amp;`, que o cliente de e-mail lê como `&`.
   const destino = "{{ .RedirectTo }}&token_hash={{ .TokenHash }}";
-
-  return `<!doctype html>
-<html lang="pt-BR">
-<body style="margin:0;padding:0;background:${NEUTROS_DE_SAIDA.fundo};font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:${NEUTROS_DE_SAIDA.texto}">
-  <div style="max-width:560px;margin:0 auto;padding:32px 24px">
-    ${logo}
-    <h1 style="font-size:22px;line-height:1.3;margin:0 0 16px;color:${NEUTROS_DE_SAIDA.texto}">
-      ${escapeHtml(t.titulo)}
-    </h1>
-    <p style="margin:0 0 16px;font-size:15px;line-height:1.5">
-      ${escapeHtml(t.corpo(marca.nome))}
-    </p>
-    ${t.detalhe ? `<p style="margin:0 0 16px;font-size:15px;line-height:1.5">${t.detalhe}</p>` : ""}
-    <p style="margin:24px 0">
-      <a href="${destino}" style="display:inline-block;padding:12px 24px;background:${marca.accent};color:${marca.accentFg};border-radius:6px;text-decoration:none;font-weight:600">
-        ${escapeHtml(t.botao)}
-      </a>
-    </p>
-    <p style="margin:0 0 8px;font-size:13px;color:${NEUTROS_DE_SAIDA.suave}">
-      Ou copie e cole este link no navegador:<br>
-      <span style="word-break:break-all;color:${marca.accent}">${destino}</span>
-    </p>
-    <p style="margin:24px 0 0;font-size:13px;color:${NEUTROS_DE_SAIDA.suave}">
-      ${escapeHtml(t.rodape)}
-    </p>
-  </div>
-</body>
-</html>`;
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+  // Só o HTML vai ao GoTrue; o `text` do layout é descartado.
+  return montarEmail({
+    assunto: t.assunto(marca.nome),
+    eyebrow: t.eyebrow,
+    titulo: t.titulo,
+    paragrafos: [t.corpo(marca.nome), ...(t.detalhe ? [t.detalhe] : [])],
+    botao: { rotulo: t.botao, href: destino },
+    aviso: t.rodape,
+  }).html;
 }

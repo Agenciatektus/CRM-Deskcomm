@@ -83,6 +83,7 @@ interface EmitirParams {
   inviterId: string;
   inviterName: string;
   requestId: string;
+  origem?: "equipe" | "compra";
 }
 
 export interface ResultadoEmissao {
@@ -138,6 +139,7 @@ export async function emitirConvite(
     requestId: params.requestId,
     inviteId,
     issuedAt,
+    origem: params.origem,
   });
 
   const nowIso = new Date().toISOString();

@@ -187,11 +187,11 @@ describe("medição da folga (pergunta de aceite da issue #1341)", () => {
   /**
    * No fork são 17: a Nuvemshop voltou ao menu lateral (#232, decisão de
    * 20/10/2026 — o app de parceiro é da Tektus e cada empresa conecta a loja)
-   * e Automações ganhou porta própria (#411). São DOIS itens acima do teto da
+   * e Automações ganhou item próprio (#417). São DOIS itens acima do teto da
    * dobra a 1280x900 do upstream: na configuração completa o menu rola. As contas de folga abaixo seguem medidas
    * contra o teto de 15, que é a régua da tela, e não contra o menu de hoje.
    */
-  it("hoje: 17 itens no menu lateral (15 do upstream + a Nuvemshop e as Automações do fork)", () => {
+  it("hoje: 17 itens no menu lateral (15 do upstream + a Nuvemshop e Automações do fork)", () => {
     expect(itensNoMenuLateral(INTERFACE_COMPLETA)).toBe(17);
     // `undefined` é o caminho de quem não tem escolha nenhuma gravada
     expect(itensNoMenuLateral(undefined)).toBe(17);
@@ -202,7 +202,7 @@ describe("medição da folga (pergunta de aceite da issue #1341)", () => {
    * A escolha da empresa é interseção, então o menu só ENCOLHE — a mudança não
    * tem como empurrar o instrumento de tela para o vermelho.
    */
-  it("configuração COMPLETA (ninguém escolheu): 17 itens — igual a hoje", () => {
+  it("configuração COMPLETA (ninguém escolheu): 17 itens, igual a hoje", () => {
     expect(itensNoMenuLateral(combinarInterfaces(completa, completa))).toBe(17);
   });
 
