@@ -260,6 +260,18 @@ describe("POST /clone — levar para outro funil move o MESMO card", () => {
     expect(tables.crm_leads).toHaveLength(1);
   });
 
+  it("9082: contato já com negócio aberto no funil de destino é 409, sem o texto do Postgres", async () => {
+    db.rpc.mockImplementationOnce(async () => ({
+      data: null,
+      error: { code: "23505", message: 'duplicate key value violates unique constraint "crm_leads_um_aberto_por_contato_no_funil"' },
+    }) as never);
+    const res = await POST(req({ pipeline_id: POS_VENDA }), ctx);
+    expect(res.status).toBe(409);
+    const corpo = (await res.json()) as { error: { code: string; message: string } };
+    expect(corpo.error.code).toBe("lead_aberto_existente");
+    expect(corpo.error.message).not.toContain("duplicate key");
+  });
+
   it("mesmo funil é recusa (isso é /move), sem escrever", async () => {
     const res = await POST(req({ pipeline_id: VENDAS }), ctx);
     expect(res.status).toBe(422);

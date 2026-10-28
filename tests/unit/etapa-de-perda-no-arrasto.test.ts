@@ -55,6 +55,8 @@ const RECUSA_DO_BANCO = {
 interface Estado {
   updates: Array<Record<string, unknown>>;
   lostReasonRequired?: boolean;
+  /** Erro que o UPDATE devolve no lugar do comportamento da CHECK (9082). */
+  erroDoUpdate?: { code: string; message: string };
 }
 
 function stub(estado: Estado) {
@@ -112,7 +114,9 @@ function stub(estado: Estado) {
             eq: () => ({
               select: () => ({
                 maybeSingle: async () =>
-                  payload.lost_reason || estado.lostReasonRequired === false
+                  estado.erroDoUpdate
+                    ? { data: null, error: estado.erroDoUpdate }
+                    : payload.lost_reason || estado.lostReasonRequired === false
                     ? {
                         data: { id: LEAD_ID, stage_id: PERDIDO_ID, updated_at: UPDATED_AT },
                         error: null,
@@ -221,6 +225,34 @@ describe("arrastar o card para a etapa de perda sem motivo (#917)", () => {
     expect(estado.updates).toHaveLength(1);
     expect(estado.updates[0]).toMatchObject({ stage_id: PERDIDO_ID });
     expect(estado.updates[0]).not.toHaveProperty("lost_reason");
+  });
+
+  it("9082: reabrir com outro aberto do contato no funil é 409, nunca 500 com o texto do Postgres", async () => {
+    estado.lostReasonRequired = false;
+    estado.erroDoUpdate = {
+      code: "23505",
+      message: 'duplicate key value violates unique constraint "crm_leads_um_aberto_por_contato_no_funil"',
+    };
+    sessao(estado);
+    const res = await POST(
+      pedido({ stage_id: PERDIDO_ID, position_in_stage: 1000, expected_updated_at: UPDATED_AT }),
+      { params: Promise.resolve({ id: LEAD_ID }) },
+    );
+    expect(res.status).toBe(409);
+    const corpo = (await res.json()) as { error?: { code?: string; message?: string } };
+    expect(corpo.error?.code).toBe("lead_aberto_existente");
+    expect(corpo.error?.message ?? "").not.toContain("duplicate key");
+  });
+
+  it("CONTROLE 9082: 23505 de outro índice segue 500", async () => {
+    estado.lostReasonRequired = false;
+    estado.erroDoUpdate = { code: "23505", message: 'violates unique constraint "crm_leads_pkey"' };
+    sessao(estado);
+    const res = await POST(
+      pedido({ stage_id: PERDIDO_ID, position_in_stage: 1000, expected_updated_at: UPDATED_AT }),
+      { params: Promise.resolve({ id: LEAD_ID }) },
+    );
+    expect(res.status).toBe(500);
   });
 
   it("a saída que a recusa nomeia existe de verdade no menu do card", () => {
