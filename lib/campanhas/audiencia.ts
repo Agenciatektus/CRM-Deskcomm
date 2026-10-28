@@ -146,13 +146,7 @@ export const filtroDeAudienciaSchema = z
 
 export type FiltroDeAudiencia = z.infer<typeof filtroDeAudienciaSchema>;
 
-const CHAVES_DO_FILTRO = new Set([
-  ...Object.keys(criteriosShape),
-  "incluir_contatos",
-  "excluir_contatos",
-  "excluir",
-  "limite",
-]);
+const CHAVES_DO_FILTRO = new Set(Object.keys(filtroDeAudienciaSchema.shape));
 
 /**
  * Lê o filtro SALVO descartando chave que o schema atual não conhece: o schema é

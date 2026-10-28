@@ -168,7 +168,6 @@ export async function PATCH(
     // preso ao rascunho, como o texto e os passos.
     "entrada_continua",
     "entrada_etapa_id",
-    "audience_filter",
     "intervalo_segundos",
     "janela_inicio_hora",
     "janela_fim_hora",

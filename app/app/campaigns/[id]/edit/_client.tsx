@@ -345,7 +345,7 @@ export function EditarCampanha({ id }: { id: string }) {
           </p>
         )}
         <div className="flex flex-wrap items-center gap-3">
-        <Button
+          <Button
             type="button"
             variant="outline"
             disabled={!temCriterio || previa.isPending}
