@@ -423,22 +423,31 @@ export async function adotarLeadsDoContato(
   orgId: string,
   contactId: string | null,
   userId: string,
+  /**
+   * `substituir`: assumir/transferir à mão é ação humana explícita ("assumir lead =
+   * vira dono"), então troca o dono de TODO lead aberto do contato, inclusive o que
+   * já tem outro humano ou agente de IA (o agente é limpo). O rodízio não liga isto.
+   */
+  opcoes: { substituir?: boolean } = {},
 ): Promise<number> {
   if (!contactId) return 0;
   try {
-    const { data, error } = await admin
+    const agora = new Date().toISOString();
+    let consulta = admin
       .from("crm_leads")
       .update({
         owner_user_id: userId,
         owner_kind: "user",
-        updated_at: new Date().toISOString(),
+        ...(opcoes.substituir ? { owner_agent_id: null, assigned_at: agora } : {}),
+        updated_at: agora,
       })
       .eq("organization_id", orgId)
       .eq("contact_id", contactId)
-      .eq("status", "open")
-      .is("owner_user_id", null)
-      .is("owner_agent_id", null)
-      .select("id");
+      .eq("status", "open");
+    consulta = opcoes.substituir
+      ? consulta.or(`owner_user_id.is.null,owner_user_id.neq.${userId}`)
+      : consulta.is("owner_user_id", null).is("owner_agent_id", null);
+    const { data, error } = await consulta.select("id");
     if (error) {
       logger.warn("[routing-worker] não consegui dar dono ao lead do contato", {
         organization_id: orgId,

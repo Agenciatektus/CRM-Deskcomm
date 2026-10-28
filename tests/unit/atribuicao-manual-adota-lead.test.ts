@@ -1,5 +1,6 @@
 /**
- * ASSUMIR E TRANSFERIR LEVAM O LEAD JUNTO — só o lead aberto e sem dono.
+ * ASSUMIR E TRANSFERIR LEVAM O LEAD JUNTO — o lead aberto do contato vira de quem assumiu
+ * (ou do destino), mesmo que já tivesse outro dono.
  *
  * ## O buraco que este arquivo fecha
  *
@@ -12,8 +13,8 @@
  *
  * Mockar `adotarLeadsDoContato` provaria que a rota "chamou algo". O que importa
  * é o que chega ao banco: service role bypassa RLS, então o filtro de org tem
- * que vir da SESSÃO, e as condições `owner_user_id is null` /
- * `owner_agent_id is null` são o que separa "acompanhar" de "roubar a carteira".
+ * que vir da SESSÃO, e o filtro `or` (sem dono OU dono diferente do destino) mais
+ * `owner_agent_id: null` nos valores é o que faz "assumir = vira dono".
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
@@ -81,6 +82,10 @@ function montar(assignRows: Array<Record<string, unknown>>) {
           filtros[`is:${col}`] = val;
           return cadeia;
         },
+        or(expr: string) {
+          filtros["or"] = expr;
+          return cadeia;
+        },
         // Checagem de membro do destino no transfer.
         maybeSingle: () => Promise.resolve({ data: { role: "agent" }, error: null }),
       };
@@ -136,8 +141,13 @@ function esperaAdocaoSegura(u: Update | undefined, novoDono: string) {
   expect(u!.filtros["eq:organization_id"]).toBe(ORG_ID);
   expect(u!.filtros["eq:contact_id"]).toBe(CONTACT_ID);
   expect(u!.filtros["eq:status"]).toBe("open");
-  expect(u!.filtros["is:owner_user_id"], "lead com dono não pode trocar de mão").toBe(null);
-  expect(u!.filtros["is:owner_agent_id"], "lead da IA não pode ser arrancado").toBe(null);
+  // Assumir/transferir à mão = vira dono: troca o dono humano ou da IA (agente é limpo)
+  // e adota o lead sem dono; só pula quem já é o próprio destino.
+  expect(u!.valores).toMatchObject({ owner_agent_id: null });
+  expect(u!.valores).toHaveProperty("assigned_at");
+  expect(u!.filtros["or"]).toBe(`owner_user_id.is.null,owner_user_id.neq.${novoDono}`);
+  expect(u!.filtros["is:owner_user_id"]).toBeUndefined();
+  expect(u!.filtros["is:owner_agent_id"]).toBeUndefined();
 }
 
 beforeEach(() => {
@@ -145,7 +155,7 @@ beforeEach(() => {
   vi.mocked(isServiceRoleConfigured).mockReturnValue(true);
 });
 
-describe("Assumir leva o lead sem dono para quem assumiu", () => {
+describe("Assumir faz do atendente o dono do lead (adota o sem dono e troca o de outro)", () => {
   it("claim ok → lead aberto e sem dono do contato vai para o atendente", async () => {
     const updates = montar([conv(AGENT_ID)]);
     const { POST } = await import("@/app/api/v1/conversations/[id]/claim/route");
@@ -163,7 +173,7 @@ describe("Assumir leva o lead sem dono para quem assumiu", () => {
   });
 });
 
-describe("Transferir leva o lead sem dono para o DESTINO", () => {
+describe("Transferir faz do DESTINO o dono do lead", () => {
   it("transfer ok → lead vai para o destino, não para quem transferiu", async () => {
     const updates = montar([conv(TARGET_ID)]);
     const { POST } = await import("@/app/api/v1/conversations/[id]/transfer/route");
