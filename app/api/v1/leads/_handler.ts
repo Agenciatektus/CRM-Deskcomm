@@ -45,6 +45,11 @@ import {
 import { motivosDaCategoria } from "@/lib/leads/motivos-de-perda-do-funil";
 import type { CreateLeadInput, UpdateLeadInput } from "@/lib/schemas";
 import { ehCorrecaoDeMovimentoDaIa } from "@/lib/leads/correcao-humana";
+import {
+  RECUSA_DO_LEAD_UNICO,
+  ehViolacaoDoLeadUnico,
+  entraNoLeadUnico,
+} from "@/lib/leads/negocio-aberto-duplicado";
 
 type SB = SupabaseClient;
 
@@ -227,6 +232,18 @@ async function recusaPessoalNaEscrita(
       traduzir("Contato marcado como pessoal.", ctx.idioma ?? "pt-BR"),
     );
   }
+}
+
+/** O 23505 do índice 9082 como recusa de negócio (409), nunca o texto do Postgres. */
+function recusaDoLeadUnico(ctx: HandlerCtx, erro: { code?: string; message?: string } | null): ApiError | null {
+  if (!ehViolacaoDoLeadUnico(erro)) return null;
+  return new ApiError(
+    409,
+    RECUSA_DO_LEAD_UNICO.codigo,
+    undefined,
+    ctx.requestId,
+    traduzir(RECUSA_DO_LEAD_UNICO.mensagem, ctx.idioma ?? "pt-BR"),
+  );
 }
 
 /**
@@ -597,6 +614,30 @@ export async function createLeadHandler(
     );
   }
 
+  // ── UM ABERTO POR CONTATO NO FUNIL (migration 9082) ───────────────────────
+  // Origem automática ou lote com negócio aberto do contato neste funil:
+  // devolve o que existe (`reaproveitado: true`), sem INSERT e sem
+  // `lead.created`. Antes da régua de campos: reaproveitar não cria nada.
+  // Com `external_id` fica de fora (o índice também): a captação cria um card
+  // POR EVENTO, com idempotência própria por source+external_id.
+  const leadUnico = !!input.contact_id && !input.external_id && entraNoLeadUnico(input.source);
+  const abertoDoContato = async () => {
+    const { data } = await supabase
+      .from("crm_leads")
+      .select(LEAD_COLS)
+      .eq("organization_id", ctx.organization_id)
+      .eq("contact_id", input.contact_id as string)
+      .eq("pipeline_id", input.pipeline_id)
+      .eq("status", "open")
+      .limit(1)
+      .maybeSingle();
+    return data ? { ...(data as Record<string, unknown>), reaproveitado: true } : null;
+  };
+  if (leadUnico) {
+    const aberto = await abertoDoContato();
+    if (aberto) return aberto;
+  }
+
   // ── A ETAPA EM QUE O NEGÓCIO NASCE TAMBÉM É UMA ENTRADA (issue #1710) ──────
   //
   // Criar direto numa etapa exigente é o MESMO gatilho do arrasto: o funil que
@@ -715,6 +756,14 @@ export async function createLeadHandler(
     })
     .select(LEAD_COLS)
     .single();
+
+  // Corrida com outro escritor do mesmo contato: o índice 9082 recusou este.
+  // Quem a RLS não deixa ler o vencedor recebe 409, nunca a linha.
+  if (leadUnico && ehViolacaoDoLeadUnico(insErr)) {
+    const aberto = await abertoDoContato();
+    if (aberto) return aberto;
+    throw recusaDoLeadUnico(ctx, insErr)!;
+  }
 
   const recusaNoInsert = recusaDaGuardaDoBanco(ctx, insErr);
   if (recusaNoInsert) throw recusaNoInsert;
@@ -948,6 +997,9 @@ export async function updateLeadHandler(
 
   const recusaNoUpdate = recusaDaGuardaDoBanco(ctx, updErr);
   if (recusaNoUpdate) throw recusaNoUpdate;
+  // Trocar o contato para quem já tem negócio aberto neste funil (9082).
+  const leadUnicoNoUpdate = recusaDoLeadUnico(ctx, updErr);
+  if (leadUnicoNoUpdate) throw leadUnicoNoUpdate;
   if (updErr) {
     throw new ApiError(500, "internal_error", undefined, ctx.requestId, updErr.message);
   }
@@ -1387,7 +1439,9 @@ export async function moveLeadHandler(
     if (recusa) {
       throw new ApiError(422, recusa.codigo, undefined, ctx.requestId, recusa.mensagem);
     }
-    throw new ApiError(500, "internal_error", undefined, ctx.requestId, updErr.message);
+    // Reabrir (etapa ganha/perdida → aberta) com outro aberto no funil (9082).
+    throw recusaDoLeadUnico(ctx, updErr) ??
+      new ApiError(500, "internal_error", undefined, ctx.requestId, updErr.message);
   }
   if (!updated) {
     throw new ApiError(

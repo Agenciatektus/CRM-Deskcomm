@@ -46,6 +46,8 @@ interface ResumoDaImportacao {
   contatos_criados: number;
   erros: ErroDaLinha[];
   colunas_ignoradas: string[];
+  /** LINHAS cujo contato já tinha negócio aberto neste funil (migration 9082). Por linha: nenhuma some do relatório. */
+  reaproveitados: number;
 }
 
 export async function POST(req: NextRequest): Promise<Response> {
@@ -183,6 +185,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     contatos_criados: 0,
     erros: [...lido.erros],
     colunas_ignoradas: lido.colunasIgnoradas,
+    reaproveitados: 0,
   };
 
   // O mesmo telefone repetido na planilha vira UM contato, não N. Sem isto, uma
@@ -242,7 +245,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         }
       }
 
-      await createLeadHandler(
+      const lead = await createLeadHandler(
         supabase,
         { organization_id: orgId, actor: { type: "user", id: authz.user.id }, requestId },
         {
@@ -257,7 +260,9 @@ export async function POST(req: NextRequest): Promise<Response> {
           via_planilha: true,
         },
       );
-      resumo.criados += 1;
+      // 9082: contato com negócio aberto neste funil não ganha um segundo.
+      if (lead?.reaproveitado) resumo.reaproveitados += 1;
+      else resumo.criados += 1;
     } catch (err) {
       // A ETAPA ERRADA DERRUBA A IMPORTAÇÃO INTEIRA, e de propósito: se a etapa
       // não é desta organização, ela não será na linha 2 nem na 300. Seguir

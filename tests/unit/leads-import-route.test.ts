@@ -220,6 +220,22 @@ describe("POST /api/v1/leads/import", () => {
     }
   });
 
+  // 9082: a linha cujo contato já tinha negócio aberto no funil não some do
+  // relatório; conta POR LINHA, mesmo com o mesmo contato repetido.
+  it("conta as linhas reaproveitadas separadas das criadas", async () => {
+    fazerSupabase(null);
+    vi.mocked(createLeadHandler)
+      .mockResolvedValueOnce({ id: "aberto", reaproveitado: true } as never)
+      .mockResolvedValueOnce({ id: "aberto", reaproveitado: true } as never)
+      .mockResolvedValueOnce({ id: "novo" } as never);
+    const { POST } = await import("@/app/api/v1/leads/import/route");
+
+    const res = await POST(pedido("nome,valor\nAna,100\nAna,150\nBruno,200"));
+    const corpo = (await res.json()) as { data: { criados: number; reaproveitados: number; total_linhas: number } };
+
+    expect(corpo.data).toMatchObject({ criados: 1, reaproveitados: 2, total_linhas: 3 });
+  });
+
   // O gatilho de follow-up "Lead criado" lê essa marca para não inscrever a
   // planilha inteira de uma vez (`lib/followup/gatilho-lead.ts`).
   it("marca cada linha como vinda de planilha", async () => {
