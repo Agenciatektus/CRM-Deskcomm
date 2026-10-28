@@ -114,6 +114,30 @@ const fixture = (nome: string) =>
     .replaceAll(NEUTROS_GRAVADOS.texto, NEUTROS_DE_SAIDA.texto)
     .replaceAll(NEUTROS_GRAVADOS.suave, NEUTROS_DE_SAIDA.suave);
 
+/**
+ * Sétima exceção, também sem regravar fixture: o INVÓLUCRO do HTML. Os e-mails
+ * saem no layout escuro do CRM (`montarEmail`), então o HTML do fixture (gravado
+ * no invólucro antigo) não é mais comparável byte a byte. O que se trava é o
+ * texto jurídico: assunto, `text` e `fromName` seguem byte a byte, e cada linha
+ * de texto visível do HTML gravado tem de aparecer no HTML novo.
+ */
+const visivel = (html: string) =>
+  html
+    .replace(/<style[\s\S]*?<\/style>/g, "")
+    .replace(/<[^>]+>/g, "\n")
+    .replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&quot;", '"').replaceAll("&#39;", "'").replaceAll("&amp;", "&");
+function igualAoGravado(obtido: unknown, nome: string) {
+  const lista = (v: unknown) => (Array.isArray(v) ? v : [v]) as { html: string }[];
+  const gravado = JSON.parse(fixture(nome));
+  const semHtml = (v: unknown) => JSON.stringify(JSON.parse(JSON.stringify(v), (k, x) => (k === "html" ? undefined : x)));
+  expect(semHtml(obtido), nome).toBe(semHtml(gravado));
+  lista(obtido).forEach((o, i) => {
+    const novo = visivel(o.html).split("\n").map((l) => l.trim()).filter(Boolean).join("\n");
+    for (const linha of visivel(lista(gravado)[i]!.html).split("\n").map((l) => l.trim()).filter(Boolean))
+      expect(novo, `${nome}: ${linha}`).toContain(linha);
+  });
+}
+
 const MARCA = {
   nome: "Silva & Filhos",
   logoUrl: null,
@@ -267,7 +291,7 @@ describe("os neutros do fixture (sexta exceção)", () => {
 
 describe("e-mail ao titular", () => {
   it("Brasil: o de antes do doc 88, byte a byte, mais o link do arquivo de dados (doc 103, A)", async () => {
-    expect(JSON.stringify(await emailPara(perfilDoPais("BR")), null, 2)).toBe(fixture("email.json"));
+    igualAoGravado(await emailPara(perfilDoPais("BR")), "email.json");
   });
 
   it("Portugal: pt-PT, sem LGPD, citando o RGPD como direito exercido", async () => {
@@ -302,9 +326,9 @@ describe("e-mail ao titular", () => {
 
 describe("alarme ao encarregado", () => {
   it("Brasil: igual, byte a byte, nos dois limiares", async () => {
-    expect(JSON.stringify(await alarmesPara(null), null, 2)).toBe(fixture("alarmes.json"));
+    igualAoGravado(await alarmesPara(null), "alarmes.json");
     // `BR` escrito é o mesmo Brasil que a coluna vazia.
-    expect(JSON.stringify(await alarmesPara("BR"), null, 2)).toBe(fixture("alarmes.json"));
+    igualAoGravado(await alarmesPara("BR"), "alarmes.json");
   });
 
   it("Portugal: sem LGPD; prazo declarado interno e mais curto que o do RGPD", async () => {
@@ -319,9 +343,7 @@ describe("alarme ao encarregado", () => {
   });
 
   it("Brasil: o apagamento da loja sai igual, byte a byte, ao de antes", async () => {
-    expect(JSON.stringify(await alarmesPara(null, "store_redact"), null, 2)).toBe(
-      fixture("alarmes-store-redact.json"),
-    );
+    igualAoGravado(await alarmesPara(null, "store_redact"), "alarmes-store-redact.json");
   });
 
   it("Portugal: o apagamento da loja não é pedido de titular nem leva o prazo do RGPD", async () => {

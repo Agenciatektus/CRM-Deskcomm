@@ -25,15 +25,16 @@
 
 import * as Sentry from "@sentry/nextjs";
 
-import { NEUTROS_DE_SAIDA, type MarcaDeSaida } from "@/lib/branding/saida";
+import { type MarcaDeSaida } from "@/lib/branding/saida";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { montarEmail } from "@/lib/email/layout";
 import { sendEmail } from "@/lib/email/roteador";
 import { audit } from "@/lib/audit";
 import { env } from "@/lib/env";
 import { valorDaInstalacao } from "@/lib/instalacao/config";
 import { citacaoDaLei, PAIS_PADRAO, perfilDoPais, type PerfilDoPais } from "@/lib/legal/perfil-do-pais";
 import { traduzir } from "@/lib/i18n/dicionario";
-import { idiomaDoTexto } from "@/lib/i18n/idiomas";
+import { idiomaDoTexto, type Idioma } from "@/lib/i18n/idiomas";
 import { diasAtePrazo, diasDeAtraso, prazoEmBr } from "./sla";
 import type { LgpdRequest } from "./types";
 
@@ -154,7 +155,6 @@ export async function triggerSlaAlarm(
   } else {
     try {
       const shortId = request.id.slice(0, 8);
-      const orgName = escapeHtml(organizationName || marca.nome);
       const appUrl = env.NEXT_PUBLIC_APP_URL;
       // Porta neutra, não `/app` nem o hub: a empresa pode ser suspensa ou
       // reativada entre o envio e o clique, e quem decide é o clique
@@ -217,10 +217,8 @@ export async function triggerSlaAlarm(
 
       // A frase do limiar: no Brasil ela nomeia a lei ("A solicitação LGPD") e
       // fica em duro, byte a byte como sempre foi; fora do Brasil sai pelo
-      // idioma. Os `{id}`/`{org}`/`{limiar}` são substituídos DEPOIS, para o
-      // HTML manter o `<strong>` que o texto puro não tem — é por isso uma frase
-      // só com marcadores, e não a prosa remontada em pedaços traduzidos, que o
-      // idioma desmontaria ("de" e "atingiu o limiar" soltos não são frase).
+      // idioma. Os `{id}`/`{org}`/`{limiar}` são substituídos aqui, em frase
+      // única com marcadores: o idioma desmontaria a prosa remontada em pedaços.
       const origemBruta = organizationName || marca.nome;
       const modeloDaFrase = noBrasil
         ? "A solicitação LGPD {id} de {org} atingiu o limiar {limiar}."
@@ -229,44 +227,37 @@ export async function triggerSlaAlarm(
       // cadastrou, e como string de substituição um `$$`/`$&`/`$'` no nome
       // seria lido como padrão do `replace` — o Brasil deixaria de sair byte a
       // byte igual para "Ca$$h Store".
-      const fraseHtml = modeloDaFrase
-        .replace("{id}", `<strong>#${shortId}</strong>`)
-        .replace("{limiar}", `<strong>${thresholdLabel}</strong>`)
-        .replace("{org}", () => `<strong>${orgName}</strong>`);
       const fraseTexto = modeloDaFrase
         .replace("{id}", `#${shortId}`)
         .replace("{limiar}", thresholdLabel)
         .replace("{org}", () => origemBruta);
 
-      // `#dc2626` FICA, e não vira o accent: é semântica de ALERTA, não marca.
-      // Um atraso que aparece em verde-sálvia porque o revendedor escolheu
-      // verde deixa de comunicar urgência — a cor aqui é a informação.
       const notaDeAtraso = t("Esta solicitação está {n} dia(s) em atraso.").replace(
         "{n}",
         String(daysOverdue),
       );
-      const overdueNote =
-        daysOverdue > 0
-          ? `<p style="color:#dc2626;font-weight:600;">⚠ ${notaDeAtraso}</p>`
-          : `<p>${t("O prazo vence em {data}.").replace("{data}", `<strong>${dueFmt}</strong>`)}</p>`;
+      const notaDoPrazoHtml =
+        daysOverdue > 0 ? `⚠ ${notaDeAtraso}` : t("O prazo vence em {data}.").replace("{data}", dueFmt);
       // O texto puro diz o prazo curto ("Prazo: 20/10/2026."), e não "O prazo
       // vence em" — duas frases que sempre foram diferentes.
       const notaDePrazoTexto = daysOverdue > 0 ? notaDeAtraso : t("Prazo: {data}.").replace("{data}", dueFmt);
 
-      const html = `<!doctype html>
-<html lang="${idioma}">
-<body style="font-family:-apple-system,Helvetica,Arial,sans-serif;color:${NEUTROS_DE_SAIDA.texto};line-height:1.5;max-width:560px;margin:0 auto;padding:24px;">
-  <h2 style="margin:0 0 12px;font-size:18px;">${etiqueta} ${t("Alerta de SLA — Solicitação {id}").replace("{id}", `#${shortId}`)}</h2>
-  <p>${t("Olá,")}</p>
-  <p>${fraseHtml}</p>
-  ${overdueNote}
-  <p>${t("Status atual:")} <code>${request.request_type}</code> / <code>${request.status}</code></p>
-  <p style="margin:24px 0;">
-    <a href="${requestUrl}" style="background:${marca.accent};color:${marca.accentFg};padding:10px 18px;border-radius:6px;text-decoration:none;display:inline-block;">${t("Ver solicitação no painel")}</a>
-  </p>
-  <p style="font-size:12px;color:${NEUTROS_DE_SAIDA.suave};">${rodapeHtml}</p>
-</body>
-</html>`;
+      const titulo = `${etiqueta} ${t("Alerta de SLA — Solicitação {id}").replace("{id}", `#${shortId}`)}`;
+      // `lang` pode ser `pt-PT`, que o seletor não oferece: o layout só o escreve
+      // no `<html>` e passa às frases fixas, que sem tradução ficam em português.
+      const { html } = montarEmail({
+        assunto: subject,
+        titulo,
+        paragrafos: [
+          t("Olá,"),
+          fraseTexto,
+          notaDoPrazoHtml,
+          `${t("Status atual:")} ${request.request_type} / ${request.status}`,
+        ],
+        botao: { rotulo: t("Ver solicitação no painel"), href: requestUrl },
+        rodape: [rodapeHtml],
+        idioma: idioma as Idioma,
+      });
 
       // Texto puro não escapa: `&amp;` no corpo de um alarme é ruído.
       const text = `${etiqueta} ${t("Alerta de SLA — Solicitação {id}").replace("{id}", `#${shortId}`)}
@@ -404,19 +395,4 @@ function mesLegalDoPedidoVencido(receivedAt: string | null | undefined, agora: D
     vencimento.setUTCDate(0);
   }
   return agora.getTime() > vencimento.getTime();
-}
-
-/**
- * O nome da organização e a marca passaram a vir de campos que uma pessoa
- * digita numa tela (`organizations.display_name`, `settings.branding`) — então
- * entram no HTML escapados. Antes desta fase o pior caso era o literal
- * `"DeskcommCRM"`.
- */
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }

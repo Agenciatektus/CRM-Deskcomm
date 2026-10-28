@@ -246,7 +246,7 @@ describe("o nome da organização chega verbatim, com `$` e chaves", () => {
       const email = await alarme({ country: "BR", nome });
       expect(email.text).toContain(`A solicitação LGPD #22222222 de ${nome} atingiu o limiar D+5 (acesso a dados).`);
       expect(email.html).toContain(
-        `A solicitação LGPD <strong>#22222222</strong> de <strong>${html(nome)}</strong> atingiu o limiar <strong>D+5 (acesso a dados)</strong>.`,
+        `A solicitação LGPD #22222222 de ${html(nome)} atingiu o limiar D+5 (acesso a dados).`,
       );
     });
   }
