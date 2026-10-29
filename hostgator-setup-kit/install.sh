@@ -2191,6 +2191,21 @@ $(sed 's/^/    /' "$PENDENCIA_EMAIL")
        GOTRUE_MAILER_SUBJECTS_CONFIRMATION="Confirme seu e-mail no ${APP_NAME:-Verdash CRM}"
        GOTRUE_MAILER_SUBJECTS_RECOVERY="Redefina sua senha no ${APP_NAME:-Verdash CRM}"
        GOTRUE_MAILER_SUBJECTS_EMAIL_CHANGE="Confirme a troca de e-mail no ${APP_NAME:-Verdash CRM}"
+       GOTRUE_MAILER_NOTIFICATIONS_PASSWORD_CHANGED_ENABLED=true
+       GOTRUE_MAILER_NOTIFICATIONS_MFA_FACTOR_ENROLLED_ENABLED=true
+       GOTRUE_MAILER_NOTIFICATIONS_MFA_FACTOR_UNENROLLED_ENABLED=true
+       GOTRUE_MAILER_NOTIFICATIONS_IDENTITY_LINKED_ENABLED=true
+       GOTRUE_MAILER_NOTIFICATIONS_IDENTITY_UNLINKED_ENABLED=true
+       GOTRUE_MAILER_TEMPLATES_PASSWORD_CHANGED_NOTIFICATION=https://${DOMAIN}/email-templates/password_changed
+       GOTRUE_MAILER_TEMPLATES_MFA_FACTOR_ENROLLED_NOTIFICATION=https://${DOMAIN}/email-templates/mfa_factor_enrolled
+       GOTRUE_MAILER_TEMPLATES_MFA_FACTOR_UNENROLLED_NOTIFICATION=https://${DOMAIN}/email-templates/mfa_factor_unenrolled
+       GOTRUE_MAILER_TEMPLATES_IDENTITY_LINKED_NOTIFICATION=https://${DOMAIN}/email-templates/identity_linked
+       GOTRUE_MAILER_TEMPLATES_IDENTITY_UNLINKED_NOTIFICATION=https://${DOMAIN}/email-templates/identity_unlinked
+       GOTRUE_MAILER_SUBJECTS_PASSWORD_CHANGED_NOTIFICATION="Sua senha foi alterada no ${APP_NAME:-Verdash CRM}"
+       GOTRUE_MAILER_SUBJECTS_MFA_FACTOR_ENROLLED_NOTIFICATION="Verificação em duas etapas ativada no ${APP_NAME:-Verdash CRM}"
+       GOTRUE_MAILER_SUBJECTS_MFA_FACTOR_UNENROLLED_NOTIFICATION="Verificação em duas etapas removida no ${APP_NAME:-Verdash CRM}"
+       GOTRUE_MAILER_SUBJECTS_IDENTITY_LINKED_NOTIFICATION="Novo login vinculado à sua conta no ${APP_NAME:-Verdash CRM}"
+       GOTRUE_MAILER_SUBJECTS_IDENTITY_UNLINKED_NOTIFICATION="Login desvinculado da sua conta no ${APP_NAME:-Verdash CRM}"
 
   $(c_ylw "$(t "Tem de ser URL http(s).")") $(t "O GoTrue cola no fim do SITE_URL tudo o que não")
   $(t "começa com \`http\` e busca por HTTP — um caminho de arquivo faz o cliente")
