@@ -57,9 +57,11 @@ export const ESCOPO_DAS_ESCRITAS: Readonly<Record<string, Readonly<Record<string
   crm_cancel_appointment: { appointment_id: "compromisso" },
   crm_confirm_appointment: { appointment_id: "compromisso" },
   crm_set_appointment_outcome: { appointment_id: "compromisso" },
+  crm_join_waitlist: { contact_id: "contato", owner_user_id: "configuracao" },
 
   // ---- contato e conversa ----
   crm_propose_contact_field: { contact_id: "contato" },
+  crm_add_lead_note: { contact_id: "contato" },
   crm_create_conversation_draft: { conversation_id: "conversa" },
   crm_assign_conversation: { conversation_id: "conversa", to_user_id: "configuracao" },
   crm_manage_tags: { target_id: "alvo_de_tag" },
