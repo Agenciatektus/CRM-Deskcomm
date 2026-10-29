@@ -232,7 +232,7 @@ export async function getLeadContext(
   knobs: LeadContextKnobs,
 ): Promise<LeadContextResult> {
   const { rows: contactRows } = await db.query<ContactRow>(
-    `select name, display_name, observacoes, email, phone_number, tags, is_blocked, is_personal, source, consent, is_anonymized
+    `select name, display_name, email, phone_number, tags, is_blocked, is_personal, observacoes, source, consent, is_anonymized
      from contacts where organization_id = $1 and id = $2`,
     [input.tenantId, input.leadId],
   );

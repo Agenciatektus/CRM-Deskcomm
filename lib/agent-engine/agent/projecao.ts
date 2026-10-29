@@ -106,7 +106,7 @@ export function projetarContexto(ctx: LeadContext): ContextoProjetado {
       telefone: ctx.contact.phone,
       email: ctx.contact.email,
       marcadores: ctx.contact.tags,
-      apelido: ctx.contact.display_name ?? null,
+      apelido: ctx.contact.display_name,
       observacoes: observacoesParaOPrompt(ctx.contact.observacoes ?? null),
     },
     ultima_decisao_humana:
