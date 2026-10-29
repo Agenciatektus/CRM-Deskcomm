@@ -31,6 +31,13 @@ describe("aviso de mudança de acesso", () => {
     expect(e.html).not.toContain("Abrir o ");
   });
 
+  it("nome de empresa com `$&` ou `{novo}` sai como foi escrito", () => {
+    const e = buildAvisoDeMudancaDeAcesso({ ...papel, empresa: "Loja $& {novo} Cia" });
+    expect(e.subject).toBe("Seu papel na Loja $& {novo} Cia foi alterado");
+    expect(e.text).toContain("Loja $& {novo} Cia");
+    expect(e.text).toContain("de Atendente para Gerente");
+  });
+
   it("escapa o nome da empresa no HTML", () => {
     const e = buildAvisoDeMudancaDeAcesso({ ...removido, empresa: "<script>x</script>" });
     expect(e.html).not.toContain("<script>");

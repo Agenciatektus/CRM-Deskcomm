@@ -30,6 +30,10 @@ const ROTULO_DO_PAPEL: Record<string, string> = {
   viewer: "Visualizador",
 };
 
+/** Uma passada só: `$&` no nome da empresa não é interpretado e `{anterior}` dentro dele não é substituído. */
+const preencher = (texto: string, valores: Record<string, string>) =>
+  texto.replace(/\{(\w+)\}/g, (achado, chave: string) => valores[chave] ?? achado);
+
 export function buildAvisoDeMudancaDeAcesso(opts: AvisoDeMudancaDeAcessoOpcoes): {
   subject: string;
   html: string;
@@ -50,31 +54,30 @@ export function buildAvisoDeMudancaDeAcesso(opts: AvisoDeMudancaDeAcessoOpcoes):
   let comBotao = true;
 
   if (opts.tipo === "papel_alterado") {
-    subject = t("Seu papel na {empresa} foi alterado").replace("{empresa}", empresa);
+    subject = preencher(t("Seu papel na {empresa} foi alterado"), { empresa });
     paragrafos = [
-      t("Um administrador da empresa {empresa} alterou o seu papel: de {anterior} para {novo}.")
-        .replace("{empresa}", empresa)
-        .replace("{anterior}", papel(opts.papelAnterior))
-        .replace("{novo}", papel(opts.papel)),
+      preencher(t("Um administrador da empresa {empresa} alterou o seu papel: de {anterior} para {novo}."), {
+        empresa,
+        anterior: papel(opts.papelAnterior),
+        novo: papel(opts.papel),
+      }),
     ];
   } else if (opts.tipo === "acesso_removido") {
-    subject = t("Seu acesso à {empresa} foi removido").replace("{empresa}", empresa);
+    subject = preencher(t("Seu acesso à {empresa} foi removido"), { empresa });
     eyebrow = t("Segurança");
     comBotao = false;
     paragrafos = [
-      t("Um administrador da empresa {empresa} removeu o seu acesso. Você não consegue mais entrar nela.").replace(
-        "{empresa}",
+      preencher(t("Um administrador da empresa {empresa} removeu o seu acesso. Você não consegue mais entrar nela."), {
         empresa,
-      ),
+      }),
     ];
     aviso = t("Se foi engano, fale com o administrador da empresa.");
   } else {
-    subject = t("Seu acesso à {empresa} foi reativado").replace("{empresa}", empresa);
+    subject = preencher(t("Seu acesso à {empresa} foi reativado"), { empresa });
     paragrafos = [
-      t("Um administrador da empresa {empresa} reativou o seu acesso. Você já pode entrar de novo.").replace(
-        "{empresa}",
+      preencher(t("Um administrador da empresa {empresa} reativou o seu acesso. Você já pode entrar de novo."), {
         empresa,
-      ),
+      }),
     ];
   }
 
