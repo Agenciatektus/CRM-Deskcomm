@@ -28,6 +28,7 @@ import { logger } from "@/lib/logger";
 import {
   ErroDoProvedor,
   type AdaptadorDeCobranca,
+  type CobrancaEstornavel,
   type CompraLida,
   type Modo,
   type PlanoParaProvedor,
@@ -206,6 +207,16 @@ const faturaDaStripe = z.object({
   parent: z.object({ subscription_details: z.object({ subscription: z.string() }).nullish() }).nullish(),
 });
 type FaturaDaStripe = z.infer<typeof faturaDaStripe>;
+
+const cobrancaDaStripe = z.object({
+  id: z.string(),
+  amount: z.number(),
+  amount_refunded: z.number(),
+  currency: z.string(),
+  created: z.number(),
+  paid: z.boolean(),
+  status: z.string(),
+});
 
 const listaDe = <T extends z.ZodType>(item: T) => z.object({ data: z.array(item) });
 const emData = (segundos: number) => new Date(segundos * 1000);
@@ -643,6 +654,16 @@ export function criarAdaptadorStripe(dep: DependenciasDaStripe): AdaptadorDeCobr
     }
   }
 
+  async function lerUltimaCobranca(p: { clienteRef: string }): Promise<CobrancaEstornavel | null> {
+    const lista = ler(listaDe(cobrancaDaStripe), await chamar("GET", `/charges?customer=${encodeURIComponent(p.clienteRef)}&limit=10`)).data;
+    const c = lista.filter((x) => x.paid && x.status === "succeeded" && x.amount > 0).sort((a, b) => b.created - a.created)[0];
+    return c ? { ref: c.id, valorCents: c.amount, estornadoCents: c.amount_refunded, moeda: c.currency, pagaEm: emData(c.created) } : null;
+  }
+
+  async function estornarCobranca(p: { cobrancaRef: string; valorCents: number; chaveIdempotencia: string }): Promise<void> {
+    await chamar("POST", "/refunds", { charge: p.cobrancaRef, amount: p.valorCents, reason: "requested_by_customer" }, p.chaveIdempotencia);
+  }
+
   const metadadosDaMarca = { cobranca_do_revendedor: dep.marca };
   const ehNosso = (m: Record<string, string> | null | undefined) => m?.cobranca_do_revendedor === dep.marca;
 
@@ -770,6 +791,8 @@ export function criarAdaptadorStripe(dep: DependenciasDaStripe): AdaptadorDeCobr
     trocarPlano,
     cancelarNoFim,
     cancelarAgora,
+    lerUltimaCobranca,
+    estornarCobranca,
     prepararWebhook,
     removerWebhooks,
     clienteExiste,
