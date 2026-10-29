@@ -1,92 +1,75 @@
 # 03 — Tipografia
 
-> **Source of truth:** `app/design/lib/fonts.ts` (`atkinson`, `plexMono`), `app/design/lib/tokens.ts` → `TYPOS.atkinson`
+> **Source of truth:** `app/layout.tsx` (`atkinson`, `atkinsonMono`, via `next/font/local`), `app/globals.css` (`--font-sans`, `--font-mono`, `--font-size-*`, `--text-*`). Arquivos das fontes em `app/fonts/`.
 
 ## Por que Atkinson Hyperlegible
 
-A fonte de display + body do DeskcommCRM é **Atkinson Hyperlegible**, criada pelo Braille Institute em 2020 com um único objetivo: **maximizar a distinção entre caracteres similares** para usuários com baixa visão.
+A fonte de display + body do produto é **Atkinson Hyperlegible Next**, da família criada pelo Braille Institute com um único objetivo: **maximizar a distinção entre caracteres similares** para usuários com baixa visão.
 
 Razões da escolha:
 
 - **Acessibilidade-first.** `0` vs `O`, `1` vs `l` vs `I`, `rn` vs `m`, `B` vs `8` — todos disambiguados por design. Crítico em CRM onde número de pedido (`#01430`) e código de cliente (`Bl0OO1`) precisam ser lidos sem ambiguidade.
 - **Humanista, não geométrica.** Curvas levemente abertas, terminais não-mecânicos. Diferencia do par Inter/Geist (geométrico, dominante no SaaS atual).
-- **Baseline alta, x-height generosa.** Confortável em 12–13px, que é onde acontece 80% da UI operacional (timestamps, helpers, dados de tabela).
-- **Anti-genérica.** Quase ninguém em CRM SaaS usa Atkinson. Diverge sem custo de legibilidade — pelo contrário, ganha.
-- **Mesma família display + body.** Reduz cognição na hierarquia: o que muda é peso e tamanho, não tipo. Combina com Aerada (a hierarquia vem do whitespace).
+- **Baseline alta, x-height generosa.** Confortável em 12–13px, que é onde acontece boa parte da UI operacional (timestamps, helpers, dados de tabela).
+- **Mesma família display + body.** Reduz cognição na hierarquia: o que muda é peso e tamanho, não tipo.
 
-A fonte secundária para **dados monoespaçados** é **IBM Plex Mono** — escolhida por ter a mesma sensibilidade humanista (pertence à família Plex, da IBM) sem cair em JetBrains Mono (saturação developer-tools) nem Fira Code (ligatures que confundem em UI).
+A fonte para **dados monoespaçados** é **Atkinson Hyperlegible Mono**, da mesma família: mantém a desambiguação de caracteres nos IDs e valores.
 
 ## Stack completo
 
 ```css
---ds-font-display: var(--font-atkinson), ui-sans-serif, system-ui, sans-serif;
---ds-font-body:    var(--font-atkinson), ui-sans-serif, system-ui, sans-serif;
---ds-font-mono:    var(--font-plex-mono), ui-monospace, "SF Mono", Menlo, monospace;
+--font-sans: var(--font-atkinson), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+--font-mono: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 ```
 
-`var(--font-atkinson)` é injetado por `next/font/google` via `app/design/lib/fonts.ts`.
+`--font-atkinson` e `--font-mono` são injetadas por `next/font/local` em `app/layout.tsx`, a partir de arquivos versionados em `app/fonts/` (o build não depende do Google). Use sempre a custom property, nunca o nome da fonte.
 
-**Pesos disponíveis** (Atkinson):
-- 400 — body, default UI
-- 700 — bold, headings, ênfase
+**Pesos carregados** (Atkinson Hyperlegible Next): 200, 300, 400, 500, 600, 700, 800. Body é 400; ênfase e títulos usam 600 ou 700 conforme o papel (ver escala).
 
-Itálico disponível em ambos. Não há 500/600 — quando precisar de "semibold", use 700 com tamanho menor, ou aceite que peso 400 é o body.
+**Pesos carregados** (Atkinson Hyperlegible Mono): 400, 500, 700.
 
-**Pesos disponíveis** (IBM Plex Mono):
-- 400 — default mono
-- 500 — emphasis em mono (raro)
+Só o estilo normal está carregado. Itálico é sintetizado pelo navegador; por isso o uso é raro (ver Itálico).
+
+> `app/design/lib/fonts.ts` carrega outras famílias (Bricolage, Jakarta, Fraunces e afins) só para a vitrine em `app/design`. Não são fontes do produto.
 
 ## Escala tipográfica
 
-Modular ratio: **1.250 (minor third)**, com ajustes manuais em alguns stops para alinhar pixel-grid.
+Papéis definidos em `app/globals.css` (`--font-size-*`, `--line-height-*`, `--text-*`). Cada papel já leva tamanho, peso e entrelinha: `text-title-lg` sozinho é 20px / 700 / -0,01em. Um `font-*` explícito vence o peso do papel.
 
-| Token | Tamanho | Line-height | Peso | Tracking | Uso |
-|-------|---------|-------------|------|----------|-----|
-| `display-xl` | 48px | 56px | 700 | -1% | Hero raríssimo (página de boas-vindas) |
-| `display-lg` | 36px | 44px | 700 | -0.5% | Hero de página de feature, marketing-style |
-| `display-md` | 28px | 36px | 700 | 0 | Header de view (`Inbox`, `Kanban`) |
-| `display-sm` | 24px | 32px | 700 | 0 | Header de seção em página densa |
-| `h1` | 20px | 28px | 700 | 0 | Títulos de card grande, modal title |
-| `h2` | 18px | 24px | 700 | 0 | Subtítulo, header de coluna |
-| `h3` | 16px | 22px | 700 | 0 | Card title, group label em form |
-| `body-lg` | 16px | 24px | 400 | 0 | Body de prosa (descrição, comentário) |
-| `body` | 14px | 20px | 400 | 0 | **Default UI** — labels, copy de botão, item de lista |
-| `body-sm` | 13px | 18px | 400 | 0 | Helper, preview de mensagem em inbox, secondary text |
-| `caption` | 12px | 16px | 400 | 0.5% | Timestamp, badge label, microcopy |
-| `mono-data` | 13px | 18px | 400 | 0 | **IBM Plex Mono** — IDs, valores, datas tabulares |
+| Token | Tamanho | Peso | Tracking | Uso |
+|-------|---------|------|----------|-----|
+| `text-rail` | 10.5px | 600 | -0.01em | Rótulo mínimo (trilho, contador) |
+| `text-meta` | 12px | 600 | 0 | Timestamp, badge, microcopy |
+| `text-label` | 13px | 600 | 0 | Label de campo, helper, texto secundário |
+| `text-ui` | 14px | 400 | 0 | **Default UI**: copy de botão, item de lista (entrelinha 1.45) |
+| `text-message` | 15px | 400 | 0 | Corpo de mensagem na conversa (entrelinha 1.42) |
+| `text-title-sm` | 16px | 700 | 0 | Título de card, grupo de formulário |
+| `text-title-md` | 17px | 700 | 0 | Título de seção |
+| `text-title-lg` | 20px | 700 | -0.01em | Título de página, de modal |
 
 **Regras de uso:**
 
-- Não invente tamanhos intermediários. Se 14 e 16 não cabem, repense o layout.
-- `tracking` (letter-spacing) só nos extremos da escala: negativo nos display (compactar), positivo no caption (legibilidade).
-- **Line-height nunca abaixo de 1.4** em prosa (`body-lg`, `body`). UI compacta pode ir até 1.35 (caption).
+- Não invente tamanhos intermediários. Se `ui` e `message` não cabem, repense o layout.
+- `tracking` só onde o token já define (`rail` e `title-lg`). Não sobrescreva sem motivo.
+- **Line-height nunca abaixo de 1.4** em prosa.
 
 ## Numerais
 
-Atkinson Hyperlegible suporta **tabular nums** via `font-feature-settings`. Aplicado obrigatoriamente em:
+Aplique `tabular-nums` (utilitário Tailwind, `font-variant-numeric: tabular-nums`) em:
 
-```css
-.tabular {
-  font-variant-numeric: tabular-nums;
-}
-```
-
-**Quando usar tabular-nums (largura igual por dígito):**
 - IDs de pedido (`#12.443`)
 - Preços (`R$ 247,90`)
 - Datas e horários (`14:32`, `28/04`)
 - Contadores em colunas (`Pedidos: 1.247`)
 - Qualquer número em tabela ou lista alinhada
 
-**Quando manter proporcional (default):**
+**Mantenha proporcional (default):**
 - Números em prosa (`Você tem 3 conversas pendentes`)
 - Números pequenos isolados em meio a texto
 
-Em IBM Plex Mono o tabular já é nativo (toda mono é tabular).
-
 ## Itálico
 
-Itálico tem **uso semântico**, não decorativo:
+Itálico tem **uso semântico**, não decorativo, e é sintetizado (a fonte só carrega o estilo normal):
 
 ✅ Sim — citar texto literal (`A cliente disse: "ainda não chegou"`)
 ✅ Sim — termo técnico em primeira ocorrência
@@ -104,48 +87,45 @@ Exemplo canônico: **item de inbox**.
 <div className="ds-list-item">
   <Avatar />
   <div className="body">
-    <span className="title">João Silva — Pedido #12.443</span>          {/* body, weight 700 implicit via .title */}
-    <span className="preview">"Olá, ainda não recebi rastreio…"</span>  {/* body-sm, text-muted */}
+    <span className="title">João Silva — Pedido #12.443</span>          {/* text-ui, peso forte via .title */}
+    <span className="preview">"Olá, ainda não recebi rastreio…"</span>  {/* text-label, text-muted */}
   </div>
   <div className="meta">
-    <span className="ts tabular">14:32</span>                            {/* caption, tabular, mono opcional */}
-    <Badge variant="success">Resolvido</Badge>                           {/* caption peso 500 */}
+    <span className="ts tabular-nums">14:32</span>                       {/* text-meta, tabular */}
+    <Badge variant="success">Resolvido</Badge>
   </div>
 </div>
 ```
 
 Detalhes a observar:
 - O nome da pessoa e o ID do pedido convivem na mesma linha porque hierarquia é dada por `weight` + `text-muted`, não por tamanho diferente.
-- ID `#12.443` está em sans (Atkinson) com `font-variant-numeric: tabular-nums` porque é um número curto inline; quando vira coluna de tabela, vira `mono-data` (Plex Mono).
-- Timestamp em `caption` + `tabular` para alinhar verticalmente entre rows.
+- Timestamp em `text-meta` + `tabular-nums` para alinhar verticalmente entre rows.
 
 Outro exemplo: **header de view**.
 
 ```tsx
 <header>
-  <h1 className="display-md">Inbox</h1>                {/* 28px / 700 */}
-  <p className="body-sm text-muted">42 conversas abertas · 3 vencendo SLA</p>
+  <h1 className="text-title-lg">Inbox</h1>                        {/* 20px / 700 */}
+  <p className="text-label text-muted">42 conversas abertas · 3 vencendo SLA</p>
 </header>
 ```
 
 ## Acessibilidade
 
-- **Tamanho mínimo:** 12px (`caption`). Abaixo disso só ícones com `aria-label`.
-- **Line-height mínimo:** 1.4 em prosa, 1.35 em UI compacta.
-- **Tracking:** já calibrado por escala. Não sobrescreva sem motivo (legível ou marketing).
-- **Peso mínimo de leitura:** 400 sempre. Light (300) não existe na escala — Atkinson não tem 300 carregado.
-- **Foco visual:** texto em `text-muted` (`#5d594f` light / `#8e8b7f` dark) só pra UI 14px+; nunca aplicar a prosa longa.
+- **Tamanho mínimo:** 12px (`text-meta`). `text-rail` (10.5px) só para rótulo curto ou contador, nunca para frase.
+- **Line-height mínimo:** 1.4 em prosa.
+- **Contraste:** `--color-text-muted` (`#474d58` claro / `#c8cbce` escuro) serve a UI e a prosa curta; `--color-text-subtle` (`#606671` claro / `#a1a5aa` escuro) só em apoio de 14px+. Os valores vêm de `app/globals.css`; releia lá antes de citar.
 - **Truncate:** sempre com `text-overflow: ellipsis` + `white-space: nowrap` + `min-width: 0`. Tooltip com texto completo no hover (`<Tooltip>` shadcn).
+
+## E-mails
+
+Os e-mails transacionais não usam estas classes: o layout (`lib/email/layout.ts`) leva estilo inline e a pilha `'Atkinson Hyperlegible Next','Atkinson Hyperlegible',system-ui,'Segoe UI',Arial,sans-serif`. Inventário e regras: `docs/email/transacionais.md`.
 
 ## Como consumir em código
 
 ```tsx
 // Tailwind (mapeado no `@theme inline` de app/globals.css)
-<h1 className="text-display-md font-bold tracking-tight">Inbox</h1>
-<p className="text-body-sm text-muted">42 abertas</p>
-<span className="font-mono text-mono-data tabular-nums">#12.443</span>
-
-// CSS direto (showcase ou estilos globais)
-.title { font-family: var(--ds-font-display); font-size: 28px; line-height: 36px; font-weight: 700; }
-.id    { font-family: var(--ds-font-mono);    font-size: 13px; line-height: 18px; font-variant-numeric: tabular-nums; }
+<h1 className="text-title-lg">Inbox</h1>
+<p className="text-label text-muted">42 abertas</p>
+<span className="font-mono text-label tabular-nums">#12.443</span>
 ```
