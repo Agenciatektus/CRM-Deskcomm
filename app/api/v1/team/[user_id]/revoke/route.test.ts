@@ -4,10 +4,12 @@ import { NextRequest } from "next/server";
 import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
 import { audit } from "@/lib/audit";
+import { avisarMudancaDeAcesso } from "@/lib/team/avisar-mudanca-de-acesso";
 import { registrarTrocaDeComando } from "@/lib/inbox/atividade-de-comando";
 
 vi.mock("@/lib/auth/require-role", () => ({ requireRole: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
+vi.mock("@/lib/team/avisar-mudanca-de-acesso", () => ({ avisarMudancaDeAcesso: vi.fn(async () => undefined) }));
 vi.mock("@/lib/impersonate/support", () => ({
   requireSupportWrite: vi.fn(async () => null),
 }));
@@ -86,7 +88,7 @@ beforeEach(() => {
   vi.mocked(requireRole).mockResolvedValue({
     ok: true,
     user: { id: ADMIN, idioma: "pt-BR" },
-    org: { orgId: ORG, role: "admin" },
+    org: { orgId: ORG, role: "admin", name: "Acme" },
   } as never);
 });
 
@@ -181,12 +183,36 @@ describe("revogar membro", () => {
     expect(registrarTrocaDeComando).not.toHaveBeenCalled();
   });
 
+  it("avisa a pessoa uma vez após revogar", async () => {
+    mockBanco({ membro: { id: "m1", user_id: ALVO, role: "agent", revoked_at: null } });
+    const { POST } = await import("./route");
+    await POST(pedido(), ctx);
+
+    expect(avisarMudancaDeAcesso).toHaveBeenCalledTimes(1);
+    expect(avisarMudancaDeAcesso).toHaveBeenCalledWith(
+      expect.objectContaining({ mudanca: { tipo: "acesso_removido" }, autorId: ADMIN, alvoId: ALVO, empresa: "Acme" }),
+    );
+  });
+
+  it("não avisa quando já estava revogado, não achou o membro ou era o último admin", async () => {
+    const { POST } = await import("./route");
+    mockBanco({ membro: { id: "m1", user_id: ALVO, role: "agent", revoked_at: "2026-09-10T12:00:00Z" } });
+    await POST(pedido(), ctx);
+    mockBanco({ membro: null });
+    expect((await POST(pedido(), ctx)).status).toBe(404);
+    mockBanco({ membro: { id: "m1", user_id: ALVO, role: "admin", revoked_at: null }, adminCount: 1 });
+    expect((await POST(pedido(), ctx)).status).toBe(409);
+
+    expect(avisarMudancaDeAcesso).not.toHaveBeenCalled();
+  });
+
   it("não permite revogar a si mesmo", async () => {
     const { POST } = await import("./route");
     const selfCtx = { params: Promise.resolve({ user_id: ADMIN }) };
 
     const res = await POST(pedido(), selfCtx);
     expect(res.status).toBe(409);
+    expect(avisarMudancaDeAcesso).not.toHaveBeenCalled();
   });
 
   it("não permite revogar o último admin", async () => {

@@ -15,6 +15,7 @@ import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { avisarMudancaDeAcesso } from "@/lib/team/avisar-mudanca-de-acesso";
 import { registrarTrocaDeComando } from "@/lib/inbox/atividade-de-comando";
 
 export const dynamic = "force-dynamic";
@@ -121,6 +122,15 @@ export async function POST(
       revoked_role: target.role,
       released_conversations_count: openConvs?.length ?? 0,
     },
+  });
+
+  void avisarMudancaDeAcesso({
+    mudanca: { tipo: "acesso_removido" },
+    autorId: authUser.id,
+    alvoId: targetUserId,
+    empresa: activeOrg.name,
+    orgId: activeOrg.orgId,
+    requestId,
   });
 
   return ok({ user_id: targetUserId, revoked_at: nowIso }, { requestId });

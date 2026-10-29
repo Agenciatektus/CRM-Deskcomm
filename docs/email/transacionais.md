@@ -19,6 +19,7 @@ Transporte "app" = `lib/email/roteador.ts`, que usa SMTP quando configurado e Re
 | Convite de equipe | Convite (`issue-invite.ts`, `sendOnboardingInvites.ts`) | `templates/invite.ts` | {quem convidou} convidou você para a {empresa} no {marca} | Convidado | app | pt-BR |
 | Compra confirmada | Compra direta (`issue-invite.ts`, `origem: "compra"`) | `templates/invite.ts` | Sua empresa {empresa} está pronta no {marca} | Pagador | app | pt-BR |
 | Aviso de troca de e-mail pelo admin da plataforma | PATCH admin de e-mail do membro | `templates/aviso-de-troca-de-email.ts` | O e-mail de login da sua conta foi trocado | Endereço antigo | app | do usuário (`locale`) |
+| Mudança de acesso | Papel alterado, acesso removido ou reativado (`app/api/v1/team/[user_id]/{role,revoke,reactivate}`, via `lib/team/avisar-mudanca-de-acesso.ts`) | `templates/mudanca-de-acesso.ts` | Seu papel na {empresa} foi alterado; Seu acesso à {empresa} foi removido; Seu acesso à {empresa} foi reativado | A pessoa afetada (nunca o próprio autor; sem aviso se nada mudou) | app (melhor esforço, após a mutação) | do usuário (`locale`) |
 | Régua de cobrança | Teste acabando, vencida, suspende em breve, suspensa, liberada (`lib/cobranca/avisos.ts`) | `templates/cobranca.ts` | {título do aviso} no {marca} | Admins ativos da empresa | app | da organização |
 | Aviso ao dono da instalação | Compra direta nova ou repetida; troca da chave de cobrança | `templates/cobranca.ts` | {título} no {marca} | Platform admins de acesso total | app | pt-BR |
 | Alerta de vencimento da Meta | Cron `meta-alerta-vencimento` | `templates/alerta-meta.ts` | {título} no {marca} | Admins da empresa | app | da organização |
@@ -34,7 +35,6 @@ Não habilitados no GoTrue: `email_changed` (o app já avisa no caso do admin; n
 
 Cada item foi conferido no código (nenhum `sendEmail` nesses fluxos).
 
-- Membro removido ou papel alterado (`app/api/v1/team/[user_id]/{role,revoke,reactivate}`). Segurança. Avisar a pessoa afetada; quem perde acesso hoje só descobre ao tentar entrar.
 - Convite aceito avisando quem convidou (`app/actions/team/acceptInvite.ts`). Conveniência. Uma linha ao convidante evita a pergunta "já entrou?".
 - Novo dispositivo ou login suspeito. Segurança. Não há detecção; o GoTrue não oferece esse aviso nativo. Exigiria registrar dispositivo, só vale se houver demanda.
 - Exclusão de empresa concluída (`lib/tenants/exclusao.ts` só apaga usuários). Negócio. Confirmar por e-mail ao admin dá prova do que foi apagado.
