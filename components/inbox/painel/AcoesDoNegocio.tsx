@@ -177,6 +177,20 @@ export function AcoesDoNegocio({ lead, contactId, leitura, onMudou }: {
         </div>
       )}
 
+      {/* Negócio ganho não tem Ganho/Perdido, mas continua podendo ir para outro
+          funil (pós-venda, recompra): o servidor já aceita (`/clone`, 9053). */}
+      {lead.status === "won" && pendente === null && podeMexer && (
+        <Button
+          size="sm"
+          variant="outline"
+          className={cn("w-full", trocandoDeFunil && "border-accent bg-accent-soft text-accent-text")}
+          aria-pressed={trocandoDeFunil}
+          onClick={() => setTrocandoDeFunil((v) => !v)}
+        >
+          <Funnel size={14} aria-hidden /> {t("Outro funil")}
+        </Button>
+      )}
+
       {/* Perder e trocar de funil NO PAINEL (`.lead-form`), com os mesmos
           formulários das janelas do quadro. Releitura só quando gravou. */}
       {perdendo && (
