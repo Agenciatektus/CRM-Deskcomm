@@ -721,6 +721,14 @@ describe("trocarPlano, cancelarNoFim, prepararWebhook e portal", () => {
     expect(chamadas[0]?.headers.get("idempotency-key")).toBe("idem-fixa");
   });
 
+  it("cancelarAgora apaga a assinatura na hora; já encerrada (404) não é falha", async () => {
+    const { adaptador, chamadas } = montar({ "DELETE /subscriptions/sub_x": { corpo: objetos.assinatura } });
+    await adaptador.cancelarAgora("sub_x");
+    expect(chamadas[0]?.rota).toBe("DELETE /subscriptions/sub_x");
+    const sumida = montar({ "DELETE /subscriptions/sub_x": { status: 404, corpo: { error: { code: "resource_missing" } } } });
+    await expect(sumida.adaptador.cancelarAgora("sub_x")).resolves.toBeUndefined();
+  });
+
   /** Uma conta com estado: endpoints e configurações de portal vivem entre as chamadas. */
   function contaComEstado(inicial: Array<{ id: string; url: string; metadata: Record<string, string> }>) {
     const endpoints = [...inicial];

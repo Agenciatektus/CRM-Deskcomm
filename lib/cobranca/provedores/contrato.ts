@@ -185,6 +185,8 @@ export interface AdaptadorDeCobranca {
    */
   expirarSessao(sessaoId: string): Promise<void>;
   cancelarNoFim(assinaturaRef: string): Promise<void>;
+  /** Encerra NA HORA, sem acesso até o fim do período: é o que deixa `assinaturasVivas` em zero (o dono, para excluir a empresa). Já encerrada (404) não é falha. */
+  cancelarAgora(assinaturaRef: string): Promise<void>;
   urlDeGerenciar(p: { clienteRef: string; urlDeVolta: string }): Promise<string | null>;
   /** Venda direta (só Stripe): evento -> sessão de checkout -> compra, tudo relido na API. */
   lerCompra?(eventoId: string): Promise<CompraLida>;
