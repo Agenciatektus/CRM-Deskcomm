@@ -32,6 +32,7 @@ import {
   validaCamposExigidos,
 } from "@/lib/leads/campos-exigidos";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { RECUSA_DO_LEAD_UNICO, ehViolacaoDoLeadUnico } from "@/lib/leads/negocio-aberto-duplicado";
 
 export const dynamic = "force-dynamic";
 
@@ -244,6 +245,10 @@ export async function POST(
     // chegar aqui como 500 — que é o defeito, com outro nome.
     const recusa = recusaDeMotivoDaPerdaPeloBanco(updErr, user.idioma);
     if (recusa) return fail(recusa.codigo, recusa.mensagem, 422, { requestId });
+    // Reabrir (o trigger devolve ganho/perdido a `open`) com outro aberto no funil (9082).
+    if (ehViolacaoDoLeadUnico(updErr)) {
+      return fail(RECUSA_DO_LEAD_UNICO.codigo, t(RECUSA_DO_LEAD_UNICO.mensagem), 409, { requestId });
+    }
     return fail("internal_error", updErr.message, 500, { requestId });
   }
 

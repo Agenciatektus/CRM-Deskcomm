@@ -39,6 +39,7 @@ import {
   type UpdateDeMarcacao,
 } from "@/lib/leads/stage-editing";
 import { autoriaDaMudanca } from "@/lib/operacao/autoria";
+import { RECUSA_DO_LEAD_UNICO, ehViolacaoDoLeadUnico } from "@/lib/leads/negocio-aberto-duplicado";
 
 /** O vocabulário de `crm_stages.evento_de_conversao` (9054; CHECK no banco). */
 type EventoDeConversaoDaEtapa = "Purchase" | "QualifiedLead";
@@ -615,6 +616,11 @@ export async function arquivarEtapa(
       .update({ stage_id: destinoId })
       .eq("organization_id", deps.organizationId)
       .eq("stage_id", stageId);
+    // Etapa encerrada indo para uma aberta reabre os cards; um contato com outro
+    // aberto no funil barra no índice 9082.
+    if (error && ehViolacaoDoLeadUnico(error)) {
+      throw new ApiError(409, RECUSA_DO_LEAD_UNICO.codigo, undefined, deps.requestId, RECUSA_DO_LEAD_UNICO.mensagem);
+    }
     if (error) {
       // O texto do Postgres vai em `details`, não colado na frase: a mensagem é
       // o que a tela mostra ao dono da clínica.

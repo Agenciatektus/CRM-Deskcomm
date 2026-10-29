@@ -39,6 +39,7 @@ import { createClient } from "@/lib/supabase/server";
 import { observeServiceOrigin } from "@/lib/atendimento/origem";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { RECUSA_DO_LEAD_UNICO, ehViolacaoDoLeadUnico } from "@/lib/leads/negocio-aberto-duplicado";
 
 export const dynamic = "force-dynamic";
 
@@ -318,6 +319,10 @@ export async function POST(req: NextRequest): Promise<Response> {
         const recusaDoBanco = recusaDeMotivoDaPerdaPeloBanco(error, user.idioma);
         if (recusaDoBanco) {
           return fail(recusaDoBanco.codigo, recusaDoBanco.mensagem, 422, { requestId });
+        }
+        // Lote que reabre um card cujo contato já tem outro aberto no funil (9082).
+        if (ehViolacaoDoLeadUnico(error)) {
+          return fail(RECUSA_DO_LEAD_UNICO.codigo, traduzir(RECUSA_DO_LEAD_UNICO.mensagem, user.idioma ?? "pt-BR"), 409, { requestId });
         }
         return fail("internal_error", error.message, 500, { requestId });
       }
