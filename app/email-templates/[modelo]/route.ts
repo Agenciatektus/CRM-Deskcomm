@@ -3,8 +3,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { marcaDaSaida } from "@/lib/branding/saida";
 import {
   MODELOS_DE_ACESSO,
+  MODELOS_DE_AVISO,
   montarTemplateDeAcesso,
+  montarTemplateDeAviso,
   type ModeloDeAcesso,
+  type ModeloDeAviso,
 } from "@/lib/email/templates/acesso-gotrue";
 
 /**
@@ -58,7 +61,8 @@ export async function GET(
 ): Promise<NextResponse> {
   const { modelo } = await params;
 
-  if (!MODELOS_DE_ACESSO.includes(modelo as ModeloDeAcesso)) {
+  const aviso = MODELOS_DE_AVISO.includes(modelo as ModeloDeAviso);
+  if (!aviso && !MODELOS_DE_ACESSO.includes(modelo as ModeloDeAcesso)) {
     return new NextResponse("modelo desconhecido", { status: 404 });
   }
 
@@ -68,7 +72,10 @@ export async function GET(
   // do produto, que é uma instalação funcionando.
   const marca = await marcaDaSaida(null);
 
-  return new NextResponse(montarTemplateDeAcesso(modelo as ModeloDeAcesso, marca), {
+  const corpo = aviso
+    ? montarTemplateDeAviso(modelo as ModeloDeAviso, marca)
+    : montarTemplateDeAcesso(modelo as ModeloDeAcesso, marca);
+  return new NextResponse(corpo, {
     status: 200,
     headers: {
       "content-type": "text/html; charset=utf-8",
