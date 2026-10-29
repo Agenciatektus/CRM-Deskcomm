@@ -31,6 +31,18 @@ describe("Outro funil no painel do negócio", () => {
     expect(screen.queryByRole("button", { name: /^Ganho$/ })).toBeNull();
   });
 
+  it("abrir a troca fecha a confirmação de Reabrir, e Reabrir fecha a troca", () => {
+    abre("won");
+    fireEvent.click(screen.getByRole("button", { name: /Outro funil/ }));
+    expect(screen.getByTestId("formulario-de-outro-funil")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Reabrir/ }));
+    expect(screen.queryByTestId("formulario-de-outro-funil")).toBeNull();
+    expect(screen.getByTestId("confirmar-reabrir")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Outro funil/ }));
+    expect(screen.queryByTestId("confirmar-reabrir")).toBeNull();
+    expect(screen.getByTestId("formulario-de-outro-funil")).toBeInTheDocument();
+  });
+
   it("negócio ABERTO segue com Ganho, Perdido e Outro funil", () => {
     abre("open");
     expect(screen.getByRole("button", { name: /Outro funil/ })).toBeInTheDocument();

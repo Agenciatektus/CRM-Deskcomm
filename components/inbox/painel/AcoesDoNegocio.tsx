@@ -104,7 +104,7 @@ export function AcoesDoNegocio({ lead, contactId, leitura, onMudou }: {
 
   return (
     <div className="space-y-2" data-testid="inbox-acoes-do-negocio">
-      {(lead.status === "won" || pendente === "ganho") && (
+      {((lead.status === "won" && pendente !== "troca") || pendente === "ganho") && (
         <div className="flex items-center gap-2 rounded-field bg-success-bg px-3 py-2.25 text-[13.5px] font-semibold text-success-fg">
           <Check size={14} aria-hidden /> <span className="grow">{t("Negócio ganho")}</span>
         </div>
@@ -121,7 +121,7 @@ export function AcoesDoNegocio({ lead, contactId, leitura, onMudou }: {
         </div>
       )}
       {!aberto && pendente === null && podeMexer && !confirmandoReabrir && (
-        <Button size="sm" variant="outline" className="w-full" onClick={() => setConfirmandoReabrir(true)}>
+        <Button size="sm" variant="outline" className="w-full" onClick={() => { setTrocandoDeFunil(false); setConfirmandoReabrir(true); }}>
           <ArrowsClockwise size={14} aria-hidden /> {t("Reabrir")}
         </Button>
       )}
@@ -185,7 +185,7 @@ export function AcoesDoNegocio({ lead, contactId, leitura, onMudou }: {
           variant="outline"
           className={cn("w-full", trocandoDeFunil && "border-accent bg-accent-soft text-accent-text")}
           aria-pressed={trocandoDeFunil}
-          onClick={() => setTrocandoDeFunil((v) => !v)}
+          onClick={() => { setConfirmandoReabrir(false); setTrocandoDeFunil((v) => !v); }}
         >
           <Funnel size={14} aria-hidden /> {t("Outro funil")}
         </Button>
