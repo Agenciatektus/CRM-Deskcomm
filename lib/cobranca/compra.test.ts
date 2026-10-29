@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { slugDoProvisionamento } from "@/lib/auth/provision";
 import { argumentos, bancoFalso, operacao, valorDoFiltro, type BancoFalso, type Cadeia, type Resposta } from "@/tests/helpers/banco-falso-da-cobranca";
 
 import type { CompraLida } from "./provedores/contrato";
@@ -9,7 +8,7 @@ vi.mock("@/lib/logger", () => ({ logger: { warn: vi.fn(), error: vi.fn(), info: 
 vi.mock("./provedores", () => ({ adaptador: () => ({}), modoDoProvedor: async () => "teste" }));
 vi.mock("./sincronizar", () => ({ sincronizar: vi.fn() }));
 
-import { IDADE_MAXIMA_SEM_PAGAMENTO_MS, LIMITE_DE_COMPRAS_POR_RODADA, TETO_DE_TENTATIVAS, mascararEmail, processarCompra, processarComprasPendentes } from "./compra";
+import { IDADE_MAXIMA_SEM_PAGAMENTO_MS, LIMITE_DE_COMPRAS_POR_RODADA, TETO_DE_TENTATIVAS, mascararEmail, processarCompra, slugDaCompra, processarComprasPendentes } from "./compra";
 
 const AGORA = new Date("2026-10-27T12:00:00Z");
 
@@ -101,7 +100,7 @@ describe("processarCompra", () => {
         args: {
           p_compra: `compra-${n}`,
           p_nome: `Empresa ${n} Ltda`,
-          p_slug: slugDoProvisionamento("stripe", `cs_test_${n}`),
+          p_slug: slugDaCompra(`Empresa ${n} Ltda`, `cs_test_${n}`),
           p_plano: `plano-${n}`,
           p_modo: "teste",
           p_cliente: `cus_${n}`,
@@ -350,5 +349,14 @@ describe("processarComprasPendentes", () => {
     const r = await processarComprasPendentes(banco.cliente as never, { aoCriar });
     expect(ultima()).toEqual({ motivo: "efeitos_pendentes", tentativas: 4 });
     expect(r.falhas).toBe(1);
+  });
+});
+
+describe("slugDaCompra", () => {
+  it("nome legível + sufixo da sessão: estável por sessão, distinto entre sessões", () => {
+    const a = slugDaCompra("Clínica São João Ltda", "cs_1");
+    expect(a).toMatch(/^clinica-sao-joao-ltda-[0-9a-f]{6}$/);
+    expect(slugDaCompra("Clínica São João Ltda", "cs_1")).toBe(a);
+    expect(slugDaCompra("Clínica São João Ltda", "cs_2")).not.toBe(a);
   });
 });

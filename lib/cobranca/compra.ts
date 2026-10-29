@@ -17,7 +17,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { audit } from "@/lib/audit";
-import { slugDoProvisionamento } from "@/lib/auth/provision";
+import { slugDoProvisionamento, slugify } from "@/lib/auth/provision";
 import { logger } from "@/lib/logger";
 
 import { avisarDonosDaInstalacao } from "./emails";
@@ -29,6 +29,16 @@ import type { Modo } from "./vocabulario";
 export const CHAVE_DO_MAPA_DE_PLANOS = "VENDA_DIRETA_PLANOS";
 export const LIMITE_DE_COMPRAS_POR_RODADA = 20;
 export const TETO_DE_TENTATIVAS = 10;
+
+/**
+ * Slug legível da empresa comprada: o nome dela + 6 caracteres do hash da sessão.
+ * Continua determinístico por sessão (a repetição do aviso cai na mesma empresa) e o
+ * hash evita colisão entre duas empresas de mesmo nome.
+ */
+export function slugDaCompra(nomeDaEmpresa: string, sessaoId: string): string {
+  const sufixo = slugDoProvisionamento("stripe", sessaoId).slice("stripe-".length, "stripe-".length + 6);
+  return `${slugify(nomeDaEmpresa)}-${sufixo}`;
+}
 const JANELA_DO_MESMO_EMAIL_MS = 24 * 3600 * 1000;
 /** Compra que não foi paga depois disso deixa a fila (`pagamento_nao_confirmado`). */
 export const IDADE_MAXIMA_SEM_PAGAMENTO_MS = 72 * 3600 * 1000;
@@ -240,7 +250,7 @@ export async function processarCompra(
     const { data: org, error: erroDaRpc } = await admin.rpc("fn_cobranca_org_da_compra", {
       p_compra: compra.id,
       p_nome: nomeDaEmpresa,
-      p_slug: slugDoProvisionamento("stripe", relida.sessaoId),
+      p_slug: slugDaCompra(nomeDaEmpresa, relida.sessaoId),
       p_plano: planoId,
       p_modo: relida.modo,
       p_cliente: relida.clienteRef,
