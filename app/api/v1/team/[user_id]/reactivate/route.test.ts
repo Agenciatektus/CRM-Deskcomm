@@ -4,6 +4,7 @@ import { NextRequest } from "next/server";
 import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
 import { audit } from "@/lib/audit";
+import { avisarMudancaDeAcesso } from "@/lib/team/avisar-mudanca-de-acesso";
 
 /**
  * POST /api/v1/team/[user_id]/reactivate — devolver o acesso de quem foi
@@ -21,6 +22,7 @@ import { audit } from "@/lib/audit";
 
 vi.mock("@/lib/auth/require-role", () => ({ requireRole: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
+vi.mock("@/lib/team/avisar-mudanca-de-acesso", () => ({ avisarMudancaDeAcesso: vi.fn(async () => undefined) }));
 vi.mock("@/lib/impersonate/support", () => ({
   requireSupportWrite: vi.fn(async () => null),
 }));
@@ -63,7 +65,7 @@ beforeEach(() => {
   vi.mocked(requireRole).mockResolvedValue({
     ok: true,
     user: { id: ADMIN, idioma: "pt-BR" },
-    org: { orgId: ORG },
+    org: { orgId: ORG, name: "Acme" },
   } as never);
 });
 
@@ -115,6 +117,25 @@ describe("reativar membro", () => {
     expect(res.status).toBe(200);
     expect(body.data.already_active).toBe(true);
     expect(ultimoUpdate).toBeNull();
+  });
+
+  it("avisa a pessoa uma vez ao reativar; não avisa se já estava ativo, se não existe ou se o banco recusa", async () => {
+    const { POST } = await import("./route");
+    bancoCom({ id: "m1", user_id: ALVO, role: "agent", revoked_at: "2026-09-10T22:45:53Z" });
+    await POST(pedido(), ctx);
+    expect(avisarMudancaDeAcesso).toHaveBeenCalledTimes(1);
+    expect(avisarMudancaDeAcesso).toHaveBeenCalledWith(
+      expect.objectContaining({ mudanca: { tipo: "acesso_reativado" }, alvoId: ALVO, empresa: "Acme" }),
+    );
+
+    vi.mocked(avisarMudancaDeAcesso).mockClear();
+    bancoCom({ id: "m1", user_id: ALVO, role: "agent", revoked_at: null });
+    await POST(pedido(), ctx);
+    bancoCom(null);
+    await POST(pedido(), ctx);
+    bancoCom({ id: "m1", user_id: ALVO, role: "agent", revoked_at: "2026-09-10T22:45:53Z" }, { message: "boom" });
+    expect((await POST(pedido(), ctx)).status).toBe(500);
+    expect(avisarMudancaDeAcesso).not.toHaveBeenCalled();
   });
 
   it("membro de outra organização não é encontrado", async () => {
