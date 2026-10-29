@@ -12241,6 +12241,24 @@ export const DICIONARIO: Traducoes = {
       es: "Confirma con la persona que reconoce el cambio. Si no lo reconoce, habla con quien administra el servidor.",
     },
   "Abrir a equipe": { es: "Abrir el equipo" },
+  Visualizador: { es: "Visualizador" },
+  "Abrir o {marca}": { es: "Abrir {marca}" },
+  "Seu papel na {empresa} foi alterado": { es: "Tu rol en {empresa} fue cambiado" },
+  "Um administrador da empresa {empresa} alterou o seu papel: de {anterior} para {novo}.": {
+    es: "Un administrador de la empresa {empresa} cambió tu rol: de {anterior} a {novo}.",
+  },
+  "Seu acesso à {empresa} foi removido": { es: "Tu acceso a {empresa} fue eliminado" },
+  "Um administrador da empresa {empresa} removeu o seu acesso. Você não consegue mais entrar nela.": {
+    es: "Un administrador de la empresa {empresa} eliminó tu acceso. Ya no puedes entrar en ella.",
+  },
+  "Se foi engano, fale com o administrador da empresa.": {
+    es: "Si fue un error, habla con el administrador de la empresa.",
+  },
+  "Seu acesso à {empresa} foi reativado": { es: "Tu acceso a {empresa} fue reactivado" },
+  "Um administrador da empresa {empresa} reativou o seu acesso. Você já pode entrar de novo.": {
+    es: "Un administrador de la empresa {empresa} reactivó tu acceso. Ya puedes entrar de nuevo.",
+  },
+  "Dúvidas? Fale com a Tektus no WhatsApp.": { es: "¿Dudas? Habla con Tektus por WhatsApp." },
   "O e-mail de login da sua conta foi trocado": {
     es: "Se cambió el correo de inicio de sesión de tu cuenta",
   },

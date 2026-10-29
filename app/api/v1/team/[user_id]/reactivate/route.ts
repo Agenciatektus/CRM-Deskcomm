@@ -42,6 +42,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { traduzirLimiteDoPlano } from "@/lib/cobranca/limites";
 import { createClient } from "@/lib/supabase/server";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { avisarMudancaDeAcesso } from "@/lib/team/avisar-mudanca-de-acesso";
 
 export const dynamic = "force-dynamic";
 
@@ -98,6 +99,15 @@ export async function POST(
     resourceId: target.id,
     requestId,
     metadata: { target_user_id: targetUserId, restored_role: target.role },
+  });
+
+  void avisarMudancaDeAcesso({
+    mudanca: { tipo: "acesso_reativado" },
+    autorId: authUser.id,
+    alvoId: targetUserId,
+    empresa: activeOrg.name,
+    orgId: activeOrg.orgId,
+    requestId,
   });
 
   return ok({ user_id: targetUserId, reactivated_at: nowIso }, { requestId });
