@@ -17123,6 +17123,10 @@ export const DICIONARIO: Traducoes = {
   "Prazo concedido.": { es: "Plazo concedido." },
   "Tornar isenta": { es: "Dejar exenta" },
   "A empresa agora é isenta.": { es: "La empresa ahora está exenta." },
+  "Encerra a assinatura no provedor agora, sem acesso até o fim do período, e não devolve o valor pago. Reembolso é no painel do provedor.": {
+    es: "Cierra la suscripción en el proveedor ahora, sin acceso hasta el fin del período, y no devuelve el valor pagado. El reembolso se hace en el panel del proveedor.",
+  },
+  "Assinatura cancelada no provedor.": { es: "Suscripción cancelada en el proveedor." },
   "O uso atual não cabe no plano escolhido. Para trocar, primeiro:": { es: "El uso actual no cabe en el plan elegido. Para cambiar, primero:" },
   "Revogue o acesso de {n} pessoa(s) em Equipe.": { es: "Revoca el acceso de {n} persona(s) en Equipo." },
   "Exclua {n} número(s) em Conexões.": { es: "Elimina {n} número(s) en Conexiones." },

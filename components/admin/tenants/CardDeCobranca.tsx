@@ -101,6 +101,7 @@ export function CardDeCobranca({
   const [remover, setRemover] = useState<ReturnType<typeof oQueRemover>>([]);
   const [documento, setDocumento] = useState(documentoDoCadastro ?? "");
   const [link, setLink] = useState<string | null>(null);
+  const [confirmandoCancelamento, setConfirmandoCancelamento] = useState(false);
   const documentoNormalizado = documentoDoPagador(documento);
   const documentoErrado = documento.trim() !== "" && documentoNormalizado === null;
   const base = `/api/v1/admin/tenants/${orgId}/assinatura`;
@@ -312,6 +313,31 @@ export function CardDeCobranca({
           <Button variant="outline" disabled={ocupado} onClick={() => agir(() => apiClient.delete(base), t("A empresa agora é isenta."))}>
             {t("Tornar isenta")}
           </Button>
+          {assinatura?.provedor &&
+            (confirmandoCancelamento ? (
+              <>
+                <p role="alert" className="basis-full text-sm text-warning-fg">
+                  {t("Encerra a assinatura no provedor agora, sem acesso até o fim do período, e não devolve o valor pago. Reembolso é no painel do provedor.")}
+                </p>
+                <Button
+                  variant="destructive"
+                  disabled={ocupado}
+                  onClick={() => {
+                    setConfirmandoCancelamento(false);
+                    void agir(() => apiClient.post(`${base}/cancelar`, {}), t("Assinatura cancelada no provedor."));
+                  }}
+                >
+                  {t("Confirmar cancelamento")}
+                </Button>
+                <Button variant="outline" disabled={ocupado} onClick={() => setConfirmandoCancelamento(false)}>
+                  {t("Voltar")}
+                </Button>
+              </>
+            ) : (
+              <Button variant="outline" disabled={ocupado} onClick={() => setConfirmandoCancelamento(true)}>
+                {t("Cancelar assinatura")}
+              </Button>
+            ))}
         </div>
       )}
     </Card>
