@@ -76,6 +76,12 @@ beforeEach(() => {
   fake.trocasNuvemshop = 0;
 });
 
+/** Destino da ponte (200 + location.replace), no lugar do header Location. */
+async function destinoDaPonte(res: Response): Promise<string> {
+  const m = /location\.replace\((".*?")\)/.exec(await res.clone().text());
+  return m ? (JSON.parse(m[1]) as string) : "";
+}
+
 describe("o retorno do OAuth vale uma vez", () => {
   it("Google Ads: o mesmo state na segunda volta é recusado sem trocar código", async () => {
     const { emitirEstado } = await import("@/lib/plataformas-de-anuncio/google/estado");
@@ -93,10 +99,10 @@ describe("o retorno do OAuth vale uma vez", () => {
       });
 
     const primeira = await GET(pedido());
-    expect(new URL(primeira.headers.get("location")!).searchParams.get("ok")).toBe("1");
+    expect(new URL(await destinoDaPonte(primeira)).searchParams.get("ok")).toBe("1");
 
     const segunda = await GET(pedido());
-    expect(new URL(segunda.headers.get("location")!).searchParams.get("erro")).toBe("estado_invalido");
+    expect(new URL(await destinoDaPonte(segunda)).searchParams.get("erro")).toBe("estado_invalido");
     expect(fake.trocasAds, "a segunda volta não pode chegar à troca do código").toBe(1);
   });
 

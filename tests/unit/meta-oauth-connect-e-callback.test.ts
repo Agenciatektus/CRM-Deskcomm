@@ -166,12 +166,18 @@ async function iniciado(): Promise<{ state: string; cookie: string }> {
   return { state, cookie: `crm_oauth_bind=${resposta.cookies.get("crm_oauth_bind")!.value}` };
 }
 
+/** Destino da ponte (200 + location.replace), no lugar do header Location. */
+async function destinoDaPonte(res: Response): Promise<string> {
+  const m = /location\.replace\((".*?")\)/.exec(await res.clone().text());
+  return m ? (JSON.parse(m[1]) as string) : "";
+}
+
 async function voltar(query: string, cookie?: string) {
   const { GET } = await import("@/app/api/v1/plataformas-de-anuncio/meta/callback/route");
   const resposta = await GET(
     new NextRequest(`http://localhost${CALLBACK}?${query}`, { headers: cookie ? { cookie } : {} }),
   );
-  const destino = new URL(resposta.headers.get("location")!);
+  const destino = new URL(await destinoDaPonte(resposta));
   return {
     caminho: destino.pathname,
     conectado: destino.searchParams.get("conectado"),

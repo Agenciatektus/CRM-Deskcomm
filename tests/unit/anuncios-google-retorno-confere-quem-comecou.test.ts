@@ -92,6 +92,12 @@ async function comecar(): Promise<{ state: string; cookie: string }> {
   return { state, cookie: `crm_oauth_bind=${gravado!.value}` };
 }
 
+/** Destino da ponte (200 + location.replace), no lugar do header Location. */
+async function destinoDaPonte(res: Response): Promise<string> {
+  const m = /location\.replace\((".*?")\)/.exec(await res.clone().text());
+  return m ? (JSON.parse(m[1]) as string) : "";
+}
+
 async function voltar(state: string, cookie?: string) {
   const { GET } = await import("@/app/api/v1/plataformas-de-anuncio/google/callback/route");
   const resposta = await GET(
@@ -99,7 +105,7 @@ async function voltar(state: string, cookie?: string) {
       headers: cookie ? { cookie } : {},
     }),
   );
-  const destino = new URL(resposta.headers.get("location")!);
+  const destino = new URL(await destinoDaPonte(resposta));
   return { ok: destino.searchParams.get("ok"), erro: destino.searchParams.get("erro") };
 }
 
