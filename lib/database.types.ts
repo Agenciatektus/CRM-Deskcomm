@@ -3053,6 +3053,7 @@ export type Database = {
           is_available: boolean
           last_heartbeat_at: string | null
           organization_id: string
+          overlap_tolerance_minutes: number
           schedule: Json
           simultaneous_appointments: number
           updated_at: string
@@ -3064,6 +3065,7 @@ export type Database = {
           is_available?: boolean
           last_heartbeat_at?: string | null
           organization_id: string
+          overlap_tolerance_minutes: number
           schedule?: Json
           simultaneous_appointments?: number
           updated_at?: string
@@ -3075,6 +3077,7 @@ export type Database = {
           is_available?: boolean
           last_heartbeat_at?: string | null
           organization_id?: string
+          overlap_tolerance_minutes?: number
           schedule?: Json
           simultaneous_appointments?: number
           updated_at?: string

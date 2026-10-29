@@ -240,6 +240,8 @@ function agenda(
     bufferDepoisMin?: number;
     /** Atendimentos simultâneos do dono (`simultaneous_appointments`, migration 9083). */
     simultaneos?: number;
+    /** Tolerância no fim do atendimento (`overlap_tolerance_minutes`, migration 9084). */
+    tolerancia?: number;
   } = {},
 ): Banco {
   return bancoEmMemoria({
@@ -266,6 +268,7 @@ function agenda(
         organization_id: ORG,
         user_id: DONO,
         simultaneous_appointments: args.simultaneos ?? 1,
+        overlap_tolerance_minutes: args.tolerancia ?? 0,
         schedule: {
           timezone: "America/Sao_Paulo",
           windows: [{ dow: 3, start: "09:00", end: args.fimDaJornada ?? "18:00" }],
@@ -727,6 +730,68 @@ describe("atendimentos simultâneos (migration 9083): a capacidade chega à grad
 
   it("o ENCAIXE em cima do GOOGLE continua RECUSADO com capacidade 2 — evento de fora ocupa inteiro", async () => {
     const banco = agenda({ eventosDoGoogle: [eventoDoGoogle(NA_GRADE, "2026-10-07T14:00:00.000Z")], simultaneos: 2 });
+    await expect(
+      marcarAgendamentoHandler(banco.client, ctx(PESSOA), { event_type_id: TIPO, starts_at: FORA_DA_GRADE }),
+    ).rejects.toMatchObject(RECUSA);
+  });
+});
+
+describe("tolerância no fim (migration 9084): a gravação decide igual à listagem", () => {
+  // 09:00–11:00 local (12:00Z–14:00Z); com 30 de tolerância ele ocupa até 10:30 para colisão.
+  const DAS_9_AS_11 = (id = "ag-9h") => agendamento("2026-10-07T12:00:00.000Z", "2026-10-07T14:00:00.000Z", { id });
+  const AS_10H29 = "2026-10-07T13:29:00.000Z";
+
+  it("o ENCAIXE às 10:30 MARCA com tolerância 30", async () => {
+    const banco = agenda({ agendamentos: [DAS_9_AS_11()], tolerancia: 30 });
+    await marcarAgendamentoHandler(banco.client, ctx(PESSOA), { event_type_id: TIPO, starts_at: FORA_DA_GRADE });
+    expect(criados(banco), "a tolerância da jornada não chegou ao encaixe").toHaveLength(1);
+  });
+
+  it("CONTROLE: o mesmo encaixe às 10:30 é RECUSADO com tolerância 0", async () => {
+    const banco = agenda({ agendamentos: [DAS_9_AS_11()] });
+    await expect(
+      marcarAgendamentoHandler(banco.client, ctx(PESSOA), { event_type_id: TIPO, starts_at: FORA_DA_GRADE }),
+    ).rejects.toMatchObject(RECUSA);
+  });
+
+  it("o encaixe às 10:29 é RECUSADO — um minuto antes da tolerância ainda é simultâneo", async () => {
+    const banco = agenda({ agendamentos: [DAS_9_AS_11()], tolerancia: 30 });
+    await expect(
+      marcarAgendamentoHandler(banco.client, ctx(PESSOA), { event_type_id: TIPO, starts_at: AS_10H29 }),
+    ).rejects.toMatchObject(RECUSA);
+  });
+
+  it("a IA NA grade às 10:00 é RECUSADA com tolerância 30 — a grade e a gravação usam a mesma régua", async () => {
+    const banco = agenda({ agendamentos: [DAS_9_AS_11()], tolerancia: 30 });
+    await expect(
+      marcarAgendamentoHandler(banco.client, ctx(AGENTE), { event_type_id: TIPO, starts_at: NA_GRADE }),
+    ).rejects.toMatchObject(RECUSA);
+  });
+
+  it("a IA NA grade às 10:00 MARCA quando o anterior termina 10:30 e a tolerância é 30", async () => {
+    const banco = agenda({
+      agendamentos: [agendamento("2026-10-07T12:00:00.000Z", "2026-10-07T13:30:00.000Z")],
+      tolerancia: 30,
+    });
+    await marcarAgendamentoHandler(banco.client, ctx(AGENTE), { event_type_id: TIPO, starts_at: NA_GRADE });
+    expect(criados(banco), "a tolerância da jornada não chegou ao motor da grade").toHaveLength(1);
+  });
+
+  it("capacidade 2: dois das 9 às 11 recusam o encaixe às 10:00 e liberam às 10:30", async () => {
+    const recusa = agenda({ agendamentos: [DAS_9_AS_11(), DAS_9_AS_11("ag-9h-b")], simultaneos: 2, tolerancia: 30 });
+    await expect(
+      marcarAgendamentoHandler(recusa.client, ctx(PESSOA), { event_type_id: TIPO, starts_at: NA_GRADE }),
+    ).rejects.toMatchObject(RECUSA);
+    const aceita = agenda({ agendamentos: [DAS_9_AS_11(), DAS_9_AS_11("ag-9h-b")], simultaneos: 2, tolerancia: 30 });
+    await marcarAgendamentoHandler(aceita.client, ctx(PESSOA), { event_type_id: TIPO, starts_at: FORA_DA_GRADE });
+    expect(criados(aceita)).toHaveLength(1);
+  });
+
+  it("o GOOGLE continua ocupando inteiro com tolerância 30", async () => {
+    const banco = agenda({
+      eventosDoGoogle: [eventoDoGoogle("2026-10-07T12:00:00.000Z", "2026-10-07T14:00:00.000Z")],
+      tolerancia: 30,
+    });
     await expect(
       marcarAgendamentoHandler(banco.client, ctx(PESSOA), { event_type_id: TIPO, starts_at: FORA_DA_GRADE }),
     ).rejects.toMatchObject(RECUSA);

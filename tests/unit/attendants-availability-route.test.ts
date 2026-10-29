@@ -150,6 +150,7 @@ describe("GET /api/v1/attendants/availability", () => {
         "is_available",
         "last_heartbeat_at",
         "name",
+        "overlap_tolerance_minutes",
         "present",
         "role",
         "schedule",

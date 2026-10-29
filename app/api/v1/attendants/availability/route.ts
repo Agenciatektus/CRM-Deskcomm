@@ -33,7 +33,7 @@ import { createClient } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 const SELECT_COLS =
-  "user_id, is_available, capacity, schedule, simultaneous_appointments, updated_at, last_heartbeat_at";
+  "user_id, is_available, capacity, schedule, simultaneous_appointments, overlap_tolerance_minutes, updated_at, last_heartbeat_at";
 
 interface AvailabilityRow {
   user_id: string;
@@ -41,6 +41,7 @@ interface AvailabilityRow {
   capacity: number;
   schedule: unknown;
   simultaneous_appointments: number;
+  overlap_tolerance_minutes: number;
   updated_at: string | null;
   last_heartbeat_at: string | null;
 }
@@ -119,6 +120,7 @@ export async function GET(_req: NextRequest): Promise<Response> {
     capacity: m.capacidade,
     schedule: m.agenda,
     simultaneous_appointments: m.atendimentosSimultaneos,
+    overlap_tolerance_minutes: m.toleranciaNoFim,
     updated_at: m.atualizadoEm,
     current_load: m.cargaAtual,
     // Presença: "tem sinal recente" — nunca "está de plantão". Os dois campos
