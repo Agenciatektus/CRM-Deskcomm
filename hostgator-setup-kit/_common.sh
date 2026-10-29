@@ -586,8 +586,11 @@ gravar_modelos_do_gotrue() {  # gravar_modelos_do_gotrue <.env do Supabase> <htt
     valor="$(printf '%s' "$caminho" | tr 'a-z' 'A-Z')"
     chave="GOTRUE_MAILER_TEMPLATES_${valor}_NOTIFICATION"
     [ -z "$(valor_do_env "$env_sb" "$chave")" ] || continue
-    set_env_var "$env_sb" "$chave" "${base}/email-templates/${caminho}"
-    set_env_var "$env_sb" "GOTRUE_MAILER_NOTIFICATIONS_${valor}_ENABLED" true
+    atual="${!chave:-}"
+    [ -n "$atual" ] || atual="${base}/email-templates/${caminho}"
+    set_env_var "$env_sb" "$chave" "$atual"
+    # ENABLED só quando vazio: quem desligou o aviso de propósito segue desligado.
+    [ -n "$(valor_do_env "$env_sb" "GOTRUE_MAILER_NOTIFICATIONS_${valor}_ENABLED")" ]       || set_env_var "$env_sb" "GOTRUE_MAILER_NOTIFICATIONS_${valor}_ENABLED" true
   done
   return 0
 }
