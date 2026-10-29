@@ -222,7 +222,7 @@ export function ScheduleDialog({
   open: boolean;
   onOpenChange: (o: boolean) => void;
   /** Devolve as janelas que o SERVIDOR guardou — é daqui que o resumo lê. */
-  onSave: (windows: ScheduleWindow[], timezone: string, simultaneos: number) => Promise<ScheduleWindow[]>;
+  onSave: (windows: ScheduleWindow[], timezone: string, simultaneos: number, tolerancia: number) => Promise<ScheduleWindow[]>;
   isPending: boolean;
   organizationTimezone?: string;
 }) {
@@ -232,6 +232,7 @@ export function ScheduleDialog({
   const [timezone, setTimezone] = useState(initial?.timezone || defaultTimezone);
   const [windows, setWindows] = useState<ScheduleWindow[]>(initial?.windows ?? []);
   const [simultaneos, setSimultaneos] = useState(attendant.availability?.simultaneous_appointments ?? 1);
+  const [tolerancia, setTolerancia] = useState(attendant.availability?.overlap_tolerance_minutes ?? 0);
   /**
    * O que o SERVIDOR guardou no último "Salvar", lido do RETORNO da gravação.
    * `null` enquanto nada foi publicado nesta abertura do diálogo.
@@ -245,13 +246,18 @@ export function ScheduleDialog({
     rascunho: ScheduleWindow[];
     timezone: string;
     simultaneos: number;
+    tolerancia: number;
     janelas: ScheduleWindow[];
   } | null>(null);
   // O resumo vale para o rascunho que foi gravado. Mexeu depois (outra faixa,
   // o botão de copiar, o fuso)? O resumo sai e o "Salvar" volta — senão a
   // edição sumiria no "Fechar" sem aviso, que é o defeito da #2312 de novo.
   const publicado =
-    gravacao && gravacao.rascunho === windows && gravacao.timezone === timezone && gravacao.simultaneos === simultaneos
+    gravacao &&
+    gravacao.rascunho === windows &&
+    gravacao.timezone === timezone &&
+    gravacao.simultaneos === simultaneos &&
+    gravacao.tolerancia === tolerancia
       ? gravacao.janelas
       : null;
   /** Desligado quando não há o que copiar ou quando a cópia estouraria a rota. */
@@ -259,7 +265,13 @@ export function ScheduleDialog({
 
   async function salvar() {
     try {
-      setGravacao({ rascunho: windows, timezone, simultaneos, janelas: await onSave(windows, timezone, simultaneos) });
+      setGravacao({
+        rascunho: windows,
+        timezone,
+        simultaneos,
+        tolerancia,
+        janelas: await onSave(windows, timezone, simultaneos, tolerancia),
+      });
     } catch {
       // O erro já virou toast no hook (`showApiError`) e o diálogo fica ABERTO:
       // fechar depois de uma gravação que falhou seria dizer que deu certo.
@@ -315,6 +327,25 @@ export function ScheduleDialog({
             />
             <p className="text-xs text-muted-foreground">
               {t("Quantos clientes esta pessoa atende ao mesmo tempo. Use 1 para um cliente por vez; num salão, a química age enquanto ela atende outra cliente.")}
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="tolerancia">{t("Tolerância no fim do atendimento (minutos)")}</Label>
+            <Input
+              id="tolerancia"
+              type="number"
+              min={0}
+              max={120}
+              value={tolerancia}
+              className="h-9 w-24"
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                if (Number.isInteger(n) && n >= 0 && n <= 120) setTolerancia(n);
+              }}
+            />
+            <p className="text-xs text-muted-foreground">
+              {t("Nos últimos minutos do atendimento a próxima cliente já pode ser marcada. Com 30, um atendimento das 10h às 12h libera o horário das 11h30. Use 0 para esperar o fim.")}
             </p>
           </div>
 
@@ -724,13 +755,17 @@ export function AttendantsClient({ canManage, organizationTimezone }: Props) {
           onOpenChange={(o) => !o && setScheduleFor(null)}
           isPending={patch.isPending}
           organizationTimezone={organizationTimezone}
-          onSave={async (windows, timezone, simultaneos) => {
+          onSave={async (windows, timezone, simultaneos, tolerancia) => {
             // `mutateAsync`, e não `mutate`: o resumo lê o RETORNO da gravação
             // (issue #2312) — fechar o diálogo no `onSuccess` era exatamente o
             // que impedia a pessoa de conferir o que ficou publicado.
             const resposta = await patch.mutateAsync({
               userId: scheduleFor.userId,
-              patch: { schedule: { timezone, windows }, simultaneous_appointments: simultaneos },
+              patch: {
+                schedule: { timezone, windows },
+                simultaneous_appointments: simultaneos,
+                overlap_tolerance_minutes: tolerancia,
+              },
             });
             return resposta?.data?.schedule?.windows ?? [];
           }}

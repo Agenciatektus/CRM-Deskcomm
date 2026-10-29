@@ -98,6 +98,7 @@ describe("o sinal de presença (lib/atendimento/presenca)", () => {
       atualizadoEm: null,
       cargaAtual: 0,
       atendimentosSimultaneos: 1,
+      toleranciaNoFim: 0,
     };
     const comSinalNovo = { ...base, ultimoSinalEm: sinalHa(5), presente: true };
     const comSinalVencido = { ...base, ultimoSinalEm: sinalHa(60 * 60), presente: false };
