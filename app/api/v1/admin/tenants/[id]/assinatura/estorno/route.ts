@@ -50,11 +50,12 @@ type Lida =
 async function ler(admin: ReturnType<typeof createAdminClient>, tenantId: string, requestId: string): Promise<Lida> {
   const { data, error } = await admin
     .from("cobranca_assinaturas")
-    .select("provedor, provedor_cliente_id, cobranca_planos(intervalo)")
+    // Três chaves levam ao plano (atual, agendado, troca pendente): sem a dica o embed é ambíguo e o PostgREST recusa.
+    .select("provedor, provedor_cliente_id, plano:cobranca_planos!cobranca_assinaturas_plano_id_fkey(intervalo)")
     .eq("organization_id", tenantId)
     .maybeSingle();
   if (error) return { resposta: fail("internal_error", "Não foi possível ler a assinatura", 500, { requestId }) };
-  const linha = data as { provedor: ProvedorDeCobranca | null; provedor_cliente_id: string | null; cobranca_planos: { intervalo: "mes" | "ano" } | { intervalo: "mes" | "ano" }[] | null } | null;
+  const linha = data as { provedor: ProvedorDeCobranca | null; provedor_cliente_id: string | null; plano: { intervalo: "mes" | "ano" } | { intervalo: "mes" | "ano" }[] | null } | null;
   if (!linha?.provedor || !linha.provedor_cliente_id) {
     return { resposta: fail("state_conflict", "Esta empresa não tem pagamento no provedor.", 409, { requestId }) };
   }
@@ -62,7 +63,7 @@ async function ler(admin: ReturnType<typeof createAdminClient>, tenantId: string
   if (!prov.lerUltimaCobranca || !prov.estornarCobranca) {
     return { resposta: fail("estorno_nao_suportado", "Este provedor não faz estorno por aqui. Estorne no painel dele.", 409, { requestId }) };
   }
-  const plano = Array.isArray(linha.cobranca_planos) ? linha.cobranca_planos[0] : linha.cobranca_planos;
+  const plano = Array.isArray(linha.plano) ? linha.plano[0] : linha.plano;
   try {
     const cobranca = await prov.lerUltimaCobranca({ clienteRef: linha.provedor_cliente_id });
     return { prov, cobranca, intervalo: plano?.intervalo ?? "mes" };
