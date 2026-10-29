@@ -149,6 +149,7 @@ function mensagemDoBrasil(args: SendArgs, shortId: string): Mensagem {
       "Se você não solicitou este relatório, ignore este email — nenhum dado adicional é compartilhado.",
       `${rotulo}: LGPD Lei nº 13.709/2018, Art. 18, II.`,
     ],
+    rodapeLink: { rotulo: "Baixar a cópia dos dados (data.json)", href: args.signedUrlDados },
     idioma: "pt-BR",
   });
 
@@ -197,6 +198,7 @@ function mensagemForaDoBrasil(args: SendArgs, shortId: string): Mensagem {
       "Se não fez este pedido, ignore este e-mail.",
       ...(direito ? [direito] : []),
     ],
+    rodapeLink: args.signedUrlDados ? { rotulo: "Descarregar a cópia dos dados (data.json)", href: args.signedUrlDados } : undefined,
     idioma: "pt-PT" as Idioma,
   });
 
