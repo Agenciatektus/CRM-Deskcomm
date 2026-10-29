@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { bancoFalso, type BancoFalso, type Cadeia, type Resposta } from "@/tests/helpers/banco-falso-da-cobranca";
+import { argumentos, bancoFalso, type BancoFalso, type Cadeia, type Resposta } from "@/tests/helpers/banco-falso-da-cobranca";
 
 const h = vi.hoisted(() => ({
   ator: "aaaaaaaa-0000-4000-8000-000000000001",
@@ -50,6 +50,11 @@ const get = () => new NextRequest(url);
 let linha: Record<string, unknown> | null;
 function responder(c: Cadeia): Resposta {
   if (c.tabela === "organizations") return { data: { id: TENANT, status: "active", suspended_kind: null } };
+  // O PostgREST recusa o embed do plano sem a dica da chave (a tabela tem 3 chaves para cobranca_planos).
+  const select = String(argumentos(c, "select")?.[0] ?? "");
+  if (select.includes("cobranca_planos") && !select.includes("!cobranca_assinaturas_plano_id_fkey")) {
+    return { error: { code: "PGRST201", message: "more than one relationship was found" } };
+  }
   return { data: linha };
 }
 const cobranca = (estornadoCents = 0) => ({ ref: "ch_1", valorCents: 10_000, estornadoCents, moeda: "brl", pagaEm: new Date() });
@@ -63,7 +68,7 @@ beforeEach(() => {
   h.leitura.mockResolvedValue(admin);
   h.lerUltimaCobranca.mockResolvedValue(cobranca());
   h.estornarCobranca.mockResolvedValue(undefined);
-  linha = { provedor: "stripe", provedor_cliente_id: "cus_1", cobranca_planos: { intervalo: "mes" } };
+  linha = { provedor: "stripe", provedor_cliente_id: "cus_1", plano: { intervalo: "mes" } };
   h.banco = bancoFalso(responder, () => ({}));
 });
 
