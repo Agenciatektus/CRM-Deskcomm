@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { EstornoDaEmpresa } from "@/components/admin/tenants/EstornoDaEmpresa";
 import { CopiarLinkDePagamento } from "@/components/admin/cobranca/CopiarLinkDePagamento";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import { Button } from "@/components/ui/button";
@@ -313,6 +314,15 @@ export function CardDeCobranca({
           <Button variant="outline" disabled={ocupado} onClick={() => agir(() => apiClient.delete(base), t("A empresa agora é isenta."))}>
             {t("Tornar isenta")}
           </Button>
+          {assinatura?.provedor && (
+            <EstornoDaEmpresa
+              base={base}
+              onFeito={async () => {
+                router.refresh();
+                await queryClient.invalidateQueries({ queryKey: ["admin", "tenant", orgId] });
+              }}
+            />
+          )}
           {assinatura?.provedor &&
             (confirmandoCancelamento ? (
               <>

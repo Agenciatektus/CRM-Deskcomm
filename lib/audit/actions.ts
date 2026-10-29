@@ -1128,6 +1128,8 @@ export const AUDIT_ACTIONS = [
   "cobranca.checkout_iniciado",
   "cobranca.estado_mudou",
   "cobranca.assinatura_cancelada",
+  "cobranca.estorno_feito",
+  "cobranca.estorno_incerto",
   "cobranca.org_suspensa",
   "cobranca.org_reativada",
   "cobranca.rodada",
