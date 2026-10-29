@@ -275,6 +275,7 @@ export const TOOLS_AGENDAMENTO = declararTools([
     oQueToca: "Fila de espera da agenda",
     // Só anota na fila; quem oferece a vaga é a recepção. Nada sai para o cliente.
     risco: "atencao",
-    pacotes: ["vender"],
+    // `organizar` e não `vender`: em `vender` ela entra no agente que nasce no onboarding e tira o último pacote que ainda cabia no teto (pacote-reserva-vaga-da-critica).
+    pacotes: ["organizar"],
   },
 ]);
