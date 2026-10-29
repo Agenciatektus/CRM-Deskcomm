@@ -15,11 +15,12 @@ const OUTRA_ORG = "bbbbbbbb-1111-4111-8111-111111111111";
 const DO_TURNO = "aaaaaaaa-2222-4222-8222-222222222222";
 const DE_OUTRO = "aaaaaaaa-3333-4333-8333-333333333333";
 const DE_OUTRA_ORG = "bbbbbbbb-3333-4333-8333-333333333333";
+const DONO = "aaaaaaaa-5555-4555-8555-555555555555";
 const TIPO = "aaaaaaaa-4444-4444-8444-444444444444";
 
 type Linha = Record<string, unknown>;
 
-function banco() {
+function banco(opts: { falhaInsertEm?: string } = {}) {
   const t: Record<string, Linha[]> & { lead_notes: Linha[]; calendar_waitlist: Linha[] } = {
     contacts: [
       { id: DO_TURNO, organization_id: ORG },
@@ -32,6 +33,7 @@ function banco() {
       { id: "n2", organization_id: ORG, contact_id: DO_TURNO, headline: "minha", body: "y", created_at: "2026-01-02" },
     ],
     calendar_waitlist: [],
+    user_organizations: [{ user_id: DONO, organization_id: ORG, revoked_at: null }],
   };
   const from = (tabela: string) => {
     let linhas = [...(t[tabela] ?? [])];
@@ -44,6 +46,14 @@ function banco() {
       in: (k: string, v: unknown[]) => ((linhas = linhas.filter((l) => v.includes(l[k]))), c),
       is: (k: string, v: unknown) => ((linhas = linhas.filter((l) => (l[k] ?? null) === v)), c),
       insert: (row: Linha) => {
+        if (opts.falhaInsertEm === tabela) {
+          inserida = null;
+          const e = { error: { code: "23505", message: "duplicate" } };
+          // a outra chamada "entrou primeiro"
+          (t[tabela] ??= []).push({ id: "da-outra", ...row });
+          c.single = () => Promise.resolve({ data: null, ...e });
+          return c;
+        }
         inserida = { id: `novo-${(t[tabela] ?? []).length + 1}`, ...row };
         (t[tabela] ??= []).push(inserida);
         return c;
@@ -122,6 +132,33 @@ describe("crm_join_waitlist", () => {
       registrada: false, motivo: "atendimento_nao_encontrado",
     });
     expect(db.t.calendar_waitlist.length).toBe(0);
+  });
+});
+
+describe("revisão do Cassio", () => {
+  it("profissional de fora da organização é recusada como resposta", async () => {
+    const db = banco();
+    const r = await chama(crmJoinWaitlist, { owner_user_id: "cccccccc-5555-4555-8555-555555555555" }, ctx(db, DO_TURNO));
+    expect(r).toMatchObject({ registrada: false, motivo: "profissional_nao_encontrada" });
+    const ok = await chama(crmJoinWaitlist, { owner_user_id: DONO }, ctx(db, DO_TURNO));
+    expect(ok).toMatchObject({ registrada: true });
+  });
+
+  it("23505 no insert devolve a espera que já estava", async () => {
+    const db = banco({ falhaInsertEm: "calendar_waitlist" });
+    const r = await chama(crmJoinWaitlist, {}, ctx(db, DO_TURNO));
+    expect(r).toMatchObject({ registrada: true, ja_estava_na_fila: true, espera_id: "da-outra" });
+  });
+
+  it("nota que estoura o orçamento do índice é recusada e nada é gravado", async () => {
+    const db = banco();
+    for (let i = 0; i < 60; i++) {
+      db.t.lead_notes.push({ id: `x${i}`, organization_id: ORG, contact_id: DO_TURNO, headline: "uma linha de índice razoavelmente longa para encher o orçamento", body: "b", created_at: "2026-01-03" });
+    }
+    const antes = db.t.lead_notes.length;
+    const r = await chama(crmAddLeadNote, { headline: "mais uma", body: "b" }, ctx(db, DO_TURNO));
+    expect(r).toMatchObject({ registrada: false, motivo: "indice_de_notas_cheio" });
+    expect(db.t.lead_notes.length).toBe(antes);
   });
 });
 

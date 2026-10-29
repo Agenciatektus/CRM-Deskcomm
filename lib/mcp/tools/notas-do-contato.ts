@@ -8,6 +8,7 @@
  */
 import { z } from "zod";
 
+import { estimateIndexTokens } from "@/lib/agent-engine/agent/lead-notes";
 import type { McpContext, McpToolDefinition } from "@/lib/mcp/types";
 
 const FORA_DA_CONVERSA = {
@@ -68,6 +69,28 @@ export const crmAddLeadNote: McpToolDefinition<typeof adicionarShape> = {
   handler: async (input, ctx) => {
     const alvo = await alvoDaNota(ctx, input.contact_id);
     if ("recusa" in alvo) return alvo.recusa;
+    // Mesmo orçamento do índice que o `save_lead_note` nativo respeita: o índice vai inteiro ao prompt.
+    const { data: atuais, error: eIdx } = await ctx.supabase
+      .from("lead_notes")
+      .select("id, headline")
+      .eq("organization_id", ctx.organizationId)
+      .eq("contact_id", alvo.contactId);
+    if (eIdx) throw new Error(eIdx.message);
+    const orcamento = Number(process.env.LEAD_NOTES_INDEX_MAX_TOKENS) || 500;
+    const indice = [
+      ...((atuais ?? []) as Array<{ id: string; headline: string }>),
+      // id de uuid (36) para a conta bater com o render real
+      { id: "00000000-0000-0000-0000-000000000000", headline: input.headline },
+    ];
+    if (estimateIndexTokens(indice) > orcamento) {
+      return {
+        registrada: false,
+        motivo: "indice_de_notas_cheio",
+        mensagem:
+          "as notas deste cliente já ocupam todo o espaço reservado a elas. Não grave esta; se for essencial, " +
+          "avise a equipe para consolidar as notas antigas.",
+      };
+    }
     const { data, error } = await ctx.supabase
       .from("lead_notes")
       .insert({

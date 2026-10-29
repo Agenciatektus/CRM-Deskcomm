@@ -78,21 +78,39 @@ export const crmJoinWaitlist: McpToolDefinition<typeof shape> = {
       eventTypeId = (tipo as { id: string }).id;
     }
 
-    const base = ctx.supabase
-      .from("calendar_waitlist")
-      .select("id")
-      .eq("organization_id", ctx.organizationId)
-      .eq("contact_id", contactId)
-      .in("status", ["open", "offered"]);
-    const { data: existente, error: eViva } = await (eventTypeId
-      ? base.eq("event_type_id", eventTypeId)
-      : base.is("event_type_id", null))
-      .limit(1)
-      .maybeSingle();
-    if (eViva) throw new Error(eViva.message);
-    if (existente) {
-      return { registrada: true, ja_estava_na_fila: true, espera_id: (existente as { id: string }).id };
+    if (input.owner_user_id) {
+      const { data: dono, error: eDono } = await ctx.supabase
+        .from("user_organizations")
+        .select("user_id")
+        .eq("organization_id", ctx.organizationId)
+        .eq("user_id", input.owner_user_id)
+        .is("revoked_at", null)
+        .maybeSingle();
+      if (eDono) throw new Error(eDono.message);
+      if (!dono) {
+        return {
+          registrada: false,
+          motivo: "profissional_nao_encontrada",
+          mensagem: "não existe profissional com esse identificador nesta organização; deixe em branco para qualquer uma.",
+        };
+      }
     }
+
+    const buscaViva = async () => {
+      const base = ctx.supabase
+        .from("calendar_waitlist")
+        .select("id")
+        .eq("organization_id", ctx.organizationId)
+        .eq("contact_id", contactId)
+        .in("status", ["open", "offered"]);
+      const r = await (eventTypeId ? base.eq("event_type_id", eventTypeId) : base.is("event_type_id", null))
+        .limit(1)
+        .maybeSingle();
+      if (r.error) throw new Error(r.error.message);
+      return r.data as { id: string } | null;
+    };
+    const existente = await buscaViva();
+    if (existente) return { registrada: true, ja_estava_na_fila: true, espera_id: existente.id };
 
     const { data, error } = await ctx.supabase
       .from("calendar_waitlist")
@@ -108,7 +126,14 @@ export const crmJoinWaitlist: McpToolDefinition<typeof shape> = {
       })
       .select("id")
       .single();
-    if (error) throw new Error(error.message);
+    if (error) {
+      // 23505: outra chamada entrou primeiro (índice único da espera viva); devolve a que ficou.
+      if ((error as { code?: string }).code === "23505") {
+        const viva = await buscaViva();
+        if (viva) return { registrada: true, ja_estava_na_fila: true, espera_id: viva.id };
+      }
+      throw new Error(error.message);
+    }
     return { registrada: true, ja_estava_na_fila: false, espera_id: (data as { id: string }).id };
   },
 };
