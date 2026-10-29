@@ -7,7 +7,7 @@ import { montarEmail } from "@/lib/email/layout";
 import type { MarcaDeSaida } from "@/lib/branding/saida";
 
 /** WhatsApp da Tektus (o mesmo de `site/lib/conteudo.ts`). */
-const WHATSAPP_TEKTUS = "https://wa.me/5521977357727";
+export const WHATSAPP_TEKTUS = "https://wa.me/5521977357727";
 
 export interface InviteEmailOptions {
   inviterName: string;

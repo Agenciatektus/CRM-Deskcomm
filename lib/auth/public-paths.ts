@@ -199,7 +199,7 @@ export const PUBLIC_PATHS: RegExp[] = [
   //
   // Âncorado nos dois nomes: `/^\/email-templates\//` deixaria qualquer
   // sub-path futuro nascer público de carona.
-  /^\/email-templates\/(confirmation|recovery|email_change)$/,
+  /^\/email-templates\/(confirmation|recovery|email_change|password_changed|mfa_factor_enrolled|mfa_factor_unenrolled|identity_linked|identity_unlinked)$/,
   // Documentos legais. O checkbox obrigatório de `/onboarding/welcome` linka os
   // dois, e o aceite acontece antes de a pessoa ter qualquer coisa no sistema —
   // exigir sessão para LER o que se está aceitando inverte a ordem. Âncorado nos

@@ -579,6 +579,19 @@ gravar_modelos_do_gotrue() {  # gravar_modelos_do_gotrue <.env do Supabase> <htt
     [ -n "$valor" ] || valor="${base}${caminho}"
     set_env_var "$env_sb" "$chave" "$valor"
   done
+  # Avisos de segurança do GoTrue (senha alterada, MFA, login vinculado). Só
+  # grava o que está vazio: valor do operador manda. ENABLED vai junto com o
+  # molde, para nunca ligar o aviso com o texto padrão em inglês.
+  for caminho in password_changed mfa_factor_enrolled mfa_factor_unenrolled identity_linked identity_unlinked; do
+    valor="$(printf '%s' "$caminho" | tr 'a-z' 'A-Z')"
+    chave="GOTRUE_MAILER_TEMPLATES_${valor}_NOTIFICATION"
+    [ -z "$(valor_do_env "$env_sb" "$chave")" ] || continue
+    atual="${!chave:-}"
+    [ -n "$atual" ] || atual="${base}/email-templates/${caminho}"
+    set_env_var "$env_sb" "$chave" "$atual"
+    # ENABLED só quando vazio: quem desligou o aviso de propósito segue desligado.
+    [ -n "$(valor_do_env "$env_sb" "GOTRUE_MAILER_NOTIFICATIONS_${valor}_ENABLED")" ]       || set_env_var "$env_sb" "GOTRUE_MAILER_NOTIFICATIONS_${valor}_ENABLED" true
+  done
   return 0
 }
 

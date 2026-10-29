@@ -4,8 +4,10 @@ import { PUBLIC_PATHS } from "@/lib/auth/public-paths";
 import type { MarcaDeSaida } from "@/lib/branding/saida";
 import {
   MODELOS_DE_ACESSO,
+  MODELOS_DE_AVISO,
   assuntoDoModelo,
   montarTemplateDeAcesso,
+  montarTemplateDeAviso,
 } from "@/lib/email/templates/acesso-gotrue";
 
 /**
@@ -77,11 +79,39 @@ describe("moldes de acesso do GoTrue", () => {
     // manda ISSO para a caixa de entrada. Medido em 2026-09-09 com um caminho
     // de arquivo; o Gmail marcou como phishing.
     const publico = (p: string) => PUBLIC_PATHS.some((re) => re.test(p));
-    for (const modelo of MODELOS_DE_ACESSO) {
+    for (const modelo of [...MODELOS_DE_ACESSO, ...MODELOS_DE_AVISO]) {
       expect(publico(`/email-templates/${modelo}`)).toBe(true);
     }
     // E não abre a porta para sub-path futuro nascer público de carona.
     expect(publico("/email-templates/qualquer-outra")).toBe(false);
     expect(publico("/email-templates/confirmation/x")).toBe(false);
+  });
+
+  describe("avisos de segurança", () => {
+    const variaveis: Record<string, string[]> = {
+      password_changed: ["{{ .Email }}"],
+      mfa_factor_enrolled: ["{{ .Email }}", "{{ .FactorType }}"],
+      mfa_factor_unenrolled: ["{{ .Email }}", "{{ .FactorType }}"],
+      identity_linked: ["{{ .Email }}", "{{ .Provider }}"],
+      identity_unlinked: ["{{ .Email }}", "{{ .Provider }}"],
+    };
+    for (const modelo of MODELOS_DE_AVISO) {
+      it(`${modelo}: placeholders Go crus, sem link de verificação, sem travessão`, () => {
+        const html = montarTemplateDeAviso(modelo, MARCA);
+        for (const v of variaveis[modelo] ?? []) expect(html).toContain(v);
+        expect(html).not.toContain("{{ .ConfirmationURL }}");
+        expect(html).not.toContain("{{ .TokenHash }}");
+        expect(html).not.toContain("—");
+        expect(html).not.toMatch(/__[A-Z_]+__/);
+        expect(html).toContain("Acme &quot;Test&quot; &amp; Cia");
+        expect(html).toContain("wa.me/5521977357727");
+        expect(assuntoDoModelo(modelo, MARCA)).toContain(MARCA.nome);
+      });
+    }
+    it("só os de MFA têm FactorType e só os de identidade têm Provider", () => {
+      expect(montarTemplateDeAviso("password_changed", MARCA)).not.toMatch(/FactorType|Provider/);
+      expect(montarTemplateDeAviso("identity_linked", MARCA)).not.toContain("FactorType");
+      expect(montarTemplateDeAviso("mfa_factor_enrolled", MARCA)).not.toContain("Provider");
+    });
   });
 });

@@ -2,14 +2,14 @@
 
 > **Quando em dúvida, consulte aqui antes de implementar.** Cada item tem o "por quê" curto.
 
-Lista canônica do que **não fazer** no DeskcommCRM. Anti-patterns ficam aqui pra preservar identidade visual e evitar convergência ao padrão SaaS genérico.
+Lista canônica do que **não fazer** no produto. Anti-patterns ficam aqui pra preservar identidade visual e evitar convergência ao padrão SaaS genérico. Os valores de cor, raio e sombra citados vêm de `app/globals.css`; na dúvida, o CSS vence este texto.
 
 ---
 
 ## 1. ❌ Inter como font family
 
 **Por quê:** ~70% dos SaaS atuais usam Inter. É correta, mas saturada. Diluição de marca.
-**✅ Sim:** Atkinson Hyperlegible (display + body) + IBM Plex Mono (dados). Ver `03-typography.md`.
+**✅ Sim:** Atkinson Hyperlegible Next (display + body) + Atkinson Hyperlegible Mono (dados). Ver `03-typography.md`.
 
 ---
 
@@ -22,15 +22,15 @@ Lista canônica do que **não fazer** no DeskcommCRM. Anti-patterns ficam aqui p
 
 ## 3. ❌ Gradient roxo/azul/rosa em hero ou primary button
 
-**Por quê:** símbolo do "AI SaaS 2024". Datado e clichê. Não combina com soft-tech calmo.
-**✅ Sim:** solid `accent-500` (Sage `#67885d`). Profundidade vem de border + shadow neutro, não gradient.
+**Por quê:** símbolo do "AI SaaS 2024". Datado e clichê.
+**✅ Sim:** o accent sólido (`--color-accent`). A única exceção é o degradê da marca (`--pele-grad*` em `app/globals.css`, azul `#2a52d8` a verde `#2bc88f`), restrito ao botão primário, chip ligado e contador do tema escuro. Texto corrido nunca vai sobre o degradê. Fora disso, profundidade vem de border + shadow neutro.
 
 ---
 
-## 4. ❌ `bg-zinc-900` ou `bg-slate-900` em dark mode
+## 4. ❌ `bg-zinc-900`, `bg-slate-900` ou qualquer cinza cru da paleta Tailwind
 
-**Por quê:** zinc/slate são cool-gray geométricos. A paleta é warm (greige). Misturar quebra coerência.
-**✅ Sim:** `bg: #161510` (warm dark canônico). Ver `02-palette-sage.md`.
+**Por quê:** o cinza do produto é calibrado (frio, com leve tom azul) e muda por tema. Cinza cru ignora o tema e a marca da organização.
+**✅ Sim:** os tokens: `--color-bg` (`#0d0e11` escuro / `#eef1f5` claro), `--color-surface`, `--color-surface-elevated`. Ver `app/globals.css`.
 
 ---
 
@@ -55,9 +55,9 @@ Lista canônica do que **não fazer** no DeskcommCRM. Anti-patterns ficam aqui p
 
 ---
 
-## 8. ❌ Sage accent como bg de toda a sidebar
+## 8. ❌ Accent como bg de toda a sidebar
 
-**Por quê:** a sidebar é greige (`surface` ou `surface-elevated`). Accent na sidebar fica saturado e cansa em 8h.
+**Por quê:** a sidebar usa `surface` ou `surface-elevated`. Accent na sidebar fica saturado e cansa em 8h.
 **✅ Sim:** sidebar `surface`, com hover `accent-soft` em items de nav, active `accent-soft` + text `accent`.
 
 ---
@@ -71,8 +71,8 @@ Lista canônica do que **não fazer** no DeskcommCRM. Anti-patterns ficam aqui p
 
 ## 10. ❌ `red-500` puro (#ef4444) pra error
 
-**Por quê:** vermelho saturado em UI calma vira alarme. Quebra o tom soft-tech.
-**✅ Sim:** `error: #a94a3c` (light) ou `#c87263` (dark). Saturação ≤ 55%. Ver `02-palette-sage.md`.
+**Por quê:** vermelho saturado em UI calma vira alarme.
+**✅ Sim:** `--color-error`: `#b02a2d` (claro) ou `#fa8785` (escuro), com `--color-error-bg` para o fundo. Ver `app/globals.css`.
 
 ---
 
@@ -106,22 +106,22 @@ Lista canônica do que **não fazer** no DeskcommCRM. Anti-patterns ficam aqui p
 
 ## 15. ❌ Sombras com preto puro (`rgba(0,0,0,0.X)`)
 
-**Por quê:** preto puro contra warm-bg vibra (gera halo cinza). Quebra coerência.
-**✅ Sim:** `rgba(20, 18, 14, X)` — cor do texto neutro. Ver `01-foundation-tokens.md` § Shadow.
+**Por quê:** preto puro contra o fundo azulado vibra (gera halo cinza). Quebra coerência.
+**✅ Sim:** os tokens `--shadow-*` (base `rgba(16, 24, 40, X)`). Ver `app/globals.css`.
 
 ---
 
 ## 16. ❌ `#fff` puro como bg de página em light mode
 
 **Por quê:** branco puro reflete demais em sessão longa, causa fadiga.
-**✅ Sim:** `bg: #faf9f6` (offwhite warm). `surface` (cards) sim usa `#ffffff` puro pra contraste.
+**✅ Sim:** `--color-bg: #eef1f5` no tema claro. `--color-surface` (cards) usa `#ffffff` puro pra contraste.
 
 ---
 
 ## 17. ❌ `border-radius: 0` em todos os controles ("flat brutalism")
 
-**Por quê:** brutalist é uma direção válida, mas não combina com soft-tech calmo. Vira hostil em uso prolongado.
-**✅ Sim:** `radius-xs` (4px) em controles, `radius-sm` (8px) em cards de lista. Radius 0 só em tabelas densas.
+**Por quê:** brutalist é uma direção válida, mas não combina com o produto. Vira hostil em uso prolongado.
+**✅ Sim:** os tokens `--radius-*` (`sm` 4px, `md` 8px, `lg` 12px, `xl` 16px; controles usam `--radius-control` 9px e `--radius-field` 10px). Radius 0 só em tabelas densas.
 
 ---
 
@@ -178,6 +178,13 @@ Lista canônica do que **não fazer** no DeskcommCRM. Anti-patterns ficam aqui p
 
 **Por quê:** mente o usuário sobre affordance.
 **✅ Sim:** `cursor: pointer` apenas em elementos com `onClick`. Card que tem subelementos clicáveis usa cursor `default`.
+
+---
+
+## 26. ❌ Estilizar e-mail transacional fora do layout
+
+**Por quê:** cor, fonte ou logo escritos à mão num modelo divergem da identidade fixa do produto e somem em clientes de e-mail com modo escuro forçado.
+**✅ Sim:** montar pelo `montarEmail` (`lib/email/layout.ts`) com os `TOKENS_EMAIL`. Sem travessão no texto. Inventário e como mexer: `docs/email/transacionais.md`.
 
 ---
 

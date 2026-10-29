@@ -12,7 +12,9 @@
   de propósito: declaração com valor inválido é DESCARTADA pelo CSS, então o
   arquivo cru — o que o Supabase local usa em dev e no CI — renderiza com o
   accent do produto em vez de um botão transparente. É a única forma de o
-  modelo ser legível antes de ser substituído.
+  modelo ser legível antes de ser substituído. O valor de reserva `#506d48` é o
+  Sage, padrão antigo; o accent atual do produto é `#0e7a5f` (app/globals.css).
+  Mantido como está para não mudar o comportamento do arquivo cru.
 
   `&`, nunca `?`: ver o comentário equivalente em recovery.html. `.RedirectTo`
   já chega com `?type=signup` embutido (app/actions/auth/signUp.ts).

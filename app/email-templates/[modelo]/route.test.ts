@@ -52,6 +52,16 @@ describe("GET /email-templates/[modelo]", () => {
     expect(await res.text()).toContain("{{ .TokenHash }}");
   });
 
+  it("serve os 5 avisos de segurança e recusa email_changed e phone_changed", async () => {
+    for (const m of ["password_changed", "mfa_factor_enrolled", "mfa_factor_unenrolled", "identity_linked", "identity_unlinked"]) {
+      const res = await chamar(m);
+      expect(res.status).toBe(200);
+      expect(await res.text()).toContain("{{ .Email }}");
+    }
+    expect((await chamar("email_changed")).status).toBe(404);
+    expect((await chamar("phone_changed")).status).toBe(404);
+  });
+
   it("modelo desconhecido é 404, não um HTML qualquer", async () => {
     // Sem isto, um typo na variável do GoTrue devolveria 200 com corpo errado —
     // e o cliente receberia isso por e-mail em vez de nada.
