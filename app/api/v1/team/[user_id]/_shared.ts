@@ -19,6 +19,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { changeRoleSchema, validateRequest } from "@/lib/schemas";
 import { createClient } from "@/lib/supabase/server";
+import { avisarMudancaDeAcesso } from "@/lib/team/avisar-mudanca-de-acesso";
 
 export async function changeMemberRole(
   req: NextRequest,
@@ -95,6 +96,15 @@ export async function changeMemberRole(
       old_role: target.role,
       new_role: input.role,
     },
+  });
+
+  void avisarMudancaDeAcesso({
+    mudanca: { tipo: "papel_alterado", papel: input.role, papelAnterior: target.role },
+    autorId: authUser.id,
+    alvoId: targetUserId,
+    empresa: activeOrg.name,
+    orgId: activeOrg.orgId,
+    requestId,
   });
 
   return ok({ user_id: targetUserId, role: input.role }, { requestId });
