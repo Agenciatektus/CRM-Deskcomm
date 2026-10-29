@@ -107,7 +107,8 @@ export function SubmenuDoFunil({ contactId, onDialogo }: {
                   ))}
                 </DropdownMenuRadioGroup>
               )}
-              {lead.status === "open" && (
+              {/* Negócio ganho também vai para outro funil (pós-venda, recompra): o servidor já aceita. */}
+              {(lead.status === "open" || lead.status === "won") && (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem className={CLASSE_DO_ITEM} onSelect={() => onDialogo({ tipo: "outro-funil", lead })}>

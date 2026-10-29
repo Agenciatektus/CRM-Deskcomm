@@ -136,6 +136,9 @@ export const ALVO_DE_FUNIL: Record<string, AlvoDeFunil> = {
   // funil nunca chega a ser perguntado para ela.
   crm_start_conversation_and_send: "sem_funil",
   crm_add_case_note: "sem_funil",
+  // Nota do cliente e fila de espera da agenda: operam por contato, sem tocar o card.
+  crm_add_lead_note: "sem_funil",
+  crm_join_waitlist: "sem_funil",
   crm_close_human_case: "sem_funil",
   crm_assign_conversation: "sem_funil",
   crm_resume_ai_attendance: "sem_funil",

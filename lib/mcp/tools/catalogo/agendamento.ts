@@ -266,4 +266,16 @@ export const TOOLS_AGENDAMENTO = declararTools([
     risco: "critico",
     pacotes: ["vender"],
   },
+  {
+    name: "crm_join_waitlist",
+    category: "write",
+    rotulo: "Colocar o cliente na fila de espera",
+    explicacao:
+      "Anota o interesse do cliente num horário que está ocupado, para a equipe avisar se uma vaga abrir. Não reserva nada nem promete vaga.",
+    oQueToca: "Fila de espera da agenda",
+    // Só anota na fila; quem oferece a vaga é a recepção. Nada sai para o cliente.
+    risco: "atencao",
+    // `organizar` e não `vender`: em `vender` ela entra no agente que nasce no onboarding e tira o último pacote que ainda cabia no teto (pacote-reserva-vaga-da-critica).
+    pacotes: ["organizar"],
+  },
 ]);
