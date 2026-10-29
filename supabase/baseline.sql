@@ -63577,6 +63577,47 @@ grant execute on function public.fn_google_appointment(uuid,uuid,text,jsonb) to 
 notify pgrst, 'reload schema';
 
 
+-- ---- tolerância no fim do atendimento na agenda (migration 9084) ----
+-- Mesmo corpo da migration 9084. Fica ANTES da VARREDURA anon porque cria funcao.
+
+alter table public.attendant_availability
+  add column if not exists overlap_tolerance_minutes integer not null default 0
+  constraint attendant_availability_overlap_tolerance_minutes_check check (overlap_tolerance_minutes between 0 and 120);
+
+comment on column public.attendant_availability.overlap_tolerance_minutes is
+  'Minutos no fim de um compromisso da AGENDA em que esta pessoa já aceita o próximo (salão: o fim do procedimento). Padrão 0. Vale entre compromissos do CRM; evento do Google e bloqueio por exceção ocupam inteiro.';
+
+-- A conta única do pico (9083), agora com a tolerância do dono nos dois lados.
+create or replace function public.fn_agenda_lotada(
+  p_org uuid, p_owner uuid, p_ignorar uuid, p_inicio timestamptz, p_fim timestamptz
+) returns boolean
+language sql stable security definer set search_path = public as $$
+  with dono as (
+    select coalesce(max(simultaneous_appointments), 1) as cap,
+           make_interval(mins => coalesce(max(overlap_tolerance_minutes), 0)) as tol
+      from public.attendant_availability where organization_id = p_org and user_id = p_owner
+  ), novo as (
+    select greatest(p_fim - d.tol, p_inicio + (p_fim - p_inicio) / 2) as fim from dono d
+  ), outros as (
+    select a.starts_at, greatest(a.ends_at - d.tol, a.starts_at + (a.ends_at - a.starts_at) / 2) as ends_at
+      from public.calendar_appointments a, dono d
+     where a.organization_id = p_org and a.owner_user_id = p_owner and a.id is distinct from p_ignorar
+       and a.status in ('pending', 'confirmed') and a.starts_at < p_fim and a.ends_at > p_inicio
+  ), cruzam as (
+    select o.* from outros o, novo n where o.starts_at < n.fim and o.ends_at > p_inicio
+  ), pontos as (
+    select p_inicio as t union select starts_at from cruzam where starts_at > p_inicio
+  )
+  select coalesce(max((select count(*) from cruzam o where o.starts_at <= p.t and o.ends_at > p.t)), 0)
+         >= (select cap from dono)
+    from pontos p;
+$$;
+revoke all on function public.fn_agenda_lotada(uuid, uuid, uuid, timestamptz, timestamptz) from public, anon, authenticated;
+grant execute on function public.fn_agenda_lotada(uuid, uuid, uuid, timestamptz, timestamptz) to service_role;
+
+notify pgrst, 'reload schema';
+
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria

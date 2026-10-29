@@ -76,6 +76,7 @@ const SUCESSO: ResultadoDaConsulta = {
   ],
   fusoDaRegra: "America/Sao_Paulo",
   capacidade: 1,
+  tolerancia: 0,
   publicouHorarios: true,
   fusoSuposto: false,
   fontesDefasadas: [],

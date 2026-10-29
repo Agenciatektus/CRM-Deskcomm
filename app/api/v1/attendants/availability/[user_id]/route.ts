@@ -32,7 +32,7 @@ import { traduzir } from "@/lib/i18n/dicionario";
 export const dynamic = "force-dynamic";
 
 const SELECT_COLS =
-  "user_id, is_available, capacity, schedule, simultaneous_appointments, updated_at";
+  "user_id, is_available, capacity, schedule, simultaneous_appointments, overlap_tolerance_minutes, updated_at";
 
 export async function PATCH(
   req: NextRequest,
@@ -99,6 +99,7 @@ export async function PATCH(
   if (input.capacity !== undefined) patch.capacity = input.capacity;
   if (input.schedule !== undefined) patch.schedule = input.schedule;
   if (input.simultaneous_appointments !== undefined) patch.simultaneous_appointments = input.simultaneous_appointments;
+  if (input.overlap_tolerance_minutes !== undefined) patch.overlap_tolerance_minutes = input.overlap_tolerance_minutes;
   // ⚠️ AQUI ESCREVIA-SE `last_heartbeat_at = now`, e a coluna ficou.
   //
   // Ela se chama "último sinal de vida" e registrava, na verdade, o CLIQUE na

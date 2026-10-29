@@ -132,6 +132,8 @@ export type ResultadoDaConsulta =
       fusoDaRegra: string;
       /** Atendimentos simultâneos do dono — o encaixe fora da grade conta com a mesma régua. */
       capacidade: number;
+      /** Tolerância no fim do atendimento do dono (minutos) — idem. */
+      tolerancia: number;
       /** DECISÃO 1.1: "não publiquei" e "não tenho vaga" não podem chegar como a mesma lista vazia. */
       publicouHorarios: boolean;
       /** DECISÃO 20.2: o fuso veio do default, ninguém escolheu — e a IA oferece horário com ele. */
@@ -240,7 +242,7 @@ export async function horariosLivresDaOrg(
 
   const { data: disponibilidade, error: erroDisp } = await supabase
     .from("attendant_availability")
-    .select("schedule, simultaneous_appointments")
+    .select("schedule, simultaneous_appointments, overlap_tolerance_minutes")
     .eq("organization_id", organizationId)
     .eq("user_id", donoId)
     .maybeSingle();
@@ -365,6 +367,7 @@ export async function horariosLivresDaOrg(
     ate: params.ate,
     agora: params.agora,
     capacidade: disponibilidade?.simultaneous_appointments ?? 1,
+    tolerancia: disponibilidade?.overlap_tolerance_minutes ?? 0,
   });
 
   // A grade semanal inclui dias passados no começo do recorte, mas a cobertura
@@ -388,6 +391,7 @@ export async function horariosLivresDaOrg(
     slots,
     fusoDaRegra: leitura.jornada.timezone,
     capacidade: disponibilidade?.simultaneous_appointments ?? 1,
+    tolerancia: disponibilidade?.overlap_tolerance_minutes ?? 0,
     publicouHorarios: leitura.publicouHorarios,
     fusoSuposto: leitura.fusoSuposto,
     fontesDefasadas,

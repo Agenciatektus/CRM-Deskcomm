@@ -30,7 +30,7 @@ import {
   type TipoDoAtendimento,
 } from "@/lib/agenda/aviso-do-compromisso";
 import { coletaOQueOcupa, horariosLivresDaOrg } from "@/lib/agenda/consulta";
-import { colide, simultaneosNoPico, type Ocupado } from "@/lib/agenda/horarios-livres";
+import { colide, comTolerancia, simultaneosNoPico, type Ocupado } from "@/lib/agenda/horarios-livres";
 import {
   atividadeDaTransicao,
   autorParaTimeline,
@@ -871,7 +871,7 @@ async function exigeHorarioLivre(
   const foraDaGrade = podeMarcarForaDaGrade(ctx.actor);
   if (foraDaGrade) {
     exigeDentroDoHorizonte(ctx, args.inicio, new Date());
-    await exigeSemSobreposicao(supabase, ctx, { ...args, capacidade: consulta.capacidade });
+    await exigeSemSobreposicao(supabase, ctx, { ...args, capacidade: consulta.capacidade, tolerancia: consulta.tolerancia });
   } else if (!consulta.slots.some((s) => s.inicio.getTime() === args.inicio.getTime())) {
     throw new ApiError(
       422,
@@ -937,7 +937,7 @@ export function exigeDentroDoHorizonte(ctx: Pick<HandlerCtx, "requestId">, inici
 async function exigeSemSobreposicao(
   supabase: SB,
   ctx: HandlerCtx,
-  args: { donoId: string; inicio: Date; fim: Date; ignorarAgendamentoId?: string; capacidade: number },
+  args: { donoId: string; inicio: Date; fim: Date; ignorarAgendamentoId?: string; capacidade: number; tolerancia: number },
 ): Promise<void> {
   const oQueOcupa = await coletaOQueOcupa(supabase, ctx.organization_id, {
     donoId: args.donoId,
@@ -949,11 +949,12 @@ async function exigeSemSobreposicao(
     throw new ApiError(500, "internal_error", undefined, ctx.requestId, "Não foi possível conferir a agenda.");
   }
   const pedido = { inicio: args.inicio.getTime(), fim: args.fim.getTime() };
-  // Google ocupa inteiro; compromisso do CRM divide até a capacidade (a mesma régua da grade).
-  const emInstantes = (o: Ocupado) => ({ inicio: o.inicio.getTime(), fim: o.fim.getTime() });
+  // Google ocupa inteiro; compromisso do CRM divide até a capacidade, descontada a tolerância (a mesma régua da grade).
+  const emInstantes = (o: Ocupado) => comTolerancia({ inicio: o.inicio.getTime(), fim: o.fim.getTime() }, args.tolerancia);
   const cruza =
     oQueOcupa.ocupados.some((o) => !o.doCrm && colide(o.inicio.getTime(), o.fim.getTime(), pedido)) ||
-    simultaneosNoPico(pedido, oQueOcupa.ocupados.filter((o) => o.doCrm).map(emInstantes)) >= args.capacidade;
+    simultaneosNoPico(comTolerancia(pedido, args.tolerancia), oQueOcupa.ocupados.filter((o) => o.doCrm).map(emInstantes)) >=
+      args.capacidade;
   if (cruza) {
     throw new ApiError(
       422,
