@@ -43,6 +43,7 @@ import { GET, POST } from "./route";
 const TENANT = "bbbbbbbb-0000-4000-8000-000000000001";
 const ctx = { params: Promise.resolve({ id: TENANT }) };
 const url = `http://localhost/api/v1/admin/tenants/${TENANT}/assinatura/estorno`;
+const visto = { cobranca_ref: "ch_1", estornado_cents_visto: 0 };
 const post = (body: unknown) => new NextRequest(url, { method: "POST", body: JSON.stringify(body), headers: { "content-type": "application/json" } });
 const get = () => new NextRequest(url);
 
@@ -76,6 +77,12 @@ describe("GET /admin/tenants/[id]/assinatura/estorno", () => {
     expect(h.estornarCobranca).not.toHaveBeenCalled();
   });
 
+  it("limite de chamadas ao provedor estourado → 429 também na leitura", async () => {
+    h.limite = false;
+    expect((await GET(get(), ctx)).status).toBe(429);
+    expect(h.lerUltimaCobranca).not.toHaveBeenCalled();
+  });
+
   it("sem cobrança paga → cobranca null", async () => {
     h.lerUltimaCobranca.mockResolvedValue(null);
     expect((await (await GET(get(), ctx)).json()).data).toEqual({ cobranca: null, sugestao: null });
@@ -89,7 +96,7 @@ describe("GET /admin/tenants/[id]/assinatura/estorno", () => {
 
 describe("POST /admin/tenants/[id]/assinatura/estorno", () => {
   it("estorna o valor pedido com chave de idempotência da cobrança e audita", async () => {
-    const res = await POST(post({ valor_cents: 200 }), ctx);
+    const res = await POST(post({ valor_cents: 200, ...visto }), ctx);
     expect(res.status).toBe(200);
     expect(h.estornarCobranca).toHaveBeenCalledWith({ cobrancaRef: "ch_1", valorCents: 200, chaveIdempotencia: `estorno:${TENANT}:ch_1:0:200` });
     expect(h.audit).toHaveBeenCalledWith(expect.objectContaining({ action: "cobranca.estorno_feito", metadata: expect.objectContaining({ valor_cents: 200 }) }));
@@ -97,21 +104,35 @@ describe("POST /admin/tenants/[id]/assinatura/estorno", () => {
 
   it("valor acima do saldo → 422, nada estornado", async () => {
     h.lerUltimaCobranca.mockResolvedValue(cobranca(9_900));
-    expect((await POST(post({ valor_cents: 200 }), ctx)).status).toBe(422);
+    expect((await POST(post({ valor_cents: 200, cobranca_ref: "ch_1", estornado_cents_visto: 9_900 }), ctx)).status).toBe(422);
     expect(h.estornarCobranca).not.toHaveBeenCalled();
   });
 
+  it("saldo mudou desde a tela (retentativa depois de timeout, outro admin) → 409, não estorna de novo", async () => {
+    h.lerUltimaCobranca.mockResolvedValue(cobranca(200)); // o 1º estorno já entrou
+    expect((await POST(post({ valor_cents: 200, ...visto }), ctx)).status).toBe(409);
+    h.lerUltimaCobranca.mockResolvedValue({ ...cobranca(), ref: "ch_nova" }); // outra cobrança paga no meio
+    expect((await POST(post({ valor_cents: 200, ...visto }), ctx)).status).toBe(409);
+    expect(h.estornarCobranca).not.toHaveBeenCalled();
+  });
+
+  it("provedor sem resposta (503) → audita como incerto e manda conferir", async () => {
+    h.estornarCobranca.mockRejectedValue(new ErroDoProvedor(null, "timeout", true));
+    expect((await POST(post({ valor_cents: 200, ...visto }), ctx)).status).toBe(503);
+    expect(h.audit).toHaveBeenCalledWith(expect.objectContaining({ action: "cobranca.estorno_incerto" }));
+  });
+
   it("corpo inválido → 400; sem cobrança → 409; limite → 429", async () => {
-    expect((await POST(post({ valor_cents: -1 }), ctx)).status).toBe(400);
+    expect((await POST(post({ valor_cents: -1, ...visto }), ctx)).status).toBe(400);
     h.lerUltimaCobranca.mockResolvedValue(null);
-    expect((await POST(post({ valor_cents: 100 }), ctx)).status).toBe(409);
+    expect((await POST(post({ valor_cents: 100, ...visto }), ctx)).status).toBe(409);
     h.limite = false;
-    expect((await POST(post({ valor_cents: 100 }), ctx)).status).toBe(429);
+    expect((await POST(post({ valor_cents: 100, ...visto }), ctx)).status).toBe(429);
   });
 
   it("provedor recusa → 502/503 e sem audit", async () => {
     h.estornarCobranca.mockRejectedValue(new ErroDoProvedor(400, "invalid_request_error", false));
-    expect((await POST(post({ valor_cents: 100 }), ctx)).status).toBe(502);
+    expect((await POST(post({ valor_cents: 100, ...visto }), ctx)).status).toBe(502);
     expect(h.audit).not.toHaveBeenCalled();
   });
 });

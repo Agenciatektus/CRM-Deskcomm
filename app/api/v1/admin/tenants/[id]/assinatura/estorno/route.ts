@@ -33,7 +33,13 @@ import { requireSupportWrite } from "@/lib/impersonate/support";
 import { moduloLigado } from "@/lib/instalacao/modulos";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-const corpoSchema = z.strictObject({ valor_cents: z.number().int().positive() });
+// `cobranca_ref` e `estornado_cents_visto` só são COMPARADOS com o que o provedor devolve agora (nunca usados como fonte):
+// a segunda tentativa depois de um timeout enxerga o saldo mudado e recusa em vez de estornar de novo.
+const corpoSchema = z.strictObject({
+  valor_cents: z.number().int().positive(),
+  cobranca_ref: z.string().min(1).max(100),
+  estornado_cents_visto: z.number().int().nonnegative(),
+});
 type Rota = { params: Promise<{ id: string }> };
 
 /** Linha da assinatura + a cobrança lida no provedor. `resposta` é a recusa pronta. */
@@ -78,13 +84,16 @@ export async function GET(_req: NextRequest, { params }: Rota) {
   if (!(await moduloLigado(admin, "cobranca")) || !z.string().uuid().safeParse(tenantId).success) {
     return fail("not_found", "Not found", 404, { requestId });
   }
+  if (!(await limiteDoProvedorPorOrg(tenantId))) {
+    return fail("rate_limited", "Muitas tentativas seguidas. Aguarde um minuto e tente de novo.", 429, { requestId, headers: { "Retry-After": "60" } });
+  }
   const r = await ler(admin, tenantId, requestId);
   if (r.resposta) return r.resposta;
   if (!r.cobranca) return ok({ cobranca: null, sugestao: null }, { requestId });
   const sugestao = sugerirEstorno(r.cobranca, r.intervalo);
   return ok(
     {
-      cobranca: { valor_cents: r.cobranca.valorCents, estornado_cents: r.cobranca.estornadoCents, moeda: r.cobranca.moeda, paga_em: r.cobranca.pagaEm.toISOString() },
+      cobranca: { ref: r.cobranca.ref, valor_cents: r.cobranca.valorCents, estornado_cents: r.cobranca.estornadoCents, moeda: r.cobranca.moeda, paga_em: r.cobranca.pagaEm.toISOString() },
       sugestao,
     },
     { requestId },
@@ -123,6 +132,9 @@ export async function POST(req: NextRequest, { params }: Rota) {
   if (r.resposta) return r.resposta;
   const c: CobrancaEstornavel | null = r.cobranca;
   if (!c) return fail("state_conflict", "Não há cobrança paga para estornar.", 409, { requestId });
+  if (c.ref !== corpo.data.cobranca_ref || c.estornadoCents !== corpo.data.estornado_cents_visto) {
+    return fail("state_conflict", "O pagamento mudou desde que você abriu a tela (outro estorno ou nova cobrança). Recarregue e confira antes de estornar.", 409, { requestId });
+  }
   const saldo = c.valorCents - c.estornadoCents;
   if (corpo.data.valor_cents > saldo) {
     return fail("validation_failed", "O valor passa do que ainda pode ser estornado.", 422, { requestId, details: { saldo_cents: saldo } });
@@ -132,10 +144,25 @@ export async function POST(req: NextRequest, { params }: Rota) {
     await r.prov.estornarCobranca!({
       cobrancaRef: c.ref,
       valorCents: corpo.data.valor_cents,
-      chaveIdempotencia: `estorno:${tenantId}:${c.ref}:${c.estornadoCents}:${corpo.data.valor_cents}`,
+      chaveIdempotencia: `estorno:${tenantId}:${c.ref}:${corpo.data.estornado_cents_visto}:${corpo.data.valor_cents}`,
     });
   } catch (e) {
     const rec = recusaDoProvedor(e);
+    if (rec.status === 503) {
+      // Ambíguo: a Stripe pode ter estornado e a resposta ter se perdido. Deixa rastro e manda conferir antes de repetir.
+      void audit({
+        action: "cobranca.estorno_incerto",
+        actorUserId: adminCtx.user.id,
+        actingAsPlatformAdmin: true,
+        bypassedRls: true,
+        organizationId: tenantId,
+        resourceType: "cobranca_assinatura",
+        resourceId: tenantId,
+        requestId,
+        metadata: { valor_cents: corpo.data.valor_cents, cobranca: c.ref },
+      });
+      return fail("provedor_indisponivel", "O provedor não confirmou o estorno. Pode ter sido feito: recarregue a tela e confira o saldo antes de tentar de novo.", 503, { requestId });
+    }
     return fail(rec.code, rec.message, rec.status, { requestId });
   }
 

@@ -14,7 +14,7 @@ import { useIdioma } from "@/lib/i18n/IdiomaProvider";
 
 interface Leitura {
   data: {
-    cobranca: { valor_cents: number; estornado_cents: number; moeda: string; paga_em: string } | null;
+    cobranca: { ref: string; valor_cents: number; estornado_cents: number; moeda: string; paga_em: string } | null;
     sugestao: { cents: number; regra: RegraDoEstorno } | null;
   };
 }
@@ -27,7 +27,9 @@ const FRASE_DA_REGRA: Record<RegraDoEstorno, string> = {
 
 /** "12,50" ou "12.50" em reais → centavos; `null` se não for um valor. */
 export function centavosDoCampo(texto: string): number | null {
-  const n = Number(texto.trim().replace(",", "."));
+  // "1.234,50" (milhar com ponto, decimal com vírgula) ou "1234.50"; "1.234" sem vírgula é decimal.
+  const limpo = texto.trim();
+  const n = Number(limpo.includes(",") ? limpo.replace(/\./g, "").replace(",", ".") : limpo);
   return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null;
 }
 
@@ -52,15 +54,18 @@ export function EstornoDaEmpresa({ base, onFeito }: { base: string; onFeito: () 
     }
   }
 
-  async function estornar(cents: number) {
+  async function estornar(cents: number, c: { ref: string; estornado_cents: number }) {
     setOcupado(true);
     try {
-      await apiClient.post(`${base}/estorno`, { valor_cents: cents });
+      await apiClient.post(`${base}/estorno`, { valor_cents: cents, cobranca_ref: c.ref, estornado_cents_visto: c.estornado_cents });
       toast.success(t("Estorno enviado ao provedor."));
       setLeitura(null);
       await onFeito();
     } catch (err) {
       showApiError(err);
+      // O resultado pode ter sido ambíguo: relê o saldo para a próxima tentativa partir do que o provedor tem.
+      setLeitura(null);
+      await abrir();
     } finally {
       setOcupado(false);
     }
@@ -93,7 +98,7 @@ export function EstornoDaEmpresa({ base, onFeito }: { base: string; onFeito: () 
           <Label htmlFor="valor-do-estorno">{t("Valor a devolver")}</Label>
           <Input id="valor-do-estorno" className="w-32" inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} aria-invalid={invalido} />
         </div>
-        <Button variant="destructive" disabled={ocupado || invalido} onClick={() => cents !== null && void estornar(cents)}>
+        <Button variant="destructive" disabled={ocupado || invalido} onClick={() => cents !== null && void estornar(cents, c)}>
           {t("Confirmar estorno")}
         </Button>
         <Button variant="outline" disabled={ocupado} onClick={() => setLeitura(null)}>
