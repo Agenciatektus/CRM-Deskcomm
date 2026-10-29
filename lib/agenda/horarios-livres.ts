@@ -138,6 +138,11 @@ export interface EntradaDeHorariosLivres {
    * Ausente ⇒ 1, e com 1 qualquer compromisso esconde o horário, como sempre foi.
    */
   capacidade?: number;
+  /**
+   * Tolerância no fim do atendimento, em minutos (`attendant_availability.overlap_tolerance_minutes`,
+   * migration 9084). Ausente ⇒ 0, e com 0 o resultado é idêntico ao de antes.
+   */
+  tolerancia?: number;
 }
 
 const MINUTO = 60_000;
@@ -322,9 +327,26 @@ export function simultaneosNoPico(faixa: FaixaEmInstantes, ocupados: FaixaEmInst
   return Math.max(0, ...pontos.map((t) => cruzam.filter((o) => o.inicio <= t && o.fim > t).length));
 }
 
+/**
+ * O compromisso do CRM como ele conta para colisão: os últimos `toleranciaMin` minutos já
+ * admitem o próximo. Aplicada aos DOIS lados (o novo e os existentes), senão a validade do
+ * mesmo par dependeria da ordem em que foram marcados. A tolerância nunca passa da METADE
+ * do atendimento: com o piso de 1 minuto, um serviço de 30 min com tolerância 30 virava
+ * [s, s+1min) e quem atende 1 por vez recebia cliente de minuto em minuto. Com a metade,
+ * capacidade 1 nunca tem mais que duas clientes reais sobrepostas. Com 0 devolve a faixa
+ * intacta. A MESMA conta mora no banco (`fn_agenda_lotada`, migration 9084).
+ */
+export function comTolerancia(faixa: FaixaEmInstantes, toleranciaMin: number): FaixaEmInstantes {
+  return {
+    inicio: faixa.inicio,
+    fim: Math.max(faixa.fim - toleranciaMin * MINUTO, faixa.inicio + (faixa.fim - faixa.inicio) / 2),
+  };
+}
+
 export function horariosLivres(entrada: EntradaDeHorariosLivres): Slot[] {
   const { jornada, excecoes, ocupados, tipo, de, ate, agora } = entrada;
   const capacidade = entrada.capacidade ?? 1;
+  const tolerancia = entrada.tolerancia ?? 0;
   const fuso = jornada.timezone;
   const passo = tipo.intervaloMin ?? tipo.duracaoMin;
   if (passo <= 0 || tipo.duracaoMin <= 0) return [];
@@ -340,7 +362,7 @@ export function horariosLivres(entrada: EntradaDeHorariosLivres): Slot[] {
   // laço — eles nascem em minutos de parede e só viram instante lá dentro.
   // Os do CRM dividem o horário até a capacidade; o resto (Google) bloqueia inteiro.
   const emInstantesDe = (o: Ocupado): FaixaEmInstantes => ({ inicio: o.inicio.getTime(), fim: o.fim.getTime() });
-  const doCrm = ocupados.filter((o) => o.doCrm).map(emInstantesDe);
+  const doCrm = ocupados.filter((o) => o.doCrm).map((o) => comTolerancia(emInstantesDe(o), tolerancia));
   const compromissos: FaixaEmInstantes[] = ocupados.filter((o) => !o.doCrm).map(emInstantesDe);
 
   const excecoesPorData = new Map<string, ExcecaoDeData[]>();
@@ -421,7 +443,7 @@ export function horariosLivres(entrada: EntradaDeHorariosLivres): Slot[] {
         const comFolga = slotInflado(inicio, fim, tipo);
         if (bloqueiosDoDia.some((b) => colide(comFolga.inicio, comFolga.fim, b))) continue;
         // Capacidade 1: pico ≥ 1 é "algum compromisso cruza" — o mesmo desfecho de antes.
-        if (simultaneosNoPico(comFolga, doCrm) >= capacidade) continue;
+        if (simultaneosNoPico(comTolerancia(comFolga, tolerancia), doCrm) >= capacidade) continue;
 
         slots.push({ inicio: new Date(inicio), fim: new Date(fim) });
       }

@@ -241,6 +241,8 @@ export const availabilityPatchSchema = z
     schedule: availabilityScheduleSchema,
     // Atendimentos da AGENDA ao mesmo tempo (migration 9083). O teto é o CHECK do banco.
     simultaneous_appointments: z.number().int().min(1).max(20),
+    // Minutos no fim do atendimento que já aceitam o próximo (migration 9084). O teto é o CHECK do banco.
+    overlap_tolerance_minutes: z.number().int().min(0).max(120),
   })
   .partial()
   .refine((v) => Object.keys(v).length > 0, {

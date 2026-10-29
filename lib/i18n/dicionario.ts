@@ -2002,6 +2002,10 @@ export const DICIONARIO: Traducoes = {
   "Quantos clientes esta pessoa atende ao mesmo tempo. Use 1 para um cliente por vez; num salão, a química age enquanto ela atende outra cliente.": {
     es: "Cuántos clientes atiende esta persona al mismo tiempo. Use 1 para un cliente a la vez; en un salón, la química actúa mientras ella atiende a otra clienta.",
   },
+  "Tolerância no fim do atendimento (minutos)": { es: "Tolerancia al final de la atención (minutos)" },
+  "Nos últimos minutos do atendimento o próximo já pode ser marcado. Com 30, um atendimento das 10h às 12h libera o horário das 11h30. Vale até a metade do atendimento. Use 0 para esperar o fim.": {
+    es: "En los últimos minutos de la atención ya se puede agendar la próxima. Con 30, una atención de 10h a 12h libera el horario de las 11h30. Vale hasta la mitad de la atención. Use 0 para esperar el final.",
+  },
   // ─── Perfil e Organização: foto e troca de e-mail (migration 9061) ───
   "Foto de perfil": { es: "Foto de perfil" },
   "Foto da organização": { es: "Foto de la organización" },

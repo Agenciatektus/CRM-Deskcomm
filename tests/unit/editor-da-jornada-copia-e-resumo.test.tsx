@@ -45,6 +45,7 @@ function disponibilidade(windows: ScheduleWindow[]): AttendantAvailability {
     updated_at: "2026-10-01T12:00:00.000Z",
     current_load: 0,
     simultaneous_appointments: 1,
+    overlap_tolerance_minutes: 0,
     last_heartbeat_at: null,
     present: false,
   };
