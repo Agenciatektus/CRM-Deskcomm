@@ -635,6 +635,14 @@ export function criarAdaptadorStripe(dep: DependenciasDaStripe): AdaptadorDeCobr
     await chamar("POST", `/subscriptions/${encodeURIComponent(assinaturaRef)}`, { cancel_at_period_end: true });
   }
 
+  async function cancelarAgora(assinaturaRef: string): Promise<void> {
+    try {
+      await chamar("DELETE", `/subscriptions/${encodeURIComponent(assinaturaRef)}`);
+    } catch (e) {
+      if (!(e instanceof ErroDoProvedor && (e.status === 404 || e.codigo === "resource_missing"))) throw e;
+    }
+  }
+
   const metadadosDaMarca = { cobranca_do_revendedor: dep.marca };
   const ehNosso = (m: Record<string, string> | null | undefined) => m?.cobranca_do_revendedor === dep.marca;
 
@@ -761,6 +769,7 @@ export function criarAdaptadorStripe(dep: DependenciasDaStripe): AdaptadorDeCobr
     lerSituacao,
     trocarPlano,
     cancelarNoFim,
+    cancelarAgora,
     prepararWebhook,
     removerWebhooks,
     clienteExiste,

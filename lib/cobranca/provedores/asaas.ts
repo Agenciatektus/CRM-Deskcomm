@@ -684,6 +684,7 @@ export function criarAdaptadorAsaas(dep: DependenciasDoAsaas): AdaptadorDeCobran
     lerSituacao,
     trocarPlano,
     cancelarNoFim,
+    cancelarAgora: cancelarNoFim, // o DELETE do Asaas já encerra na hora
     urlDeGerenciar,
   };
 }
