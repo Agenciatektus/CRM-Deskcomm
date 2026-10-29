@@ -63619,7 +63619,7 @@ notify pgrst, 'reload schema';
 
 
 -- ---- view de visitas e fila de espera da agenda (migration 9085) ----
--- Mesmo corpo da migration 9085. Fica ANTES da VARREDURA anon porque cria tabela e view.
+-- Mesmo corpo da migration 9085. Fica ANTES da VARREDURA anon porque cria tabela, view e funcao.
 
 -- manifest: 9085 — view contact_visit_stats (faltas, última visita concluída, próxima marcada por contato; security_invoker) e tabela calendar_waitlist (fila de espera da agenda, RLS por comando, status open/offered/booked/cancelled) + índice de apoio em calendar_appointments.
 --
@@ -63628,10 +63628,13 @@ notify pgrst, 'reload schema';
 --
 -- A view herda a RLS de calendar_appointments (security_invoker): quem não vê o compromisso
 -- não vê a conta. O handler do agente (service role) filtra por organization_id por conta própria.
--- calendar_waitlist.notes é texto livre da cliente/recepção: o agente só grava o que a cliente
--- disse; anonimização do contato apaga a linha (on delete cascade) e a LGPD anonimiza o contato.
+-- calendar_waitlist.notes e desired_window são texto livre da cliente/recepção: o agente só grava
+-- o que a cliente disse. Anonimizar o contato é UPDATE (o on delete cascade não dispara), então o
+-- trigger trg_redigir_fila_de_espera_ao_anonimizar zera os dois textos e cancela a espera viva.
+-- Leitura direta da tabela: manager+ (as tools do agente usam service role e filtram por organização).
 --
 -- Reverter: drop view public.contact_visit_stats; drop table public.calendar_waitlist;
+--   drop function public.fn_redigir_fila_de_espera_do_contato_anonimizado();
 --   drop index if exists public.calendar_appointments_org_contact_starts_idx;
 
 set lock_timeout = '3s';
@@ -63692,30 +63695,32 @@ alter table public.calendar_waitlist enable row level security;
 drop policy if exists calendar_waitlist_select on public.calendar_waitlist;
 create policy calendar_waitlist_select on public.calendar_waitlist
   for select using (
-    (organization_id in (select public.fn_user_org_ids())) or public.fn_is_platform_admin()
+    public.fn_is_platform_admin()
+    or ((organization_id in (select public.fn_user_org_ids()))
+        and public.fn_role_at_least(organization_id, 'manager'))
   );
 drop policy if exists calendar_waitlist_insert on public.calendar_waitlist;
 create policy calendar_waitlist_insert on public.calendar_waitlist
   for insert with check (
-    public.fn_is_platform_admin()
+    public.fn_is_platform_admin_full()
     or ((organization_id in (select public.fn_user_org_ids()))
         and public.fn_role_at_least(organization_id, 'agent'))
   );
 drop policy if exists calendar_waitlist_update on public.calendar_waitlist;
 create policy calendar_waitlist_update on public.calendar_waitlist
   for update using (
-    public.fn_is_platform_admin()
+    public.fn_is_platform_admin_full()
     or ((organization_id in (select public.fn_user_org_ids()))
         and public.fn_role_at_least(organization_id, 'agent'))
   ) with check (
-    public.fn_is_platform_admin()
+    public.fn_is_platform_admin_full()
     or ((organization_id in (select public.fn_user_org_ids()))
         and public.fn_role_at_least(organization_id, 'agent'))
   );
 drop policy if exists calendar_waitlist_delete on public.calendar_waitlist;
 create policy calendar_waitlist_delete on public.calendar_waitlist
   for delete using (
-    public.fn_is_platform_admin()
+    public.fn_is_platform_admin_full()
     or ((organization_id in (select public.fn_user_org_ids()))
         and public.fn_role_at_least(organization_id, 'agent'))
   );
@@ -63729,6 +63734,34 @@ create trigger trg_calendar_waitlist_updated_at
 create or replace trigger trg_organizacao_nao_muda
   before update of organization_id on public.calendar_waitlist
   for each row execute function public.fn_organizacao_da_linha_nao_muda();
+
+-- LGPD: anonimizar o contato zera o texto livre da fila e cancela a espera viva (molde da 0184).
+create or replace function public.fn_redigir_fila_de_espera_do_contato_anonimizado()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  update public.calendar_waitlist
+     set notes          = null,
+         desired_window = null,
+         status         = case when status in ('open', 'offered') then 'cancelled' else status end
+   where organization_id = new.organization_id
+     and contact_id = new.id;
+  return new;
+end;
+$$;
+
+revoke execute on function public.fn_redigir_fila_de_espera_do_contato_anonimizado() from public, anon, authenticated;
+grant  execute on function public.fn_redigir_fila_de_espera_do_contato_anonimizado() to service_role;
+
+drop trigger if exists trg_redigir_fila_de_espera_ao_anonimizar on public.contacts;
+create trigger trg_redigir_fila_de_espera_ao_anonimizar
+  after update of is_anonymized on public.contacts
+  for each row
+  when (new.is_anonymized is true and old.is_anonymized is distinct from true)
+  execute function public.fn_redigir_fila_de_espera_do_contato_anonimizado();
 
 notify pgrst, 'reload schema';
 

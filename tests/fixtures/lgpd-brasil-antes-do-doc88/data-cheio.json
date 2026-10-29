@@ -44,6 +44,7 @@
   "conversation_notes": [],
   "contact_field_proposals": [],
   "lead_notes": [],
+  "calendar_waitlist": [],
   "ai_agent_runs": [],
   "lead_state": []
 }
