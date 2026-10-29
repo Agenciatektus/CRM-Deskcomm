@@ -54,6 +54,13 @@ const DIVIDA_LGPD_CONHECIDA: Record<string, string> = {
   calendar_appointments:
     "Achado do levantamento 13 §2 (QAVivo/maestro). Guarda title e notes do compromisso. " +
     "Conserto DESPACHADO ao Arquiteto — sai desta lista no mesmo commit que acrescentar a tabela à cascata.",
+  calendar_waitlist:
+    "Migration 9085. A fila de espera guarda notes e desired_window, texto livre da cliente. " +
+    "⚠️ ELA JÁ ESTÁ PROTEGIDA: o trigger `trg_redigir_fila_de_espera_ao_anonimizar` zera os dois " +
+    "e cancela a espera viva na virada de is_anonymized, e `tests/invariants/fila-de-espera-lgpd.test.ts` " +
+    "prova o efeito pelo comportamento. A entrada existe só porque ESTE instrumento lê UMA função e não " +
+    "enxerga trigger, a mesma razão de calendar_appointments e crm_tasks. Sai junto com elas, quando " +
+    "`tabelasNaCascata()` derivar também os triggers de `contacts`.",
   lead_notes:
     "Memória livre do agente SOBRE o contato (headline/body). " +
     "⚠️ ELA JÁ ESTÁ PROTEGIDA: desde a 0494 (#1964) o gatilho " +

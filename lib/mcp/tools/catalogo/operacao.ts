@@ -221,4 +221,26 @@ export const TOOLS_OPERACAO = declararTools([
     risco: "seguro",
     pacotes: ["organizar", "escalar"],
   },
+
+  // ---- notas do cliente ----
+  {
+    name: "crm_add_lead_note",
+    category: "write",
+    rotulo: "Anotar uma observação sobre o cliente",
+    explicacao:
+      "Guarda uma nota sobre o cliente da conversa (preferência, combinado, observação do atendimento) para o agente e a equipe lembrarem depois.",
+    oQueToca: "Notas do cliente",
+    risco: "atencao",
+    pacotes: ["organizar"],
+  },
+  {
+    name: "crm_list_lead_notes",
+    category: "read",
+    rotulo: "Ler as anotações sobre o cliente",
+    explicacao:
+      "Mostra as notas já registradas sobre o cliente da conversa, para o agente não repetir pergunta nem perder um combinado.",
+    oQueToca: "Notas do cliente",
+    risco: "seguro",
+    pacotes: ["organizar"],
+  },
 ]);

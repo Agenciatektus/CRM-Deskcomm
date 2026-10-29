@@ -4,7 +4,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getLeadContext } from './get-lead-context';
+import { getLeadContext, OBSERVACOES_MAX_CHARS } from './get-lead-context';
 
 // ─── last_proposal (N7) ─────────────────────────────────────────────────────
 
@@ -25,7 +25,7 @@ function montarDb(opts: MundoOpts = {}) {
       if (sql.includes("from contacts")) {
         return {
           rows: [{
-            name: "Cliente", display_name: null, email: null, phone_number: "5511",
+            name: "Cliente", display_name: "Cli", observacoes: "x".repeat(900), email: null, phone_number: "5511",
             tags: [], is_blocked: false, source: "whatsapp", consent: null, is_anonymized: false,
           }],
         };
@@ -83,6 +83,18 @@ describe("getLeadContext — last_proposal (N7)", () => {
     if (r.ok) {
       expect(r.context.last_proposal).toBeNull();
       expect(r.context.contact).toBeDefined();
+    }
+  });
+});
+
+describe("apelido e observações do contato entram no contexto", () => {
+  it("display_name passa e observacoes é cortada no teto", async () => {
+    const { db } = montarDb();
+    const r = await getLeadContext(db as never, {} as never, INPUT, KNOBS);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.context.contact.display_name).toBe("Cli");
+      expect(r.context.contact.observacoes).toHaveLength(OBSERVACOES_MAX_CHARS + 1);
     }
   });
 });
