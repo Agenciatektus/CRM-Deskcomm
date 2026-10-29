@@ -179,6 +179,10 @@ const PROVA_PROPRIA: readonly Excecao[] = [
       "`it.each` provando 0 linhas cross-org nos dois sentidos (A→B e B→A).",
   },
   {
+    tabela: "calendar_waitlist",
+    razao: "tests/invariants/fila-de-espera-lgpd.test.ts — JWT simulado: gerente lê só a própria organização (zero da vizinha, nos dois sentidos), atendente (agent) lê zero (SELECT é manager+).",
+  },
+  {
     tabela: "calendar_appointments",
     razao: "tests/invariants/agenda-rls.test.ts — mesmo `it.each` de TABELAS_DA_AGENDA.",
   },

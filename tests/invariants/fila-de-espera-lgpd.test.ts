@@ -55,3 +55,52 @@ describe("a cascata de LGPD alcança a fila de espera", () => {
     expect(campo(VIZINHO, "status")).toBe("open");
   });
 });
+
+// ── Isolamento por organização e por papel (JWT simulado, não postgres: rolbypassrls mediria nada) ──
+const ORG_B = "16be0000-0000-4000-8000-00000000000b";
+const GERENTE_A = "16be0000-1111-4000-8000-00000000000a";
+const GERENTE_B = "16be0000-1111-4000-8000-00000000000b";
+const ATENDENTE_A = "16be0000-1111-4000-8000-00000000000c";
+const CONTATO_B = "16be0000-2222-4000-8000-00000000000b";
+
+function contarComo(usuario: string, consulta: string): number {
+  const saida = sql(`
+    set role authenticated;
+    select set_config('request.jwt.claims', '{"sub":"${usuario}"}', false);
+    ${consulta}
+  `);
+  const n = saida.split(/\r?\n/).pop() ?? "";
+  if (!/^\d+$/.test(n)) throw new Error(`saída inesperada do psql: ${saida}`);
+  return Number(n);
+}
+
+describe("RLS da fila de espera", () => {
+  beforeAll(() => {
+    sql(`
+      insert into auth.users (id, email) values
+        ('${GERENTE_A}', 'fila-a@invariant.test'), ('${GERENTE_B}', 'fila-b@invariant.test'),
+        ('${ATENDENTE_A}', 'fila-c@invariant.test') on conflict do nothing;
+      insert into public.organizations (id, slug, legal_name, display_name)
+        values ('${ORG_B}', 'fila-lgpd-b', 'Fila LGPD B', 'Fila LGPD B') on conflict (id) do nothing;
+      insert into public.user_organizations (user_id, organization_id, role, accepted_at) values
+        ('${GERENTE_A}', '${ORG}', 'manager', now()), ('${GERENTE_B}', '${ORG_B}', 'manager', now()),
+        ('${ATENDENTE_A}', '${ORG}', 'agent', now()) on conflict do nothing;
+      insert into public.contacts (id, organization_id, name) values ('${CONTATO_B}', '${ORG_B}', 'Ana Souza')
+        on conflict (id) do nothing;
+      insert into public.calendar_waitlist (organization_id, contact_id, notes)
+        select '${ORG_B}', '${CONTATO_B}', 'nota da org B'
+         where not exists (select 1 from public.calendar_waitlist w where w.contact_id = '${CONTATO_B}');
+    `);
+  });
+
+  it("controle positivo: o gerente enxerga a fila da própria organização", () => {
+    expect(contarComo(GERENTE_A, "select count(*) from public.calendar_waitlist;")).toBeGreaterThan(0);
+  });
+  it("o gerente de A não enxerga nada da organização B, e o de B nada da A", () => {
+    expect(contarComo(GERENTE_A, `select count(*) from public.calendar_waitlist where organization_id = '${ORG_B}';`)).toBe(0);
+    expect(contarComo(GERENTE_B, `select count(*) from public.calendar_waitlist where organization_id = '${ORG}';`)).toBe(0);
+  });
+  it("atendente (agent) não lê a tabela direto: leitura é de manager+", () => {
+    expect(contarComo(ATENDENTE_A, "select count(*) from public.calendar_waitlist;")).toBe(0);
+  });
+});
