@@ -729,6 +729,17 @@ describe("trocarPlano, cancelarNoFim, prepararWebhook e portal", () => {
     await expect(sumida.adaptador.cancelarAgora("sub_x")).resolves.toBeUndefined();
   });
 
+  it("lerUltimaCobranca pega a cobrança paga mais recente; estornarCobranca manda a cobrança, o valor e a chave", async () => {
+    const cobranca = (id: string, created: number, paid = true) => ({ id, amount: 200, amount_refunded: 50, currency: "brl", created, paid, status: paid ? "succeeded" : "failed" });
+    const lida = montar({ "GET /charges": { corpo: { data: [cobranca("ch_velha", 100), cobranca("ch_nova", 300), cobranca("ch_falha", 400, false)] } } });
+    expect(await lida.adaptador.lerUltimaCobranca?.({ clienteRef: "cus_x" })).toMatchObject({ ref: "ch_nova", valorCents: 200, estornadoCents: 50, moeda: "brl" });
+    expect(await montar({ "GET /charges": { corpo: { data: [] } } }).adaptador.lerUltimaCobranca?.({ clienteRef: "cus_x" })).toBeNull();
+    const { adaptador, chamadas } = montar({ "POST /refunds": { corpo: { id: "re_1" } } });
+    await adaptador.estornarCobranca?.({ cobrancaRef: "ch_nova", valorCents: 150, chaveIdempotencia: "estorno:k" });
+    expect(Object.fromEntries(chamadas[0]?.corpo ?? [])).toMatchObject({ charge: "ch_nova", amount: "150" });
+    expect(chamadas[0]?.headers.get("idempotency-key")).toBe("estorno:k");
+  });
+
   /** Uma conta com estado: endpoints e configurações de portal vivem entre as chamadas. */
   function contaComEstado(inicial: Array<{ id: string; url: string; metadata: Record<string, string> }>) {
     const endpoints = [...inicial];
