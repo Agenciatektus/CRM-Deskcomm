@@ -120,6 +120,10 @@ export interface LeadContext {
      * sempre preenche; quem constrói contexto à mão num teste não precisa.
      */
     is_personal?: boolean;
+    /** Apelido (`contacts.display_name`), quando difere do nome. */
+    display_name?: string | null;
+    /** `contacts.observacoes`, cortado em OBSERVACOES_MAX_CHARS. Opcional pelo mesmo motivo de `is_personal`. */
+    observacoes?: string | null;
   };
   conversation_id: string | null;
   previous_service?: { label: string; outcomes: string[] };
@@ -155,6 +159,15 @@ export type LeadContextResult =
   | { ok: true; context: LeadContext; tokenCount: number; lgpd: LgpdInput }
   | { ok: false; error: { code: LeadContextErrorCode; message: string } };
 
+/** Teto das observações do contato no prompt: nota longa come o orçamento do histórico. */
+export const OBSERVACOES_MAX_CHARS = 500;
+
+export function observacoesParaOPrompt(texto: string | null): string | null {
+  const t = texto?.trim();
+  if (!t) return null;
+  return t.length > OBSERVACOES_MAX_CHARS ? `${t.slice(0, OBSERVACOES_MAX_CHARS)}…` : t;
+}
+
 function teach(code: LeadContextErrorCode, message: string): LeadContextResult {
   return { ok: false, error: { code, message } };
 }
@@ -162,6 +175,7 @@ function teach(code: LeadContextErrorCode, message: string): LeadContextResult {
 interface ContactRow {
   name: string | null;
   display_name: string | null;
+  observacoes: string | null;
   email: string | null;
   phone_number: string | null;
   tags: string[] | null;
@@ -218,7 +232,7 @@ export async function getLeadContext(
   knobs: LeadContextKnobs,
 ): Promise<LeadContextResult> {
   const { rows: contactRows } = await db.query<ContactRow>(
-    `select name, display_name, email, phone_number, tags, is_blocked, is_personal, source, consent, is_anonymized
+    `select name, display_name, observacoes, email, phone_number, tags, is_blocked, is_personal, source, consent, is_anonymized
      from contacts where organization_id = $1 and id = $2`,
     [input.tenantId, input.leadId],
   );
@@ -367,6 +381,8 @@ export async function getLeadContext(
         tags: contact.tags ?? [],
         is_blocked: contact.is_blocked,
         is_personal: contact.is_personal,
+        display_name: contact.display_name,
+        observacoes: observacoesParaOPrompt(contact.observacoes),
       },
       conversation_id: conversationId,
       last_human_decision: lastHumanDecision,
