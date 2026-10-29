@@ -93,6 +93,8 @@ import {
   crmProposeReactivation,
 } from "./retencao";
 import { crmDraftProposal, crmPrepararProposta } from "./propostas";
+import { crmJoinWaitlist } from "./lista-de-espera";
+import { crmAddLeadNote, crmListLeadNotes } from "./notas-do-contato";
 
 // Cast via `unknown` porque McpToolDefinition<TInput> nao e covariante
 // em TInput (handler usa TInput em posicao contravariante). Coletar
@@ -140,6 +142,7 @@ export const allTools: ReadonlyArray<McpToolDefinition> = [
   crmListAutomationRuns,
   crmListTeamMembers,
   crmListFollowups,
+  crmListLeadNotes,
   crmListAtRiskLeads,
   crmListAvailableAttendants,
   crmListHumanCases,
@@ -149,6 +152,8 @@ export const allTools: ReadonlyArray<McpToolDefinition> = [
   // dia e hora, é o caminho curto, e é o que evita o turno morrer no meio (#831).
   crmFindAndBookAppointment,
   crmBookAppointment,
+  crmJoinWaitlist,
+  crmAddLeadNote,
   crmRescheduleAppointment,
   crmCancelAppointment,
   crmConfirmAppointment,

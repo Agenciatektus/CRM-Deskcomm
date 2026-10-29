@@ -28,7 +28,7 @@
  * as duas coisas produz um agente que não sabe com quem fala.
  */
 import { detectarVazamentoInterno } from '../guardrails/vazamento-interno';
-import type { LeadContext } from '../edge/crm/get-lead-context';
+import { observacoesParaOPrompt, type LeadContext } from '../edge/crm/get-lead-context';
 
 /**
  * QUANDO a projeção arma — e a regra se justifica sozinha.
@@ -68,6 +68,8 @@ export interface ContextoProjetado {
     telefone: string | null;
     email: string | null;
     marcadores: string[];
+    apelido?: string | null;
+    observacoes?: string | null;
   };
   ultima_decisao_humana: { sobre: string; decisao: 'aprovada' | 'recusada'; quando: string } | null;
   /**
@@ -104,6 +106,8 @@ export function projetarContexto(ctx: LeadContext): ContextoProjetado {
       telefone: ctx.contact.phone,
       email: ctx.contact.email,
       marcadores: ctx.contact.tags,
+      apelido: ctx.contact.display_name,
+      observacoes: observacoesParaOPrompt(ctx.contact.observacoes ?? null),
     },
     ultima_decisao_humana:
       ctx.last_human_decision === null

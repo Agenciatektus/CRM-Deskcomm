@@ -803,6 +803,15 @@ export interface ExportPayload {
     created_at: string | null;
     updated_at: string | null;
   }>;
+  /** Fila de espera da agenda: `notes` e `desired_window` são texto da cliente; o trigger de anonimização os zera. */
+  calendar_waitlist?: Array<{
+    id: string;
+    event_type_id: string | null;
+    desired_window: string | null;
+    status: string;
+    notes: string | null;
+    created_at: string | null;
+  }>;
   /**
    * Registro de execução da IA (#1957): de `ai_agent_runs.tool_calls` (jsonb)
    * saem só o nome e os argumentos de cada ferramenta — nome do titular e
@@ -1873,6 +1882,7 @@ export async function collectExportData(args: CollectArgs): Promise<ExportPayloa
   // `ai_agent_runs.tool_calls` saem os argumentos, não o resultado das
   // ferramentas, que pode trazer dado de outras pessoas (`toolCallsParaOTitular`).
   const lead_notes: NonNullable<ExportPayload["lead_notes"]> = [];
+  const calendar_waitlist: NonNullable<ExportPayload["calendar_waitlist"]> = [];
   const ai_agent_runs: NonNullable<ExportPayload["ai_agent_runs"]> = [];
   const lead_state: NonNullable<ExportPayload["lead_state"]> = [];
   if (contactId) {
@@ -1904,6 +1914,17 @@ export async function collectExportData(args: CollectArgs): Promise<ExportPayloa
         .range(de, ate),
     )) {
       lead_notes.push(nota as NonNullable<ExportPayload["lead_notes"]>[number]);
+    }
+    for (const espera of await lePaginado((de, ate) =>
+      admin
+        .from("calendar_waitlist")
+        .select("id, event_type_id, desired_window, status, notes, created_at")
+        .eq("organization_id", organizationId)
+        .eq("contact_id", contactId)
+        .order("id")
+        .range(de, ate),
+    )) {
+      calendar_waitlist.push(espera as NonNullable<ExportPayload["calendar_waitlist"]>[number]);
     }
     for (const run of await lePaginado((de, ate) =>
       admin
@@ -2294,6 +2315,7 @@ export async function collectExportData(args: CollectArgs): Promise<ExportPayloa
     conversation_notes,
     contact_field_proposals,
     lead_notes,
+    calendar_waitlist,
     ai_agent_runs,
     lead_state,
     b2b,
@@ -2484,6 +2506,7 @@ function emptyPayload(
     channel_session_groups: [],
     group_messages_authored: [],
     lead_notes: [],
+    calendar_waitlist: [],
     ai_agent_runs: [],
     lead_state: [],
   };

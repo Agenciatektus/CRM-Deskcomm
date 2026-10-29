@@ -116,7 +116,7 @@ afterEach(() => vi.restoreAllMocks());
 
 /** Ferramenta → como montar os args com um alvo, e os alvos do turno e de B. */
 const CASOS: Array<{ nome: string; args: (alvo: string) => Linha; doTurno: string; deB: string }> = [
-  ...["crm_book_appointment", "crm_find_and_book_appointment", "crm_propose_contact_field", "crm_schedule_followup"].map(
+  ...["crm_book_appointment", "crm_find_and_book_appointment", "crm_propose_contact_field", "crm_schedule_followup", "crm_add_lead_note", "crm_join_waitlist"].map(
     (nome) => ({ nome, args: (a: string) => ({ contact_id: a }), doTurno: DO_TURNO, deB: DE_B }),
   ),
   { nome: "crm_enroll_followup_flow", args: (a) => ({ contact_id: a, flow_id: FUNIL }), doTurno: DO_TURNO, deB: DE_B },

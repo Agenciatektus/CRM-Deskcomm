@@ -242,6 +242,11 @@ const DECISOES: Record<string, Decisao> = {
     caminho: "gatilho",
     razao: "fn_reply_redact (0227): rascunho/original/propostas zerados na virada — texto gerado sobre a conversa da pessoa, alcançável pelos DOIS caminhos.",
   },
+  calendar_waitlist: {
+    decidida: "redigir",
+    caminho: "gatilho",
+    razao: "9085: notes e desired_window são texto livre da cliente; o gatilho trg_redigir_fila_de_espera_ao_anonimizar zera os dois e cancela a espera viva. Prova: tests/invariants/fila-de-espera-lgpd.test.ts.",
+  },
   calendar_appointments: {
     decidida: "redigir",
     caminho: "gatilho",

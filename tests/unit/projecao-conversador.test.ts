@@ -114,7 +114,17 @@ describe("projeção — o que o Conversador pode ver", () => {
         telefone: "+5511999999999",
         email: "maria@exemplo.com",
         marcadores: ["vip"],
+        observacoes: null,
       });
+    });
+
+    it("apelido e observações do contato (cortadas em 500) também chegam ao Conversador", () => {
+      const p = projetarContexto({
+        ...cru,
+        contact: { ...cru.contact, display_name: "Mari", observacoes: "x".repeat(900) },
+      });
+      expect(p.contato.apelido).toBe("Mari");
+      expect(p.contato.observacoes).toHaveLength(501);
     });
 
     it("'inbound'/'outbound' viram 'cliente'/'nós' — quem fala com gente não pensa em direção", () => {
