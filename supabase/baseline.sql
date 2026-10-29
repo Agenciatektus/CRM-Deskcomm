@@ -63597,9 +63597,9 @@ language sql stable security definer set search_path = public as $$
            make_interval(mins => coalesce(max(overlap_tolerance_minutes), 0)) as tol
       from public.attendant_availability where organization_id = p_org and user_id = p_owner
   ), novo as (
-    select greatest(p_fim - d.tol, least(p_fim, p_inicio + interval '1 minute')) as fim from dono d
+    select greatest(p_fim - d.tol, p_inicio + (p_fim - p_inicio) / 2) as fim from dono d
   ), outros as (
-    select a.starts_at, greatest(a.ends_at - d.tol, least(a.ends_at, a.starts_at + interval '1 minute')) as ends_at
+    select a.starts_at, greatest(a.ends_at - d.tol, a.starts_at + (a.ends_at - a.starts_at) / 2) as ends_at
       from public.calendar_appointments a, dono d
      where a.organization_id = p_org and a.owner_user_id = p_owner and a.id is distinct from p_ignorar
        and a.status in ('pending', 'confirmed') and a.starts_at < p_fim and a.ends_at > p_inicio

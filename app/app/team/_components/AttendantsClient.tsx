@@ -345,7 +345,7 @@ export function ScheduleDialog({
               }}
             />
             <p className="text-xs text-muted-foreground">
-              {t("Nos últimos minutos do atendimento a próxima cliente já pode ser marcada. Com 30, um atendimento das 10h às 12h libera o horário das 11h30. Use 0 para esperar o fim.")}
+              {t("Nos últimos minutos do atendimento o próximo já pode ser marcado. Com 30, um atendimento das 10h às 12h libera o horário das 11h30. Vale até a metade do atendimento. Use 0 para esperar o fim.")}
             </p>
           </div>
 

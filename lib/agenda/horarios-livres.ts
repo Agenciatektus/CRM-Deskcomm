@@ -330,14 +330,16 @@ export function simultaneosNoPico(faixa: FaixaEmInstantes, ocupados: FaixaEmInst
 /**
  * O compromisso do CRM como ele conta para colisão: os últimos `toleranciaMin` minutos já
  * admitem o próximo. Aplicada aos DOIS lados (o novo e os existentes), senão a validade do
- * mesmo par dependeria da ordem em que foram marcados. Nunca encolhe abaixo do primeiro
- * minuto, para o mesmo instante continuar colidindo; com 0 devolve a faixa intacta. A MESMA
- * conta mora no banco (`fn_agenda_lotada`, migration 9084).
+ * mesmo par dependeria da ordem em que foram marcados. A tolerância nunca passa da METADE
+ * do atendimento: com o piso de 1 minuto, um serviço de 30 min com tolerância 30 virava
+ * [s, s+1min) e quem atende 1 por vez recebia cliente de minuto em minuto. Com a metade,
+ * capacidade 1 nunca tem mais que duas clientes reais sobrepostas. Com 0 devolve a faixa
+ * intacta. A MESMA conta mora no banco (`fn_agenda_lotada`, migration 9084).
  */
 export function comTolerancia(faixa: FaixaEmInstantes, toleranciaMin: number): FaixaEmInstantes {
   return {
     inicio: faixa.inicio,
-    fim: Math.max(faixa.fim - toleranciaMin * MINUTO, Math.min(faixa.fim, faixa.inicio + MINUTO)),
+    fim: Math.max(faixa.fim - toleranciaMin * MINUTO, faixa.inicio + (faixa.fim - faixa.inicio) / 2),
   };
 }
 

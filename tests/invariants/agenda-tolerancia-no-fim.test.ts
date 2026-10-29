@@ -111,7 +111,7 @@ describe("capacidade 1, tolerância 30 (régua do commit do Google)", () => {
     expect(marca(NIEDJA, "2026-11-05 13:00+00", "2026-11-05 15:00+00")).toBe("23505");
   });
 
-  it("tolerância maior que a duração não esvazia o compromisso: o primeiro minuto continua ocupado", () => {
+  it("tolerância maior que a duração não esvazia o compromisso: a metade dele continua ocupada", () => {
     sql(`update public.attendant_availability set overlap_tolerance_minutes = 120 where user_id = '${NIEDJA}';`);
     expect(lotada(NIEDJA, "2026-11-05 13:00+00", "2026-11-05 13:20+00")).toBe(true);
     sql(`update public.attendant_availability set overlap_tolerance_minutes = 30 where user_id = '${NIEDJA}';`);

@@ -113,10 +113,19 @@ describe("o que a tolerância não toca", () => {
     expect(livres([google("10:00", "12:00")], { tolerancia: 30 })).not.toContain("11:30");
   });
 
-  it("tolerância maior que a duração não libera o mesmo instante", () => {
-    const curto = crm("10:00", "10:20");
-    expect(livres([curto], { tolerancia: 60 })).not.toContain("10:00");
-    expect(livres([curto], { tolerancia: 60 })).toContain("10:01");
+  it("serviço de 30 min com tolerância 30: a tolerância para na metade (revisão da PR #446)", () => {
+    const meiaHora = { ...DUAS_HORAS, duracaoMin: 30 };
+    const grade = livres([crm("10:00", "10:30")], { capacidade: 1, tolerancia: 30, tipo: meiaHora });
+    // Com o piso antigo de 1 minuto, 10:01…10:14 apareciam: cliente de minuto em minuto.
+    for (let m = 0; m < 15; m++) expect(grade).not.toContain(`10:${String(m).padStart(2, "0")}`);
+    expect(grade).toContain("10:15");
+  });
+
+  it("CONTROLE: o mesmo serviço sem tolerância só volta às 10:30", () => {
+    const meiaHora = { ...DUAS_HORAS, duracaoMin: 30 };
+    const grade = livres([crm("10:00", "10:30")], { capacidade: 1, tipo: meiaHora });
+    expect(grade).not.toContain("10:15");
+    expect(grade).toContain("10:30");
   });
 
   it("comTolerancia com 0 devolve a faixa intacta", () => {

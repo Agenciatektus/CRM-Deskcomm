@@ -2,16 +2,17 @@
 --
 -- 9084: no salão, os últimos 30 minutos de um procedimento de 2 horas já admitem a próxima
 -- cliente (Salão Fabiana Lopes, 29/10). Com a tolerância T, um compromisso do CRM passa a
--- ocupar [início, fim − T) para efeito de colisão, nunca menos que o seu primeiro minuto.
+-- ocupar [início, fim − T) para efeito de colisão, nunca menos que a METADE da sua duração.
 --
 -- O ENCURTAMENTO VALE PARA OS DOIS LADOS (o compromisso novo e os que já existem): é a mesma
 -- relação física vista de cada ponta. Encurtar só o existente faria a validade do mesmo par de
 -- compromissos depender da ORDEM em que foram marcados (10h-12h e depois 11h30 entra; 11h30
 -- primeiro e depois 10h-12h seria recusado), e remarcar o primeiro em um minuto travaria.
 --
--- "Nunca menos que o primeiro minuto": com T maior que a duração, o compromisso continuaria
--- ocupando o instante em que começa, e é isso que mantém o veto de MESMO INSTANTE da
--- capacidade 1 coerente com o motor. `least(fim, início + 1 min)` deixa T = 0 idêntico a antes.
+-- "Nunca menos que a metade": com piso de 1 minuto, um serviço de 30 min com T = 30 ocuparia
+-- [s, s+1min) e quem atende 1 por vez receberia cliente de minuto em minuto (revisão da PR
+-- #446). Com a metade, capacidade 1 nunca passa de duas clientes reais sobrepostas, e o mesmo
+-- instante continua colidindo. `greatest(fim − 0, meio)` deixa T = 0 idêntico a antes.
 --
 -- Padrão 0 = nenhuma org muda. Evento do Google e bloqueio por exceção continuam ocupando
 -- inteiro: não passam por esta função (o motor em TS aplica a mesma régua só a `doCrm`).
@@ -39,9 +40,9 @@ language sql stable security definer set search_path = public as $$
            make_interval(mins => coalesce(max(overlap_tolerance_minutes), 0)) as tol
       from public.attendant_availability where organization_id = p_org and user_id = p_owner
   ), novo as (
-    select greatest(p_fim - d.tol, least(p_fim, p_inicio + interval '1 minute')) as fim from dono d
+    select greatest(p_fim - d.tol, p_inicio + (p_fim - p_inicio) / 2) as fim from dono d
   ), outros as (
-    select a.starts_at, greatest(a.ends_at - d.tol, least(a.ends_at, a.starts_at + interval '1 minute')) as ends_at
+    select a.starts_at, greatest(a.ends_at - d.tol, a.starts_at + (a.ends_at - a.starts_at) / 2) as ends_at
       from public.calendar_appointments a, dono d
      where a.organization_id = p_org and a.owner_user_id = p_owner and a.id is distinct from p_ignorar
        and a.status in ('pending', 'confirmed') and a.starts_at < p_fim and a.ends_at > p_inicio
