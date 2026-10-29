@@ -38,7 +38,9 @@
 
 import { createHash } from "node:crypto";
 
-import { NEUTROS_DE_SAIDA, type MarcaDeSaida } from "@/lib/branding/saida";
+import type { MarcaDeSaida } from "@/lib/branding/saida";
+import { montarEmail } from "@/lib/email/layout";
+import type { Idioma } from "@/lib/i18n/idiomas";
 import { sendEmail } from "@/lib/email/roteador";
 import { citacaoDaLei, PAIS_PADRAO, type PerfilDoPais } from "@/lib/legal/perfil-do-pais";
 
@@ -90,6 +92,8 @@ interface Mensagem {
 }
 
 export async function sendExportEmail(args: SendArgs): Promise<{ messageId: string }> {
+  // O layout descarta href sem http(s) em silêncio; sem o link o e-mail do Art. 18 sairia sem o arquivo.
+  if (!/^https?:\/\//i.test(args.signedUrl)) throw new EmailSendFailed("signed_url_invalida");
   const shortId = args.requestId.slice(0, 8);
   const { subject, html, text } =
     args.perfil.codigo === PAIS_PADRAO
@@ -120,7 +124,6 @@ export async function sendExportEmail(args: SendArgs): Promise<{ messageId: stri
 
 /** O texto de sempre (doc 88), mais o link do arquivo de dados (doc 103, A). */
 function mensagemDoBrasil(args: SendArgs, shortId: string): Mensagem {
-  const orgName = escapeHtml(args.marca.nome);
   // O rótulo da citação vem do PERFIL do país, como em Portugal (issue #2344):
   // o art. 18 da LGPD é um DIREITO do titular, não uma base legal (esta fica
   // nos arts. 7 e 11). O Brasil declara "Direito exercido"; o `??` cobre só
@@ -132,21 +135,23 @@ function mensagemDoBrasil(args: SendArgs, shortId: string): Mensagem {
 
   const subject = `Sua solicitação LGPD #${shortId}`;
 
-  const html = `<!doctype html>
-<html lang="pt-BR">
-<body style="font-family:-apple-system,Helvetica,Arial,sans-serif;color:${NEUTROS_DE_SAIDA.texto};line-height:1.5;max-width:560px;margin:0 auto;padding:24px;">
-  <h2 style="margin:0 0 12px;font-size:18px;">Solicitação LGPD #${shortId} processada</h2>
-  <p>Olá,</p>
-  <p>Sua solicitação de acesso aos dados pessoais (LGPD Art. 18, II) foi processada por <strong>${orgName}</strong>.</p>
-  <p>O relatório completo está disponível para download no link abaixo. Por motivos de segurança, o link expira em <strong>${expiresFmt}</strong>.</p>
-  <p style="margin:24px 0;">
-    <a href="${args.signedUrl}" style="background:${args.marca.accent};color:${args.marca.accentFg};padding:10px 18px;border-radius:6px;text-decoration:none;display:inline-block;">Baixar relatório LGPD</a>
-  </p>
-  <p style="font-size:12px;color:${NEUTROS_DE_SAIDA.suave};">A cópia dos seus dados pessoais em arquivo (data.json), com o mesmo prazo, está em <a href="${args.signedUrlDados}" style="color:inherit;">${args.signedUrlDados}</a>.</p>
-  <p style="font-size:12px;color:${NEUTROS_DE_SAIDA.suave};">Se você não solicitou este relatório, ignore este email — nenhum dado adicional é compartilhado.</p>
-  <p style="font-size:12px;color:${NEUTROS_DE_SAIDA.suave};">${rotulo}: LGPD Lei nº 13.709/2018, Art. 18, II.</p>
-</body>
-</html>`;
+  const { html } = montarEmail({
+    assunto: subject,
+    titulo: `Solicitação LGPD #${shortId} processada`,
+    paragrafos: [
+      "Olá,",
+      `Sua solicitação de acesso aos dados pessoais (LGPD Art. 18, II) foi processada por ${args.marca.nome}.`,
+      `O relatório completo está disponível para download no link abaixo. Por motivos de segurança, o link expira em ${expiresFmt}.`,
+    ],
+    botao: { rotulo: "Baixar relatório LGPD", href: args.signedUrl },
+    rodape: [
+      `A cópia dos seus dados pessoais em arquivo (data.json), com o mesmo prazo, está em ${args.signedUrlDados}.`,
+      "Se você não solicitou este relatório, ignore este email — nenhum dado adicional é compartilhado.",
+      `${rotulo}: LGPD Lei nº 13.709/2018, Art. 18, II.`,
+    ],
+    rodapeLink: { rotulo: "Baixar a cópia dos dados (data.json)", href: args.signedUrlDados },
+    idioma: "pt-BR",
+  });
 
   // O corpo em texto puro NÃO passa por `escapeHtml` — escapar aqui mostraria
   // `&amp;` ao titular numa marca como "Silva &amp; Filhos".
@@ -171,32 +176,31 @@ ${rotulo}: LGPD Lei nº 13.709/2018, Art. 18, II.`;
  * citação revisada — país sem revisão não cita lei nenhuma, nem a brasileira.
  */
 function mensagemForaDoBrasil(args: SendArgs, shortId: string): Mensagem {
-  const orgName = escapeHtml(args.marca.nome);
   const citacao = citacaoDaLei(args.perfil);
   const expiresFmt = expiraEm(args.expiresAt, args.fuso);
   const direito = citacao ? `Direito exercido: acesso aos dados pessoais, ${citacao}.` : null;
 
   const subject = `Pedido de acesso aos seus dados pessoais #${shortId}`;
 
-  const html = `<!doctype html>
-<html lang="pt-PT">
-<body style="font-family:-apple-system,Helvetica,Arial,sans-serif;color:${NEUTROS_DE_SAIDA.texto};line-height:1.5;max-width:560px;margin:0 auto;padding:24px;">
-  <h2 style="margin:0 0 12px;font-size:18px;">Pedido de acesso aos seus dados pessoais #${shortId}</h2>
-  <p>Olá,</p>
-  <p>O seu pedido de acesso aos dados pessoais foi tratado por <strong>${orgName}</strong>.</p>
-  <p>O relatório está disponível na ligação abaixo. Por razões de segurança, a ligação expira em <strong>${expiresFmt}</strong>.</p>
-  <p style="margin:24px 0;">
-    <a href="${args.signedUrl}" style="background:${args.marca.accent};color:${args.marca.accentFg};padding:10px 18px;border-radius:6px;text-decoration:none;display:inline-block;">Descarregar relatório</a>
-  </p>${
-    args.signedUrlDados
-      ? `\n  <p style="font-size:12px;color:${NEUTROS_DE_SAIDA.suave};">A cópia dos seus dados pessoais (data.json) está em <a href="${args.signedUrlDados}" style="color:inherit;">${args.signedUrlDados}</a>.</p>`
-      : ""
-  }
-  <p style="font-size:12px;color:${NEUTROS_DE_SAIDA.suave};">Se não fez este pedido, ignore este e-mail.</p>${
-    direito ? `\n  <p style="font-size:12px;color:${NEUTROS_DE_SAIDA.suave};">${escapeHtml(direito)}</p>` : ""
-  }
-</body>
-</html>`;
+  // `pt-PT` não está no seletor de idiomas: o layout só o usa no `lang` e nas
+  // frases fixas, que sem tradução ficam em português.
+  const { html } = montarEmail({
+    assunto: subject,
+    titulo: `Pedido de acesso aos seus dados pessoais #${shortId}`,
+    paragrafos: [
+      "Olá,",
+      `O seu pedido de acesso aos dados pessoais foi tratado por ${args.marca.nome}.`,
+      `O relatório está disponível na ligação abaixo. Por razões de segurança, a ligação expira em ${expiresFmt}.`,
+    ],
+    botao: { rotulo: "Descarregar relatório", href: args.signedUrl },
+    rodape: [
+      ...(args.signedUrlDados ? [`A cópia dos seus dados pessoais (data.json) está em ${args.signedUrlDados}.`] : []),
+      "Se não fez este pedido, ignore este e-mail.",
+      ...(direito ? [direito] : []),
+    ],
+    rodapeLink: args.signedUrlDados ? { rotulo: "Descarregar a cópia dos dados (data.json)", href: args.signedUrlDados } : undefined,
+    idioma: "pt-PT" as Idioma,
+  });
 
   const text = `Pedido de acesso aos seus dados pessoais #${shortId}, tratado por ${args.marca.nome}.
 
@@ -230,18 +234,4 @@ function expiraEm(quando: Date, fuso: string | undefined): string {
   } catch {
     return formato("UTC");
   }
-}
-
-/**
- * A marca deixou de ser constante e passou a vir de um campo que o operador
- * digita numa tela — então ela entra no HTML escapada. Antes desta fase o valor
- * era o literal `"DeskcommCRM"` e a questão não existia.
- */
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }
