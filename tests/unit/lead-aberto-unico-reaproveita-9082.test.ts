@@ -15,7 +15,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const rpc = vi.fn(async () => ({ error: null }));
+const rpc = vi.fn(async (_fn: string, _args?: unknown) => ({ data: undefined as unknown, error: null }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ rpc }) }));
 vi.mock("@/lib/audit", () => ({ audit: vi.fn(async () => undefined) }));
 vi.mock("@/lib/atendimento/origem", () => ({ observeServiceOrigin: async () => "humano" }));
@@ -50,8 +50,13 @@ const VIOLACAO = {
 };
 
 /** `abertoNaLeitura[n]`: o que a n-ésima busca do aberto do contato devolve. */
-function banco(opcoes: { abertoNaLeitura: boolean[]; erroNoInsert?: { code: string; message: string } }) {
+function banco(opcoes: {
+  abertoNaLeitura: boolean[];
+  erroNoInsert?: { code: string; message: string };
+  camposDoAberto?: Record<string, unknown>;
+}) {
   const inseridos: Record<string, unknown>[] = [];
+  const atualizacoes: Record<string, unknown>[] = [];
   let leituras = 0;
   const from = (tabela: string) => {
     const filtros: unknown[][] = [];
@@ -59,13 +64,14 @@ function banco(opcoes: { abertoNaLeitura: boolean[]; erroNoInsert?: { code: stri
     for (const nome of ["select", "neq", "is", "order", "limit"]) q[nome] = () => q;
     q.eq = (...a: unknown[]) => (filtros.push(a), q);
     q.insert = (linha: Record<string, unknown>) => (inseridos.push(linha), q);
+    q.update = (valores: Record<string, unknown>) => (atualizacoes.push(valores), q);
     q.maybeSingle = async () => {
       if (tabela === "crm_stages") return { data: { id: ETAPA, pipeline_id: FUNIL, organization_id: ORG }, error: null };
       if (tabela === "contacts") return { data: { id: CONTATO, is_personal: false }, error: null };
       if (tabela === "organizations") return { data: { currency: "BRL" }, error: null };
       if (tabela === "crm_leads" && filtros.some(([c, v]) => c === "status" && v === "open")) {
         const visivel = opcoes.abertoNaLeitura[leituras++] ?? false;
-        return { data: visivel ? { id: ABERTO, status: "open", pipeline_id: FUNIL } : null, error: null };
+        return { data: visivel ? { id: ABERTO, status: "open", pipeline_id: FUNIL, custom_fields: opcoes.camposDoAberto ?? {} } : null, error: null };
       }
       return { data: null, error: null };
     };
@@ -76,7 +82,7 @@ function banco(opcoes: { abertoNaLeitura: boolean[]; erroNoInsert?: { code: stri
     q.then = (ok: (v: { data: null; error: null }) => void) => ok({ data: null, error: null });
     return q;
   };
-  return { cliente: { from } as never, inseridos, leituras: () => leituras };
+  return { cliente: { from } as never, inseridos, atualizacoes, leituras: () => leituras };
 }
 
 const leadCreated = () =>
@@ -144,6 +150,27 @@ describe("9082: createLeadHandler reaproveita o aberto", () => {
     expect(lead).not.toHaveProperty("reaproveitado");
     expect(b.leituras()).toBe(0);
     expect(leadCreated()).toHaveLength(1);
+  });
+
+  it("P2-6: as respostas da chamada completam o card reaproveitado pelo banco (o card manda)", async () => {
+    const b = banco({ abertoNaLeitura: [true] });
+    rpc.mockImplementationOnce(async () => ({ data: { cidade: "Recife", servico: "Escova" }, error: null }));
+    const lead = await createLeadHandler(b.cliente, ctx, {
+      ...payload("importacao_planilha"),
+      custom_fields: { cidade: "Olinda", servico: "Escova" },
+    });
+    expect(rpc).toHaveBeenCalledWith("fn_lead_completar_campos", {
+      p_org: ORG,
+      p_lead: ABERTO,
+      p_campos: { cidade: "Olinda", servico: "Escova" },
+    });
+    expect(lead).toMatchObject({ id: ABERTO, reaproveitado: true, custom_fields: { cidade: "Recife", servico: "Escova" } });
+  });
+
+  it("P2-6 CONTROLE: sem custom_fields na chamada, não chama o banco", async () => {
+    const b = banco({ abertoNaLeitura: [true] });
+    await createLeadHandler(b.cliente, ctx, payload("importacao_planilha"));
+    expect(rpc).not.toHaveBeenCalledWith("fn_lead_completar_campos", expect.anything());
   });
 
   it("CONTROLE: 23505 de outro índice segue 500", async () => {

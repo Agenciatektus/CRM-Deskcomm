@@ -633,9 +633,21 @@ export async function createLeadHandler(
       .maybeSingle();
     return data ? { ...(data as Record<string, unknown>), reaproveitado: true } : null;
   };
+  // P2-6: as respostas que chegam com a chamada (formulário, planilha) não se perdem no card reaproveitado.
+  // O merge é atômico no banco (0502 faz o mesmo para o PATCH): o card manda, entra só a chave que ele não tem.
+  const completaComOsCamposDaChamada = async (aberto: Record<string, unknown>) => {
+    const novos = input.custom_fields ?? {};
+    if (Object.keys(novos).length === 0) return aberto;
+    const { data, error } = await createAdminClient().rpc("fn_lead_completar_campos", {
+      p_org: ctx.organization_id,
+      p_lead: aberto.id as string,
+      p_campos: novos,
+    });
+    return error || !data ? aberto : { ...aberto, custom_fields: data as Record<string, unknown> };
+  };
   if (leadUnico) {
     const aberto = await abertoDoContato();
-    if (aberto) return aberto;
+    if (aberto) return await completaComOsCamposDaChamada(aberto);
   }
 
   // ── A ETAPA EM QUE O NEGÓCIO NASCE TAMBÉM É UMA ENTRADA (issue #1710) ──────
@@ -761,7 +773,7 @@ export async function createLeadHandler(
   // Quem a RLS não deixa ler o vencedor recebe 409, nunca a linha.
   if (leadUnico && ehViolacaoDoLeadUnico(insErr)) {
     const aberto = await abertoDoContato();
-    if (aberto) return aberto;
+    if (aberto) return await completaComOsCamposDaChamada(aberto);
     throw recusaDoLeadUnico(ctx, insErr)!;
   }
 
