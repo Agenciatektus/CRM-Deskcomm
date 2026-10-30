@@ -12,6 +12,7 @@ import { join, posix } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const RAIZ = join(__dirname, "..", "..");
+// Fora de propósito: os .ts da raiz (config do Next/Sentry), `scripts/` e `extensoes/`.
 const RAIZES = ["app", "lib", "workers", "hooks", "components"];
 const TETO = 300;
 const HERDADOS: string[] = JSON.parse(
@@ -22,8 +23,10 @@ const HERDADOS: string[] = JSON.parse(
 const foraDaRegra = (f: string) =>
   /\.(test|spec)\.tsx?$/.test(f) || f.endsWith(".d.ts") || f === "lib/database.types.ts";
 
+// Igual ao `wc -l`: o \n final não abre linha nova.
 function linhas(f: string): number {
-  return readFileSync(join(RAIZ, f), "utf8").split("\n").length;
+  const t = readFileSync(join(RAIZ, f), "utf8");
+  return t.split("\n").length - (t.endsWith("\n") ? 1 : 0);
 }
 
 function producao(dir: string, out: string[] = []): string[] {
