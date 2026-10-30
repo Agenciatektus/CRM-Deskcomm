@@ -63795,6 +63795,7 @@ returns table (contact_id uuid, cpf text)
     as $$
 declare
   v_org uuid;
+  v_orgs uuid[] := '{}';
 begin
   if p_contact_ids is null or cardinality(p_contact_ids) = 0 then
     return;
@@ -63817,6 +63818,7 @@ begin
     if not public.fn_role_at_least(v_org, 'manager') and not public.fn_is_platform_admin() then
       raise exception 'forbidden_role';
     end if;
+    v_orgs := v_orgs || v_org;
   end loop;
 
   -- Audit antes do plaintext: uma linha por organização do bloco.
@@ -63829,6 +63831,7 @@ begin
            'total', count(*))
     from public.contacts c
    where c.id = any(p_contact_ids) and c.cpf_encrypted is not null
+     and c.organization_id = any(v_orgs)
    group by c.organization_id;
 
   -- CASE avalia em ordem: get_byte só roda em bytea com o piso de 66 bytes.
@@ -63840,7 +63843,8 @@ begin
              else pgp_sym_decrypt(c.cpf_encrypted, private.fn_cpf_key())
            end
       from public.contacts c
-     where c.id = any(p_contact_ids) and c.cpf_encrypted is not null;
+     where c.id = any(p_contact_ids) and c.cpf_encrypted is not null
+       and c.organization_id = any(v_orgs);
 end$$;
 
 revoke execute on function public.decrypt_cpf_lote(uuid[]) from public, anon;
