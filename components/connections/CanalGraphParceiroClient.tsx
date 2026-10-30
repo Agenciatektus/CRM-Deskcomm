@@ -161,7 +161,9 @@ export function CanalGraphParceiroClient({ onConectado }: { onConectado?: (telef
             value={token}
             onChange={(e) => setToken(e.target.value)}
             placeholder={estado?.has_token ? t("gravada — preencha para trocar") : "sk_live_…"}
-            autoComplete="off"
+            autoComplete="new-password"
+            data-1p-ignore
+            data-lpignore="true"
           />
           <p className="text-xs text-muted-foreground">
             {t(
@@ -216,7 +218,9 @@ export function CanalGraphParceiroClient({ onConectado }: { onConectado?: (telef
               value={segredo}
               onChange={(e) => setSegredo(e.target.value)}
               placeholder={estado.has_signing_secret ? t("gravada — preencha para trocar") : "whsec_…"}
-              autoComplete="off"
+              autoComplete="new-password"
+              data-1p-ignore
+              data-lpignore="true"
             />
           </div>
           <div>

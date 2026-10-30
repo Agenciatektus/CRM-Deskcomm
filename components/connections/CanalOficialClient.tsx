@@ -264,6 +264,9 @@ export function CanalOficialClient({ onConectado }: { onConectado?: (telefone: s
             <Label htmlFor="pnid">{t("ID do número de telefone")}</Label>
             <Input
               id="pnid"
+              autoComplete="off"
+              data-1p-ignore
+              data-lpignore="true"
               value={form.phone_number_id}
               onChange={(e) => setForm((f) => ({ ...f, phone_number_id: e.target.value }))}
               placeholder="1103328999528818"
@@ -274,6 +277,9 @@ export function CanalOficialClient({ onConectado }: { onConectado?: (telefone: s
             <Label htmlFor="waba">{t("ID da conta do WhatsApp Business")}</Label>
             <Input
               id="waba"
+              autoComplete="off"
+              data-1p-ignore
+              data-lpignore="true"
               value={form.waba_id}
               onChange={(e) => setForm((f) => ({ ...f, waba_id: e.target.value }))}
               placeholder="2434045433735175"
@@ -285,6 +291,9 @@ export function CanalOficialClient({ onConectado }: { onConectado?: (telefone: s
             <Input
               id="tok"
               type="password"
+              autoComplete="new-password"
+              data-1p-ignore
+              data-lpignore="true"
               value={form.token}
               onChange={(e) => setForm((f) => ({ ...f, token: e.target.value }))}
               placeholder={
