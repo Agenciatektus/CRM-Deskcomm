@@ -74,9 +74,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   const admin = isServiceRoleConfigured() ? createAdminClient() : null;
   const inviterName = authUser.full_name ?? authUser.email ?? "Um colega";
   // Emails com membership ATIVA na org — para pular o reconvite de quem já é membro.
-  // O schema `auth` NÃO é acessível via PostgREST (erro "Invalid schema: auth"), então
-  // resolvemos email↔usuário pela GoTrue admin API (getUserById) — mesmo padrão de
-  // app/api/v1/team/route.ts. N pequeno (poucos membros por org no perfil BPO).
+  // O e-mail vem de `fn_nomes_de_membros` (9088), uma chamada para a equipe inteira.
   const memberEmails = new Set<string>();
   if (admin) {
     const { data: members } = await admin
@@ -112,6 +110,13 @@ export async function POST(req: NextRequest): Promise<Response> {
       activeOrg.orgId,
       (members ?? []).map((m) => m.user_id as string),
     );
+    // Todo membro ativo tem linha em auth.users: mapa vazio com membros = a leitura falhou.
+    // Falha fechado, senão o convite sai de novo para quem já é membro.
+    if ((members ?? []).length > 0 && identidades.size === 0) {
+      return fail("members_unavailable", "Não foi possível conferir a equipe agora. Tente de novo.", 503, {
+        requestId,
+      });
+    }
     for (const u of identidades.values()) {
       const memberEmail = u.email?.trim().toLowerCase();
       if (memberEmail) memberEmails.add(memberEmail);
