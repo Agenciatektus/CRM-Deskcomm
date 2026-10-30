@@ -15,7 +15,7 @@ describe("export de contatos: CPF em lote (migration 9086)", () => {
     const cpfs = await decifraCpfsEmLote({ rpc }, contatos(1200));
     expect(rpc).toHaveBeenCalledTimes(3);
     expect(rpc.mock.calls.every(([fn]) => fn === "decrypt_cpf_lote")).toBe(true);
-    expect(rpc.mock.calls[0][1].p_contact_ids).toHaveLength(TAMANHO_DO_BLOCO_DE_CPF);
+    expect(rpc.mock.calls[0]?.[1].p_contact_ids).toHaveLength(TAMANHO_DO_BLOCO_DE_CPF);
     expect(cpfs.size).toBe(1200);
     expect(cpfs.get("c1199")).toBe("cpf-c1199");
   });
