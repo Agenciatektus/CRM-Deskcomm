@@ -10398,6 +10398,10 @@ export type Database = {
       }
     }
     Functions: {
+      // Escritas à mão a partir do baseline.sql (#465), como as RPCs usadas por
+      // lib/supabase/rpc.ts. Ao regerar com `supabase gen types`, preserve-as e
+      // mantenha `| null` em fn_upsert_wa_contact (p_lid, p_notify, p_phone) e
+      // retrieve_top_k_chunks (p_kb_version_id): o código já passa null ali.
       fn_cadencia_encerrar_conducao: { Args: { p_org: string; p_conducao: string; p_motivo: string }; Returns: boolean }
       fn_cadencia_lead_respondeu: { Args: { p_org: string; p_enrollment: string; p_event_id: string }; Returns: Json }
       fn_cadencia_publicar_versao: { Args: { p_org: string; p_pointer: string; p_graph: Json; p_created_by: string; p_conducao: Json }; Returns: string }
