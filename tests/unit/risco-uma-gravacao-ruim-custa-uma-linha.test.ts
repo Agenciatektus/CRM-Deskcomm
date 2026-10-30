@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GET } from "@/app/api/v1/cron/risk-watcher/route";
 import type { EstadoCalculado } from "@/lib/leads/risk-seed";
-import { observaTravessias } from "@/lib/leads/risk-worker";
+import { observaTravessias, orgsDaPassada } from "@/lib/leads/risk-worker";
 
 /**
  * UMA GRAVAÇÃO RUIM CUSTA UMA LINHA — e a falha chega a quem lê o cron.
@@ -82,10 +82,12 @@ function leituraDosEstados() {
 function adminDuble() {
   return {
     from(tabela: string) {
-      if (tabela === "crm_leads") {
-        return {
-          select: () => ({ eq: async () => ({ data: [{ organization_id: ORG }], error: null }) }),
+      if (tabela === "organizations") {
+        const consulta = {
+          order: () => consulta,
+          range: async () => ({ data: [{ id: ORG }], error: null }),
         };
+        return { select: () => consulta };
       }
       if (tabela === "crm_lead_risk_states") {
         return {
@@ -177,5 +179,19 @@ describe("cron risk-watcher: a contagem chega a quem lê a rodada", () => {
       "[risk-watcher] travessias sem estado gravado",
       expect.anything(),
     );
+  });
+});
+
+describe("cron risk-watcher: rodízio quando há mais orgs que o teto", () => {
+  it("até o teto, todas as orgs entram em toda passada", () => {
+    const ids = ["a", "b", "c"];
+    expect(orgsDaPassada(ids, 7, 50)).toEqual(ids);
+  });
+
+  it("acima do teto, passadas seguidas cobrem todas as orgs", () => {
+    const ids = Array.from({ length: 7 }, (_, i) => `org-${i}`);
+    const vistas = new Set([0, 1, 2, 3].flatMap((p) => orgsDaPassada(ids, p, 3)));
+    expect(vistas.size).toBe(7);
+    expect(orgsDaPassada(ids, 1, 3)).toEqual(["org-3", "org-4", "org-5"]);
   });
 });

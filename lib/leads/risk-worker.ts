@@ -219,3 +219,13 @@ export async function observaTravessias(
 }
 
 export type { EstadoCalculado };
+
+/** Teto de orgs por passada do cron; com mais que isso, o rodízio pega o resto. */
+export const ORGS_POR_PASSADA = 50;
+
+/** Com mais orgs que o teto, cada passada começa num ponto diferente (rodízio). */
+export function orgsDaPassada(ids: string[], passada: number, limite = ORGS_POR_PASSADA): string[] {
+  if (ids.length <= limite) return ids;
+  const inicio = (passada * limite) % ids.length;
+  return [...ids.slice(inicio), ...ids.slice(0, inicio)].slice(0, limite);
+}

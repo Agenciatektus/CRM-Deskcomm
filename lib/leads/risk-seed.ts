@@ -109,7 +109,7 @@ async function coletaEClassifica(
   // Paginado e ordenado: sem isso o PostgREST corta em 1.000 (PGRST_DB_MAX_ROWS)
   // e, sem ordem, cada passada via um recorte diferente dos leads abertos.
   const {
-    data: leads,
+    data: lidos,
     error: leadErr,
     truncado,
   } = await buscarTodasAsPaginas<LeadRow>((de, ate) =>
@@ -123,6 +123,9 @@ async function coletaEClassifica(
   );
   if (leadErr) throw new Error(`seed de risco: ${leadErr}`);
   if (truncado) throw new Error("seed de risco: leads abertos passaram do teto de páginas");
+  // Lead aberto durante a varredura pode vir em duas páginas; repetido derruba o
+  // upsert em lote do seed ("cannot affect row a second time").
+  const leads = [...new Map(lidos.map((l) => [l.id, l])).values()];
 
   const stageIds = [...new Set(leads.map((l) => l.stage_id).filter(Boolean))];
   const janelaPorEstagio = new Map<string, ReturnType<typeof resolveStageWindow>>();
