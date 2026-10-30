@@ -58,6 +58,8 @@ import { escoposFaltando } from "@/lib/agenda/google/oauth";
 import { trocarCodigoPorToken } from "@/lib/agenda/google/token";
 import { contaDaAgendaPrimaria } from "@/lib/agenda/google/calendarios";
 import { classificarErroDoGoogle } from "@/lib/agenda/google/erros";
+import { respostaDePonte } from "@/lib/auth/ponte-de-volta";
+import { marcaDaSaida } from "@/lib/branding/saida";
 import { env } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
@@ -97,28 +99,13 @@ export const dynamic = "force-dynamic";
  *
  * As 14 saídas herdam de graça, porque todas passam por aqui.
  */
-function voltar(parametro: string): NextResponse {
+async function voltar(parametro: string): Promise<NextResponse> {
   const base = env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const destino = new URL(`/app/agenda?${parametro}`, base).toString();
-  // Escapado mesmo o valor vindo de literais nossos: a ponte é genérica, e o
-  // dia em que alguém passar algo de fora por aqui não deve ser o dia em que
-  // isto vira injeção.
-  const seguro = destino
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-  const resposta = new NextResponse(
-    `<!doctype html><html lang="pt-br"><head><meta charset="utf-8">` +
-      `<meta name="robots" content="noindex">` +
-      `<noscript><meta http-equiv="refresh" content="0;url=${seguro}"></noscript>` +
-      `<title>Voltando…</title></head><body>` +
-      `<p>Voltando para a sua agenda…</p>` +
-      `<script>location.replace(${JSON.stringify(destino)})</script>` +
-      `<noscript><p><a href="${seguro}">Continuar</a></p></noscript>` +
-      `</body></html>`,
-    { status: 200, headers: { "content-type": "text/html; charset=utf-8" } },
-  );
+  const marca = await marcaDaSaida(null);
+  const ponte = respostaDePonte(destino, marca.nome, "Voltando para a sua agenda…");
+  // NextResponse para poder limpar o cookie abaixo.
+  const resposta = new NextResponse(ponte.body, ponte);
   // A LIMPEZA MORA AQUI, e não em cada saída, porque esta rota tem catorze delas
   // e uma que esquecesse deixaria um vínculo vivo até o TTL. Toda volta passa
   // por esta função — sucesso e erro —, então o cookie morre com o fluxo.

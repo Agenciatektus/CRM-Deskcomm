@@ -16,6 +16,8 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { NOME_DO_VINCULO, vinculoConfere } from "@/lib/agenda/google/vinculo";
 import { audit } from "@/lib/audit";
+import { respostaDePonte } from "@/lib/auth/ponte-de-volta";
+import { marcaDaSaida } from "@/lib/branding/saida";
 import { env } from "@/lib/env";
 import { supportCallbackWriteAllowed } from "@/lib/impersonate/support";
 import { logger } from "@/lib/logger";
@@ -25,6 +27,7 @@ import {
   configuracaoDoMetaAds,
 } from "@/lib/plataformas-de-anuncio/meta/oauth/config";
 import { listarContas } from "@/lib/plataformas-de-anuncio/meta/insights";
+import { escolhaDoLogin } from "@/lib/plataformas-de-anuncio/meta/oauth/escolha-do-login";
 import { segredoDoVinculo, verificarEstado } from "@/lib/plataformas-de-anuncio/meta/oauth/estado";
 import { aindaEAdminDaOrganizacao } from "@/lib/plataformas-de-anuncio/meta/oauth/papel";
 import {
@@ -42,10 +45,13 @@ import { cookieSecure } from "@/lib/supabase/cookie-secure";
 
 export const dynamic = "force-dynamic";
 
-function voltar(base: string, params: Record<string, string>): NextResponse {
+async function voltar(base: string, params: Record<string, string>): Promise<NextResponse> {
   const url = new URL("/app/settings/meta-ads", base || "http://localhost:3000");
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  const resposta = NextResponse.redirect(url);
+  // Ponte 200, não 302: o cookie de sessão Strict não viaja num redirect vindo da Meta/Google.
+  const marca = await marcaDaSaida(null);
+  const ponte = respostaDePonte(url.toString(), marca.nome, "Voltando…");
+  const resposta = new NextResponse(ponte.body, ponte);
   // Toda saída passa por aqui: o vínculo morre com o fluxo, sucesso ou erro.
   resposta.cookies.set(NOME_DO_VINCULO, "", {
     httpOnly: true,
@@ -210,9 +216,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   // 5. Identidade e verificação, DEPOIS da gravação: só informam, e nada aqui desfaz a
   // conexão. Só contagens vão para a URL (nunca nome, id ou token).
   const token = leitura.token.access_token;
+  // O `debug_token` roda uma vez por conexão; identidade e contas reaproveitam o resultado.
+  const escolha = await escolhaDoLogin(token);
   let bms = 0;
   try {
-    const quem = await lerIdentidadeDoToken(token);
+    const quem = await lerIdentidadeDoToken(token, escolha);
     bms = quem.empresas.length;
     const { error } = await admin
       .from("ad_insights_connections")
@@ -232,7 +240,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
   let desfecho: DesfechoDaVerificacao = { tipo: "aviso", aviso: "leitura_falhou" };
   try {
-    desfecho = desfechoDaVerificacao(await listarContas(token), bms);
+    desfecho = desfechoDaVerificacao(await listarContas(token, escolha), bms);
   } catch {
     // fica em leitura_falhou
   }
