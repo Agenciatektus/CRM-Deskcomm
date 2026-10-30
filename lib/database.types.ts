@@ -10981,6 +10981,10 @@ export type Database = {
         Args: { p_org: string; p_lead: string; p_campos: Json }
         Returns: Json
       }
+      fn_lead_completar_campos: {
+        Args: { p_org: string; p_lead: string; p_campos: Json }
+        Returns: Json
+      }
       fn_lgpd_anonymize_contact: {
         Args: { p_contact_id: string; p_organization_id: string }
         Returns: Json
