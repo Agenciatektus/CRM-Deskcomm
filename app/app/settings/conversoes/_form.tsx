@@ -159,7 +159,13 @@ export function FormularioDeConversoes({
             const campo = (
               <Input
                 id="dataset_id"
+                name="conversoes_dataset_id"
                 inputMode="numeric"
+                // Sem isto o gerenciador de senhas toma este campo por "usuário" e cola o e-mail.
+                autoComplete="off"
+                data-1p-ignore
+                data-lpignore="true"
+                data-form-type="other"
                 value={datasetId}
                 onChange={(e) => setDatasetId(e.target.value)}
                 placeholder="123456789012345"
@@ -187,8 +193,13 @@ export function FormularioDeConversoes({
           <Label htmlFor="access_token">{t("Token de acesso")}</Label>
           <Input
             id="access_token"
+            name="conversoes_access_token"
             type="password"
-            autoComplete="off"
+            // O Chrome ignora autocomplete="off" em campo de senha; "new-password" impede colar a senha salva.
+            autoComplete="new-password"
+            data-1p-ignore
+            data-lpignore="true"
+            data-form-type="other"
             value={token}
             onChange={(e) => setToken(e.target.value)}
             placeholder={
@@ -206,6 +217,10 @@ export function FormularioDeConversoes({
           <Label htmlFor="test_event_code">{t("Código de teste (opcional)")}</Label>
           <Input
             id="test_event_code"
+            name="conversoes_test_event_code"
+            autoComplete="off"
+            data-1p-ignore
+            data-lpignore="true"
             value={codigoDeTeste}
             onChange={(e) => setCodigoDeTeste(e.target.value)}
             placeholder="TEST12345"
