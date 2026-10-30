@@ -25,6 +25,7 @@ const VENDAS = id(21);
 const POS = id(22);
 const S_V = id(31);
 const S_P = id(32);
+const S_PERDA = id(33);
 const PRINCIPAL = id(41);
 const ABSORVIDO = id(42);
 
@@ -36,6 +37,8 @@ insert into crm_pipelines(id,organization_id,name,slug) values
  ('${VENDAS}','${ORG}','D9086 Vendas','d9086-vendas'),('${POS}','${ORG}','D9086 Pos','d9086-pos');
 insert into crm_stages(id,organization_id,pipeline_id,name,slug,position) values
  ('${S_V}','${ORG}','${VENDAS}','Novo','novo',1),('${S_P}','${ORG}','${POS}','Novo','novo',1);
+insert into crm_stages(id,organization_id,pipeline_id,name,slug,position,is_lost) values
+ ('${S_PERDA}','${ORG}','${VENDAS}','Perdido','perdido',9,true);
 `;
 
 const lead = (n: number, contato: string, source: string, funil = VENDAS, etapa = S_V) =>
@@ -73,7 +76,7 @@ describe("9086: no banco", () => {
       `${lead(1, PRINCIPAL, "whatsapp")}\n${lead(2, ABSORVIDO, "importacao_planilha")}${funde}`,
       `${statusDe(1)}\n${statusDe(2)}\nselect lost_reason from crm_leads where id = '${id(102)}';`,
     );
-    expect(saida).toMatch(/open\s+lost\s+Contato mesclado/);
+    expect(saida).toMatch(/open\s+lost\s+moved_to_another_pipeline/);
   });
 
   it("funil diferente: os dois seguem abertos (controle)", () => {

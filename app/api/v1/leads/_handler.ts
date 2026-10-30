@@ -634,19 +634,16 @@ export async function createLeadHandler(
     return data ? { ...(data as Record<string, unknown>), reaproveitado: true } : null;
   };
   // P2-6: as respostas que chegam com a chamada (formulário, planilha) não se perdem no card reaproveitado.
-  // O card manda: só entra a chave que ele ainda não tem, nunca sobrescreve o que a atendente já preencheu.
+  // O merge é atômico no banco (0502 faz o mesmo para o PATCH): o card manda, entra só a chave que ele não tem.
   const completaComOsCamposDaChamada = async (aberto: Record<string, unknown>) => {
     const novos = input.custom_fields ?? {};
-    const atuais = (aberto.custom_fields as Record<string, unknown> | null) ?? {};
-    const faltam = Object.fromEntries(Object.entries(novos).filter(([k]) => !(k in atuais)));
-    if (Object.keys(faltam).length === 0) return aberto;
-    const merged = { ...atuais, ...faltam };
-    const { error } = await supabase
-      .from("crm_leads")
-      .update({ custom_fields: merged })
-      .eq("id", aberto.id as string)
-      .eq("organization_id", ctx.organization_id);
-    return error ? aberto : { ...aberto, custom_fields: merged };
+    if (Object.keys(novos).length === 0) return aberto;
+    const { data, error } = await createAdminClient().rpc("fn_lead_completar_campos", {
+      p_org: ctx.organization_id,
+      p_lead: aberto.id as string,
+      p_campos: novos,
+    });
+    return error || !data ? aberto : { ...aberto, custom_fields: data as Record<string, unknown> };
   };
   if (leadUnico) {
     const aberto = await abertoDoContato();

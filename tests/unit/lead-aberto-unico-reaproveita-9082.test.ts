@@ -15,7 +15,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const rpc = vi.fn(async () => ({ error: null }));
+const rpc = vi.fn(async (_fn: string, _args?: unknown) => ({ data: undefined as unknown, error: null }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ rpc }) }));
 vi.mock("@/lib/audit", () => ({ audit: vi.fn(async () => undefined) }));
 vi.mock("@/lib/atendimento/origem", () => ({ observeServiceOrigin: async () => "humano" }));
@@ -152,20 +152,25 @@ describe("9082: createLeadHandler reaproveita o aberto", () => {
     expect(leadCreated()).toHaveLength(1);
   });
 
-  it("P2-6: as respostas da chamada completam o card reaproveitado, sem sobrescrever o que ele já tem", async () => {
-    const b = banco({ abertoNaLeitura: [true], camposDoAberto: { cidade: "Recife" } });
+  it("P2-6: as respostas da chamada completam o card reaproveitado pelo banco (o card manda)", async () => {
+    const b = banco({ abertoNaLeitura: [true] });
+    rpc.mockImplementationOnce(async () => ({ data: { cidade: "Recife", servico: "Escova" }, error: null }));
     const lead = await createLeadHandler(b.cliente, ctx, {
       ...payload("importacao_planilha"),
       custom_fields: { cidade: "Olinda", servico: "Escova" },
     });
-    expect(b.atualizacoes).toEqual([{ custom_fields: { cidade: "Recife", servico: "Escova" } }]);
+    expect(rpc).toHaveBeenCalledWith("fn_lead_completar_campos", {
+      p_org: ORG,
+      p_lead: ABERTO,
+      p_campos: { cidade: "Olinda", servico: "Escova" },
+    });
     expect(lead).toMatchObject({ id: ABERTO, reaproveitado: true, custom_fields: { cidade: "Recife", servico: "Escova" } });
   });
 
-  it("P2-6 CONTROLE: sem chave nova, não escreve nada", async () => {
-    const b = banco({ abertoNaLeitura: [true], camposDoAberto: { cidade: "Recife" } });
-    await createLeadHandler(b.cliente, ctx, { ...payload("importacao_planilha"), custom_fields: { cidade: "Olinda" } });
-    expect(b.atualizacoes).toHaveLength(0);
+  it("P2-6 CONTROLE: sem custom_fields na chamada, não chama o banco", async () => {
+    const b = banco({ abertoNaLeitura: [true] });
+    await createLeadHandler(b.cliente, ctx, payload("importacao_planilha"));
+    expect(rpc).not.toHaveBeenCalledWith("fn_lead_completar_campos", expect.anything());
   });
 
   it("CONTROLE: 23505 de outro índice segue 500", async () => {
