@@ -487,7 +487,10 @@ describe('ordem no turno (achado 5 da prova do #1130)', () => {
       join(process.cwd(), 'lib/agent-engine/agent/turno/portoes-de-entrada.ts'),
       'utf8',
     );
-    expect(portoes).toContain('isLeadInHandoff(pool, tenantId, leadId)');
+    const veto = portoes.indexOf('isLeadInHandoff(pool, tenantId, leadId)');
+    expect(veto).toBeGreaterThan(-1);
+    // O veto vem antes da saída que libera o turno.
+    expect(veto).toBeLessThan(portoes.indexOf('return { seguir: true'));
   });
 
   it('e nunca para contato bloqueado, nem fora do turno de inbound', () => {

@@ -115,9 +115,9 @@ describe("a escolha da organização é lida onde a camada é consumida", () => 
       // a leitura mora nos portões de entrada desde a S1, e conta junto.
       const texto = (MODULOS_DO_TURNO[arquivo] ?? [arquivo]).map(fonte).join("\n");
       const ocorrencias = texto.split("lerCamadasDaOrg(").length - 1;
-      // 1 import + 1 chamada = 2. Mais que isso é uma segunda leitura no mesmo
-      // arquivo.
-      expect(ocorrencias, `${arquivo} lê as camadas mais de uma vez por turno`).toBeLessThanOrEqual(2);
+      // O import não tem parêntese: cada ocorrência de `lerCamadasDaOrg(` é uma
+      // chamada. Duas já é uma segunda leitura no mesmo turno.
+      expect(ocorrencias, `${arquivo} lê as camadas mais de uma vez por turno`).toBe(1);
       expect(ocorrencias, `${arquivo} não lê as camadas`).toBeGreaterThan(0);
     }
   });
