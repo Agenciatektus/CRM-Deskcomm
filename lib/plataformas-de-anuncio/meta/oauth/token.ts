@@ -8,6 +8,7 @@
  */
 import { baseDaGraphDeAnuncio } from "../graph-base";
 import type { AppDoMetaAdsConfigurado } from "./config";
+import { empresasEscolhidasNoLogin } from "./escolha-do-login";
 import { lerRespostaDeToken, type LeituraDeToken } from "./oauth";
 
 const PRAZO_MS = 10_000;
@@ -154,15 +155,17 @@ export const corta = (s: string, n = 200): string => Array.from(s).slice(0, n).j
  * como ...". Melhor esforço, nunca lança: o que não veio fica `null`/vazio.
  */
 export async function lerIdentidadeDoToken(token: string): Promise<IdentidadeMeta> {
-  const [eu, empresas] = await Promise.all([
+  const [eu, empresas, escolhidas] = await Promise.all([
     lerJson("/me?fields=id,name", token),
     lerJson("/me/businesses?fields=id,name&limit=100", token),
+    empresasEscolhidasNoLogin(token),
   ]);
   const nome = typeof eu?.name === "string" && eu.name ? corta(eu.name) : null;
   const lista = Array.isArray(empresas?.data) ? (empresas.data as unknown[]) : [];
   const vistos = lista
     .map((b) => b as Record<string, unknown> | null)
     .filter((b) => typeof b?.id === "string" && /^\d+$/.test(b.id))
+    .filter((b) => !escolhidas || escolhidas.includes(b!.id as string))
     .slice(0, MAXIMO_DE_EMPRESAS)
     .map((b) => ({
       id: b!.id as string,

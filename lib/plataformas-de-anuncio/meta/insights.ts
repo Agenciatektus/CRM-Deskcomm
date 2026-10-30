@@ -48,6 +48,7 @@
 import { logger } from "@/lib/logger";
 
 import { baseDaGraphDeAnuncio } from "./graph-base";
+import { empresasEscolhidasNoLogin } from "./oauth/escolha-do-login";
 import type {
   ContaDeAnuncio,
   FalhaDeLeitura,
@@ -358,12 +359,9 @@ export async function listarContas(
   }
   const CAMPOS = "id,account_id,name,currency,account_status";
 
-  const minhas = await buscarPaginado<ContaCrua>(
-    montarUrl("me/adaccounts", { fields: CAMPOS, limit: "100" }),
-    token,
-    "adaccounts",
-  );
-  if (!minhas.ok) return minhas;
+  // Quem marcou BMs no diálogo da Meta vê só elas: sem `me/adaccounts` (traz tudo) e
+  // com as contas de cliente (`client_ad_accounts`) de cada BM marcada.
+  const escolhidas = await empresasEscolhidasNoLogin(token);
 
   const porId = new Map<string, ContaDeAnuncio>();
   const juntar = (lista: ContaCrua[]) => {
@@ -380,21 +378,35 @@ export async function listarContas(
       });
     }
   };
-  juntar(minhas.dados);
+
+  if (!escolhidas) {
+    const minhas = await buscarPaginado<ContaCrua>(
+      montarUrl("me/adaccounts", { fields: CAMPOS, limit: "100" }),
+      token,
+      "adaccounts",
+    );
+    if (!minhas.ok) return minhas;
+    juntar(minhas.dados);
+  }
 
   // No máximo 20 empresas, 3 por vez; o primeiro erro de cota da Meta encerra a
   // varredura e a lista já obtida segue (melhor esforço).
-  const empresas = await listarEmpresas(token);
+  const empresas = escolhidas
+    ? { ok: true as const, dados: escolhidas.map((id) => ({ id })) }
+    : await listarEmpresas(token);
   if (empresas.ok) {
     const bms = empresas.dados.slice(0, MAXIMO_DE_BMS);
+    const bordas = escolhidas ? ["owned_ad_accounts", "client_ad_accounts"] : ["owned_ad_accounts"];
     let cota = false;
     for (let i = 0; i < bms.length && !cota; i += BMS_EM_PARALELO) {
       const lote = await Promise.all(
-        bms.slice(i, i + BMS_EM_PARALELO).map((bm) =>
-          buscarPaginado<ContaCrua>(
-            montarUrl(`${encodeURIComponent(bm.id)}/owned_ad_accounts`, { fields: CAMPOS, limit: "100" }),
-            token,
-            "owned_ad_accounts",
+        bms.slice(i, i + BMS_EM_PARALELO).flatMap((bm) =>
+          bordas.map((borda) =>
+            buscarPaginado<ContaCrua>(
+              montarUrl(`${encodeURIComponent(bm.id)}/${borda}`, { fields: CAMPOS, limit: "100" }),
+              token,
+              borda,
+            ),
           ),
         ),
       );
@@ -418,10 +430,12 @@ export async function listarEmpresas(
     "businesses",
   );
   if (!r.ok) return r;
+  const escolhidas = await empresasEscolhidasNoLogin(token);
   return {
     ok: true,
     dados: r.dados
       .filter((b): b is { id: string; name?: string } => /^\d+$/.test(b.id ?? ""))
+      .filter((b) => !escolhidas || escolhidas.includes(b.id))
       .map((b) => ({ id: b.id, nome: b.name ?? b.id })),
   };
 }
