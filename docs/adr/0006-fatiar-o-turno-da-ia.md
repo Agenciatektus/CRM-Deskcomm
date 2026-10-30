@@ -215,9 +215,30 @@ proibido no módulo novo e ver a cerca ficar vermelha).
 `tests/unit/turno-rastro-de-efeitos.test.ts`, com o snapshot em
 `tests/unit/__snapshots__/turno-rastro-de-efeitos.test.ts.snap`. Roda na suíte unitária, sem Postgres: pool
 fingido (o de `turno-le-em-paralelo`), `runModelCall` roteirizado por cenário e canal falso por
-`deps.channel`. Grava em ordem `db:` (verbo e tabela, transação), `send:`, `llm:<purpose>`,
-`tool:<nome> ok|recusou <code>`, `job:` e os avisos de log. 14 cenários, mais um de determinismo e o controle
-negativo de ordem.
+`deps.channel`. Grava em ordem:
+
+- `db:` cada escrita (verbo e tabela), inclusive todas as de um CTE na ordem textual; `db:call fn_x` para
+  função do banco chamada como `select * from fn_x(...)`; o `status` gravado no SET de `agent_inbox_items`,
+  `contacts` e `conversations`; e as transações;
+- `send:`, `llm:<purpose>`, `tool:<nome> ok|recusou <code>`, `job:` e os avisos de log.
+
+São 14 cenários, mais um de determinismo e o controle negativo de ordem. O controle lê o `.snap` do disco e
+prova que o bloco do cenário contém a ordem original de dois efeitos vizinhos e não contém a trocada.
+
+O cenário "assistido: vira rascunho, nada sai" percorre o desvio real (`inbound-turn.ts:2172-2216`): o pool
+responde ao claim do turno autônomo, à fronteira de atendimento e ao `fn_reply_begin`, e o rastro mostra
+`llm:agent_preview` sem nenhum `llm:agent_turn`, a gravação em `ai_reply_drafts` e `fim:ok`.
+
+#### Lacunas da S0 (revisão do `cassio-secrev` na PR #468)
+
+| Lacuna | Por que ficou | Fatia que precisa dela |
+|---|---|---|
+| Horário de atendimento: o pool não devolve linhas de horário | `inbound-turn.ts` lê `new Date()` direto nas linhas 2819, 2824, 4361 e 5826 (em `3ba2fe36d`); devolver horário sem injetar o relógio deixaria o rastro dependente da hora | injeção do relógio antes de S5 (2819, 2824), S6 (4361) e S9 (5826); a injeção é mudança de comportamento e vai em PR própria, fora das fatias de movimento |
+| P2-2: o dublê do modelo devolve `responseMessages: []` e `steps: []`; a fita do turno chega vazia em `pruneToolResults`/`toolPartsAsText` e no checkpoint, então uma fatia que perca a fita passa verde | devolver as partes de tool-call/tool-result roteirizadas e gravar `llm:checkpoint msgs=N` | S8 |
+| P2-6: os classificadores do `Promise.all` (estágio, jailbreak, manipulação) não rodam, porque os knobs do agente do teste estão desligados | cenários com os knobs ligados e ordem determinística do `Promise.all` | S9 |
+| Classificadores auxiliares (`stage_classifier`, `jailbreak_detect`) fora do rastro: os knobs estão desligados no dublê | cenários com eles ligados pedem roteiro de saída de cada classificador | S8 |
+| Preview puro, `followup_turn`, `case_reply_turn`, saída truncada, veto até o teto, escalação por jailbreak, reagendamento pela janela anti-ban | fora da primeira leva de cenários | o cenário entra na PR anterior à fatia que move o trecho (S1, S5, S7, S9) |
+| `status` gravado por expressão aparece como `status=case`, sem o valor | o rastro lê o texto do SQL, não o resultado | nenhuma; basta para detectar mudança de ordem ou de alvo |
 
 ---
 
