@@ -63779,7 +63779,7 @@ notify pgrst, 'reload schema';
 -- com p_org. Execução só para service_role: as rotas já resolvem a org de fonte confiável e chamam
 -- pelo admin client. Se um dia a sessão do usuário chamar, a guarda de org abaixo já vale.
 create or replace function public.fn_nomes_de_membros(p_org uuid, p_user_ids uuid[])
-returns table (user_id uuid, full_name text, email text)
+returns table (user_id uuid, full_name text, email text, last_sign_in_at timestamptz)
 language plpgsql
 stable
 security definer
@@ -63793,7 +63793,7 @@ begin
   end if;
 
   return query
-  select u.id, (u.raw_user_meta_data ->> 'full_name')::text, u.email::text
+  select u.id, (u.raw_user_meta_data ->> 'full_name')::text, u.email::text, u.last_sign_in_at
     from auth.users u
    where u.id = any(p_user_ids)
      and exists (

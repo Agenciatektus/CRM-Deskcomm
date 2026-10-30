@@ -5,6 +5,7 @@ import { emitirConvite } from "@/lib/team/convites";
 import { isServiceRoleConfigured } from "@/lib/audit";
 import { lerLimiteDoPlano, mensagemDoLimite } from "@/lib/cobranca/limites";
 import { logger } from "@/lib/logger";
+import { nomesDeMembros } from "@/lib/users/nomes-de-membros";
 /**
  * POST /api/v1/team/invite — bulk-invite up to 20 emails.
  *
@@ -107,9 +108,12 @@ export async function POST(req: NextRequest): Promise<Response> {
       });
     }
 
-    for (const m of members ?? []) {
-      const { data: u } = await admin.auth.admin.getUserById(m.user_id as string);
-      const memberEmail = u?.user?.email?.trim().toLowerCase();
+    const identidades = await nomesDeMembros(
+      activeOrg.orgId,
+      (members ?? []).map((m) => m.user_id as string),
+    );
+    for (const u of identidades.values()) {
+      const memberEmail = u.email?.trim().toLowerCase();
       if (memberEmail) memberEmails.add(memberEmail);
     }
   }

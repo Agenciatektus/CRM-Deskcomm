@@ -39,8 +39,8 @@ describe("nomesDeMembros", () => {
       p_user_ids: ["u1", "u2", "u3"],
     });
     expect(getUserById).not.toHaveBeenCalled();
-    expect(r.get("u1")).toEqual({ full_name: "Ana", email: "ana@x.com" });
-    expect(r.get("u2")).toEqual({ full_name: null, email: "bia@x.com" });
+    expect(r.get("u1")).toEqual({ full_name: "Ana", email: "ana@x.com", last_sign_in_at: null });
+    expect(r.get("u2")).toEqual({ full_name: null, email: "bia@x.com", last_sign_in_at: null });
     // fora da org (o banco não devolveu): ausente, nunca com nome
     expect(r.has("u3")).toBe(false);
   });

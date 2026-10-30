@@ -17,6 +17,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export interface MembroIdentificado {
   full_name: string | null;
   email: string | null;
+  last_sign_in_at: string | null;
 }
 
 export async function nomesDeMembros(
@@ -35,6 +36,6 @@ export async function nomesDeMembros(
     return new Map();
   }
   return new Map(
-    ((data ?? []) as Array<{ user_id: string } & MembroIdentificado>).map((r) => [r.user_id, { full_name: r.full_name ?? null, email: r.email ?? null }]),
+    ((data ?? []) as Array<{ user_id: string } & MembroIdentificado>).map((r) => [r.user_id, { full_name: r.full_name ?? null, email: r.email ?? null, last_sign_in_at: r.last_sign_in_at ?? null }]),
   );
 }
