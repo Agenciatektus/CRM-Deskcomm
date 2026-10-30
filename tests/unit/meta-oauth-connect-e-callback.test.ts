@@ -169,7 +169,7 @@ async function iniciado(): Promise<{ state: string; cookie: string }> {
 /** Destino da ponte (200 + location.replace), no lugar do header Location. */
 async function destinoDaPonte(res: Response): Promise<string> {
   const m = /location\.replace\((".*?")\)/.exec(await res.clone().text());
-  return m ? (JSON.parse(m[1]) as string) : "";
+  return m?.[1] ? (JSON.parse(m[1]) as string) : "";
 }
 
 async function voltar(query: string, cookie?: string) {
