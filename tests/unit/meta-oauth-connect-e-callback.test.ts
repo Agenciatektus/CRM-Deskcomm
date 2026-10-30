@@ -217,6 +217,14 @@ describe("connect", () => {
 });
 
 describe("callback", () => {
+  it("a volta é página-ponte 200 (não 302) e limpa o cookie de vínculo", async () => {
+    const { GET } = await import("@/app/api/v1/plataformas-de-anuncio/meta/callback/route");
+    const resposta = await GET(new NextRequest(`http://localhost${CALLBACK}?error=access_denied`));
+    expect(resposta.status).toBe(200);
+    expect(resposta.headers.get("location")).toBeNull();
+    expect(resposta.cookies.get("crm_oauth_bind")).toMatchObject({ value: "", maxAge: 0, path: CALLBACK });
+  });
+
   it("sucesso: grava cifrado por organização e plataforma, com validade, e audita sem token", async () => {
     const { state, cookie } = await iniciado();
     const r = await voltar(`code=c&state=${encodeURIComponent(state)}`, cookie);

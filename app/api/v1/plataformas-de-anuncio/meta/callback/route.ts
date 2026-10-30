@@ -16,8 +16,9 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { NOME_DO_VINCULO, vinculoConfere } from "@/lib/agenda/google/vinculo";
 import { audit } from "@/lib/audit";
+import { respostaDePonte } from "@/lib/auth/ponte-de-volta";
+import { marcaDaSaida } from "@/lib/branding/saida";
 import { env } from "@/lib/env";
-import { ponteDeVolta } from "@/lib/http/ponte-de-volta";
 import { supportCallbackWriteAllowed } from "@/lib/impersonate/support";
 import { logger } from "@/lib/logger";
 import { gravarConexaoDeLeitura } from "@/lib/plataformas-de-anuncio/gravar-conexao-de-leitura";
@@ -43,11 +44,13 @@ import { cookieSecure } from "@/lib/supabase/cookie-secure";
 
 export const dynamic = "force-dynamic";
 
-function voltar(base: string, params: Record<string, string>): NextResponse {
+async function voltar(base: string, params: Record<string, string>): Promise<NextResponse> {
   const url = new URL("/app/settings/meta-ads", base || "http://localhost:3000");
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   // Ponte 200, não 302: o cookie de sessão Strict não viaja num redirect vindo da Meta/Google.
-  const resposta = ponteDeVolta(url.toString());
+  const marca = await marcaDaSaida(null);
+  const ponte = respostaDePonte(url.toString(), marca.nome, "Voltando…");
+  const resposta = new NextResponse(ponte.body, ponte);
   // Toda saída passa por aqui: o vínculo morre com o fluxo, sucesso ou erro.
   resposta.cookies.set(NOME_DO_VINCULO, "", {
     httpOnly: true,
