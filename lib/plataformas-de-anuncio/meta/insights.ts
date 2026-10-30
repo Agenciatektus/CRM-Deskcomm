@@ -48,7 +48,7 @@
 import { logger } from "@/lib/logger";
 
 import { baseDaGraphDeAnuncio } from "./graph-base";
-import { empresasEscolhidasNoLogin } from "./oauth/escolha-do-login";
+import { escolhaDoLogin, type EscolhaDoLogin } from "./oauth/escolha-do-login";
 import type {
   ContaDeAnuncio,
   FalhaDeLeitura,
@@ -311,7 +311,8 @@ async function buscarPaginado<T>(
       return { ok: false, falha: "transitorio", detalhe: "resposta ilegível da plataforma" };
     }
 
-    acumulado.push(...(json.data ?? []));
+    // Leitura de UM objeto (`act_<id>`) vem sem `data`: vira lista de um.
+    acumulado.push(...(json.data ?? ("id" in json ? [json as unknown as T] : [])));
     // O `next` vem da plataforma e o token segue no header: só se segue um cursor que
     // aponta para a MESMA origem da Graph que a leitura já está usando. Um `next` de
     // outro host (resposta adulterada, base mal configurada) entregaria o token a ele.
@@ -349,6 +350,8 @@ const BMS_EM_PARALELO = 3;
  */
 export async function listarContas(
   token: string,
+  /** A escolha do login já lida (uma por conexão). `undefined` lê sozinho; `null` = sem escolha. */
+  escolha?: EscolhaDoLogin | null,
 ): Promise<ResultadoDeLeitura<ContaDeAnuncio[]>> {
   interface ContaCrua {
     id?: string;
@@ -361,7 +364,7 @@ export async function listarContas(
 
   // Quem marcou BMs no diálogo da Meta vê só elas: sem `me/adaccounts` (traz tudo) e
   // com as contas de cliente (`client_ad_accounts`) de cada BM marcada.
-  const escolhidas = await empresasEscolhidasNoLogin(token);
+  const escolhidas = escolha === undefined ? await escolhaDoLogin(token) : escolha;
 
   const porId = new Map<string, ContaDeAnuncio>();
   const juntar = (lista: ContaCrua[]) => {
@@ -389,31 +392,35 @@ export async function listarContas(
     juntar(minhas.dados);
   }
 
-  // No máximo 20 empresas, 3 por vez; o primeiro erro de cota da Meta encerra a
+  // No máximo 20 empresas, 3 chamadas por vez; o primeiro erro de cota da Meta encerra a
   // varredura e a lista já obtida segue (melhor esforço).
   const empresas = escolhidas
-    ? { ok: true as const, dados: escolhidas.map((id) => ({ id })) }
-    : await listarEmpresas(token);
+    ? { ok: true as const, dados: escolhidas.empresas.map((id) => ({ id })) }
+    : await listarEmpresas(token, null);
+  const bordas = escolhidas ? ["owned_ad_accounts", "client_ad_accounts"] : ["owned_ad_accounts"];
+  const tarefas: Array<{ url: string; contexto: string }> = [];
   if (empresas.ok) {
-    const bms = empresas.dados.slice(0, MAXIMO_DE_BMS);
-    const bordas = escolhidas ? ["owned_ad_accounts", "client_ad_accounts"] : ["owned_ad_accounts"];
-    let cota = false;
-    for (let i = 0; i < bms.length && !cota; i += BMS_EM_PARALELO) {
-      const lote = await Promise.all(
-        bms.slice(i, i + BMS_EM_PARALELO).flatMap((bm) =>
-          bordas.map((borda) =>
-            buscarPaginado<ContaCrua>(
-              montarUrl(`${encodeURIComponent(bm.id)}/${borda}`, { fields: CAMPOS, limit: "100" }),
-              token,
-              borda,
-            ),
-          ),
-        ),
-      );
-      for (const donas of lote) {
-        if (donas.ok) juntar(donas.dados);
-        else if (donas.falha === "limite_de_chamadas") cota = true;
+    for (const bm of empresas.dados.slice(0, MAXIMO_DE_BMS)) {
+      for (const borda of bordas) {
+        tarefas.push({
+          url: montarUrl(`${encodeURIComponent(bm.id)}/${borda}`, { fields: CAMPOS, limit: "100" }),
+          contexto: borda,
+        });
       }
+    }
+  }
+  // Contas marcadas à mão no escopo de anúncios (`ads_read`/`ads_management`).
+  for (const id of escolhidas?.contas ?? []) {
+    tarefas.push({ url: montarUrl(`act_${id}`, { fields: CAMPOS }), contexto: "conta_escolhida" });
+  }
+  let cota = false;
+  for (let i = 0; i < tarefas.length && !cota; i += BMS_EM_PARALELO) {
+    const lote = await Promise.all(
+      tarefas.slice(i, i + BMS_EM_PARALELO).map((t) => buscarPaginado<ContaCrua>(t.url, token, t.contexto)),
+    );
+    for (const donas of lote) {
+      if (donas.ok) juntar(donas.dados);
+      else if (donas.falha === "limite_de_chamadas") cota = true;
     }
   }
 
@@ -423,6 +430,7 @@ export async function listarContas(
 /** As empresas (BM) do usuário. Só ids numéricos seguem para a URL da próxima chamada. */
 export async function listarEmpresas(
   token: string,
+  escolha?: EscolhaDoLogin | null,
 ): Promise<ResultadoDeLeitura<{ id: string; nome: string }[]>> {
   const r = await buscarPaginado<{ id?: string; name?: string }>(
     montarUrl("me/businesses", { fields: "id,name", limit: "100" }),
@@ -430,12 +438,12 @@ export async function listarEmpresas(
     "businesses",
   );
   if (!r.ok) return r;
-  const escolhidas = await empresasEscolhidasNoLogin(token);
+  const escolhidas = escolha === undefined ? await escolhaDoLogin(token) : escolha;
   return {
     ok: true,
     dados: r.dados
       .filter((b): b is { id: string; name?: string } => /^\d+$/.test(b.id ?? ""))
-      .filter((b) => !escolhidas || escolhidas.includes(b.id))
+      .filter((b) => !escolhidas || escolhidas.empresas.includes(b.id))
       .map((b) => ({ id: b.id, nome: b.name ?? b.id })),
   };
 }

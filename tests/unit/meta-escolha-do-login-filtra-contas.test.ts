@@ -20,6 +20,7 @@ function graph(debug: unknown) {
       }
       if (url.includes("me/businesses"))
         return j({ data: [{ id: "10", name: "BM10" }, { id: "11", name: "BM11" }] });
+      if (url.includes("/act_7?")) return j({ id: "act_7", account_id: "7", name: "Marcada" });
       if (url.includes("me/adaccounts")) return j({ data: [{ id: "act_9", account_id: "9" }] });
       if (url.includes("/10/owned_ad_accounts")) return j({ data: [{ id: "act_1", account_id: "1" }] });
       if (url.includes("/10/client_ad_accounts")) return j({ data: [{ id: "act_2", account_id: "2" }] });
@@ -31,11 +32,14 @@ function graph(debug: unknown) {
   return chamadas;
 }
 
-const comGranular = (ids: string[]) => ({
+const comGranular = (ids: string[], contas: string[] = []) => ({
   data: {
     is_valid: true,
     app_id: "111",
-    granular_scopes: [{ scope: "business_management", target_ids: ids }, { scope: "ads_read" }],
+    granular_scopes: [
+      { scope: "business_management", target_ids: ids },
+      { scope: "ads_read", ...(contas.length ? { target_ids: contas } : {}) },
+    ],
   },
 });
 
@@ -50,6 +54,27 @@ describe("a escolha do diálogo da Meta limita empresas e contas", () => {
     expect(chamadas.some((u) => u.includes("/11/"))).toBe(false);
     // o segredo do app não vai para a URL
     expect(chamadas.every((u) => !u.includes("SEGREDO"))).toBe(true);
+  });
+
+  it("com granular: contas marcadas em ads_read entram, lidas por act_<id>, e id não numérico é recusado", async () => {
+    const chamadas = graph(comGranular(["10"], ["7", "../x"]));
+    const r = await listarContas("t");
+    expect(r.ok && r.dados.map((c) => c.id)).toEqual(["act_1", "act_2", "act_7"]);
+    expect(chamadas.some((u) => u.includes("me/adaccounts"))).toBe(false);
+    expect(chamadas.some((u) => u.includes("x?"))).toBe(false);
+  });
+
+  it("escolha passada pelo chamador: debug_token não é chamado de novo", async () => {
+    const chamadas = graph(comGranular(["10"]));
+    const escolha = { empresas: ["10"], contas: [] };
+    await listarContas("t", escolha);
+    await lerIdentidadeDoToken("t", escolha);
+    await listarEmpresas("t", escolha);
+    expect(chamadas.some((u) => u.includes("debug_token"))).toBe(false);
+    // null = sem escolha: comportamento atual, também sem ler sozinho
+    const r = await listarContas("t", null);
+    expect(r.ok && r.dados).toHaveLength(3);
+    expect(chamadas.some((u) => u.includes("debug_token"))).toBe(false);
   });
 
   it("com granular: empresas e identidade só trazem as marcadas", async () => {

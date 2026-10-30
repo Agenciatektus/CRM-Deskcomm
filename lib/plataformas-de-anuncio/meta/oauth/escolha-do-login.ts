@@ -15,7 +15,14 @@ import { configuracaoDoMetaAds } from "./config";
 
 const PRAZO_MS = 10_000;
 
-export async function empresasEscolhidasNoLogin(token: string): Promise<string[] | null> {
+export interface EscolhaDoLogin {
+  /** BMs marcadas (`business_management`). Sempre não vazia: sem elas não há escolha. */
+  empresas: string[];
+  /** Contas de anúncio marcadas à mão em `ads_read`/`ads_management` (ids sem `act_`). */
+  contas: string[];
+}
+
+export async function escolhaDoLogin(token: string): Promise<EscolhaDoLogin | null> {
   const app = configuracaoDoMetaAds();
   if (!app) return null;
   try {
@@ -37,11 +44,17 @@ export async function empresasEscolhidasNoLogin(token: string): Promise<string[]
     const d = corpo.data;
     // Token de outro app não tem a escolha deste diálogo.
     if (!d || d.is_valid !== true || d.app_id !== app.appId) return null;
-    const ids = (d.granular_scopes ?? [])
-      .filter((g) => g.scope === "business_management" && Array.isArray(g.target_ids))
-      .flatMap((g) => g.target_ids as unknown[])
-      .filter((id): id is string => typeof id === "string" && /^\d+$/.test(id));
-    return ids.length > 0 ? [...new Set(ids)] : null;
+    const alvos = (escopos: string[]) =>
+      [
+        ...new Set(
+          (d.granular_scopes ?? [])
+            .filter((g) => g.scope !== undefined && escopos.includes(g.scope) && Array.isArray(g.target_ids))
+            .flatMap((g) => g.target_ids as unknown[])
+            .filter((id): id is string => typeof id === "string" && /^\d+$/.test(id)),
+        ),
+      ];
+    const empresas = alvos(["business_management"]);
+    return empresas.length > 0 ? { empresas, contas: alvos(["ads_read", "ads_management"]) } : null;
   } catch {
     // Mensagem fixa (nada): o erro do fetch pode carregar a URL, e a URL carrega o token.
     return null;
