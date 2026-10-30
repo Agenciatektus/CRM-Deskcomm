@@ -63783,8 +63783,12 @@ notify pgrst, 'reload schema';
 -- organização do bloco, com os ids em metadata.contact_ids (resource_id nulo).
 --
 -- O que muda de propósito: cifra malformada (curta ou sem cara de pacote PGP)
--- devolve cpf nulo para AQUELE contato em vez de levantar, porque o chamador já
--- degradava para coluna vazia e um CPF ruim não pode apagar os outros 499.
+-- devolve cpf nulo para AQUELE contato em vez de levantar. Cifra com cabeçalho
+-- válido e corpo ruim ainda levanta e o bloco sai com a coluna vazia.
+--
+-- Audit e decifração só leem contatos das orgs aprovadas no loop (v_orgs): sem
+-- isso, um CPF gravado ou uma org trocada entre a guarda e o return query
+-- passaria sem checagem (READ COMMITTED vê snapshot novo a cada comando).
 --
 -- Reverter: drop function if exists public.decrypt_cpf_lote(uuid[]);
 
