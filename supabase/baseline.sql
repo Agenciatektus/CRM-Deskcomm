@@ -67341,3 +67341,17 @@ notify pgrst, 'reload schema';
 
 create index if not exists idx_conversations_last_message_preview_trgm
   on public.conversations using gin (last_message_preview public.gin_trgm_ops);
+
+-- ---- Organizador: ultima passada por lead (migration 9091) ----
+-- Mesmo bloco da migration 9091. Nao cria funcao: pode ficar depois da VARREDURA anon.
+create table if not exists public.organizador_passadas (
+  lead_id uuid primary key references public.crm_leads(id) on delete cascade,
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  ultima_msg_em timestamptz,
+  passou_em timestamptz not null default now(),
+  decisao jsonb not null default '{}'::jsonb
+);
+create index if not exists organizador_passadas_org_idx on public.organizador_passadas (organization_id, passou_em desc);
+alter table public.organizador_passadas enable row level security;
+revoke all on table public.organizador_passadas from public, anon, authenticated;
+grant select, insert, update on table public.organizador_passadas to service_role;
