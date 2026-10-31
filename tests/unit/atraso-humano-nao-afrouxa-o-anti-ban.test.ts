@@ -169,6 +169,9 @@ describe("fiação — o \"digitando…\" cobre o turno inteiro até a 1ª bolha
     const aviso = FONTE_EQUIPE.indexOf("avisarLeadDaEscalacao(", tool);
     expect(aviso).toBeGreaterThan(tool);
     expect(FONTE_EQUIPE.slice(tool, aviso)).toMatch(/^\s*pararDigitando\(\);$/m);
+    // A ferramenta é criada ANTES de `pararDigitando` ser reatribuído (S6 do ADR-0006):
+    // passar a função direto congelaria o no-op inicial. A seta lê o valor na hora.
+    expect(FONTE_INBOUND).toMatch(/criarRequestHumanHandoff\([^)]*pararDigitando: \(\) => pararDigitando\(\)/);
   });
 });
 
