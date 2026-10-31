@@ -14,9 +14,9 @@ const FONTE_INBOUND = fs.readFileSync(
   path.join(process.cwd(), "lib/agent-engine/agent/inbound-turn.ts"),
   "utf8",
 );
-// F13 (reagendamento por cap) mora em `turno/efeitos-pos-turno.ts` desde a S3 do ADR-0006.
+// F13 (reagendamento por cap) mora em `turno/desfecho-do-envio.ts` desde a S3 do ADR-0006.
 const FONTE_EFEITOS = fs.readFileSync(
-  path.join(process.cwd(), "lib/agent-engine/agent/turno/efeitos-pos-turno.ts"),
+  path.join(process.cwd(), "lib/agent-engine/agent/turno/desfecho-do-envio.ts"),
   "utf8",
 );
 const FONTE_INGEST = fs.readFileSync(path.join(process.cwd(), "lib/waha/ingest.ts"), "utf8");

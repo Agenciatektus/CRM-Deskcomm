@@ -269,8 +269,8 @@ describe("as duas perguntas tipadas", () => {
  * em toda mensagem, ou junto com a regex.
  */
 describe("efeitos pós-turno: só no ramo represado, e só depois da regex dizer não", () => {
-  // F13 mora em `turno/efeitos-pos-turno.ts` desde a S3 do ADR-0006.
-  const fonte = readFileSync("lib/agent-engine/agent/turno/efeitos-pos-turno.ts", "utf8");
+  // F13 mora em `turno/desfecho-do-envio.ts` desde a S3 do ADR-0006.
+  const fonte = readFileSync("lib/agent-engine/agent/turno/desfecho-do-envio.ts", "utf8");
   const orquestrador = readFileSync("lib/agent-engine/agent/inbound-turn.ts", "utf8");
 
   it("o orquestrador não pergunta ao modelo por conta própria: só chama a F13, uma vez", () => {
