@@ -337,7 +337,7 @@ const CENARIOS: Record<string, Cenario> = {
   "roteamento: condução encerrada no meio-tempo": {
     conducao: { id: "77777777-7777-4777-8777-777777777777" },
   },
-  "roteamento: roteador decide, grava a decisão e move o card": {
+  "roteamento: roteador decide e grava a decisão (destino do card cai no catch)": {
     roteador: {
       routerId: "88888888-8888-4888-8888-888888888888", intentName: "orcamento", confidence: 0.9,
       outcome: "matched", destinationPipelineId: "99999999-9999-4999-8999-999999999999", destinationStageId: null,
