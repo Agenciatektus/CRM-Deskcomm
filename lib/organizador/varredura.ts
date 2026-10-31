@@ -77,7 +77,7 @@ export async function organizaLead(
         and m.conversation_id = (select c.id from conversations c
                                   where c.organization_id = $1 and c.contact_id = $2
                                   order by c.last_message_at desc nulls last limit 1)
-        and m.direction = 'outbound'
+        and m.direction in ('inbound', 'outbound')
       order by m.sent_at desc limit ${MENSAGENS_LIDAS}`,
     [organizationId, lead.contact_id],
   );
@@ -179,7 +179,7 @@ export async function leadsParaOrganizar(
        join lateral (select max(m.sent_at) as ultima
                        from messages m join conversations c on c.id = m.conversation_id
                       where c.organization_id = l.organization_id and c.contact_id = l.contact_id
-                        and m.direction = 'outbound') u on true
+                        and m.direction in ('inbound', 'outbound')) u on true
        left join organizador_passadas p on p.lead_id = l.id
       where l.organization_id = $1 and l.status = 'open' and l.pipeline_id = any($2::uuid[])
         and u.ultima is not null
