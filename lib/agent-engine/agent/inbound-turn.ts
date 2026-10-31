@@ -115,6 +115,7 @@ import {
 import {
   applyRequestHumanHandoff,
   buildHandoffSummary,
+  validarPayloadDoHandoff,
   detectAmbiguousOptOut,
   detectHumanHandoffRequest,
   isLeadInHandoff,
@@ -3870,6 +3871,10 @@ async function executarTurnoDoAgente(
     request_human_handoff: tool({
       ...AGENT_TOOL_DEFS.request_human_handoff,
       execute: async (raw) => {
+        // Payload recusado não passa a conversa: valida ANTES de avisar o lead, senão
+        // ele ouve "já estou chamando alguém da equipe" e ninguém é chamado.
+        const payload = validarPayloadDoHandoff(raw);
+        if (!payload.ok) return payload;
         passouParaAEquipe = true;
         // A conversa vai para a equipe: o robô não fala mais neste turno. O aviso
         // do piso logo abaixo sai pelo canal SEM passar pelos `send` que param a
