@@ -314,7 +314,7 @@ const CENARIOS: Record<string, Cenario> = {
   "erro do modelo: provedor fora": { modeloFalha: new Error("upstream 503") },
   // F13 com os ramos ligados (ADR-0006, S3): Operador enfileirado, checkpoint que muda
   // (emissão), negócio ativo (nota), divergência classificador×modelo (golden).
-  "pós-turno: Operador, emissão, nota e golden": {
+  "pós-turno: tentativa do Operador, emissão e golden (nota fora do rastro)": {
     agente: { operatorEnabled: true },
     knobs: { goldenCandidates: true, stageClassifier: {} },
     comNegocio: true,

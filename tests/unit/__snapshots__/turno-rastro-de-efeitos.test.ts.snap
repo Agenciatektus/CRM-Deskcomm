@@ -118,7 +118,7 @@ exports[`rastro de efeitos do turno (ADR-0006, S0) > portão: lead em handoff hu
 ]
 `;
 
-exports[`rastro de efeitos do turno (ADR-0006, S0) > pós-turno: Operador, emissão, nota e golden 1`] = `
+exports[`rastro de efeitos do turno (ADR-0006, S0) > pós-turno: tentativa do Operador, emissão e golden (nota fora do rastro) 1`] = `
 [
   "db:update agent_inbox_items status='resolved'",
   "llm:stage_classifier",
