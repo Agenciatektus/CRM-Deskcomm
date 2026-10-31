@@ -188,7 +188,7 @@ export function montarArgumentosDoEnvio(
       // do turno (a checagem de `max_sends_per_turn` acima roda uma vez, antes).
       // O resto é medido ANTES DE CADA FOTO, depois do texto: o texto acima do
       // teto de legenda sai à parte e também gasta o teto.
-      return enviarComFotos(finalBody, [], {
+      return enviarComFotos(finalBody, fotosDoProduto, {
         sleep,
         jitter,
         restantes: () => maxSendsPerTurn - estado.seq,
