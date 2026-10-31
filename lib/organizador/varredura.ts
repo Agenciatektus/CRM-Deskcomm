@@ -114,7 +114,7 @@ export async function organizaLead(
     return { leadId, decisao: { mover: false, porque: "saida_ilegivel" }, aplicado: false };
   }
 
-  const decisao = decide(saida.data, etapas, lead.stage_id, motivos);
+  const decisao = decide(saida.data, etapas, lead.stage_id, motivos, historico);
   let aplicado = false;
   let recusa: string | undefined;
   if (decisao.mover && !dryRun) {
